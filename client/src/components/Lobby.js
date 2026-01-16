@@ -1,15 +1,40 @@
 import React, { useEffect, useState } from "react";
 import "./Lobby.css";
 
+// 게임 목록
+const GAMES = [
+  {
+    id: "clickBattle",
+    name: "클릭 대결",
+    description: "30초 동안 최대한 많이 클릭하세요!",
+    icon: "👆",
+    minPlayers: 1,
+  },
+  // 추후 추가할 게임들
+  // {
+  //   id: "typingRace",
+  //   name: "타이핑 레이스",
+  //   description: "빠르게 타이핑하세요!",
+  //   icon: "⌨️",
+  //   minPlayers: 2,
+  // },
+];
+
 function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [playerName, setPlayerName] = useState("");
   const [currentRoom, setCurrentRoom] = useState(room);
+  const [selectedGame, setSelectedGame] = useState(
+    currentRoom?.selectedGame || GAMES[0].id
+  );
   const isHost = currentRoom?.players[0]?.id === socket.id;
 
   useEffect(() => {
     // 방 업데이트 수신
     socket.on("roomUpdated", (updatedRoom) => {
       setCurrentRoom(updatedRoom);
+      if (updatedRoom.selectedGame) {
+        setSelectedGame(updatedRoom.selectedGame);
+      }
     });
 
     // 게임 시작 수신
@@ -40,9 +65,22 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     }
   };
 
+  const handleGameSelect = (gameId) => {
+    if (isHost) {
+      setSelectedGame(gameId);
+      socket.emit("selectGame", {
+        roomId: currentRoom.id,
+        gameId: gameId,
+      });
+    }
+  };
+
   const handleStartGame = () => {
     if (isHost && currentRoom.players.length > 0) {
-      socket.emit("startGame", { roomId: currentRoom.id });
+      socket.emit("startGame", {
+        roomId: currentRoom.id,
+        gameType: selectedGame,
+      });
     }
   };
 
@@ -122,6 +160,30 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
               />
               <button onClick={handleUpdateName}>변경</button>
             </div>
+          </div>
+        </div>
+
+        <div className="game-selection-section">
+          <h2>게임 선택</h2>
+          <div className="games-list">
+            {GAMES.map((game) => (
+              <div
+                key={game.id}
+                className={`game-item ${
+                  selectedGame === game.id ? "selected" : ""
+                } ${!isHost ? "disabled" : ""}`}
+                onClick={() => isHost && handleGameSelect(game.id)}
+              >
+                <div className="game-icon">{game.icon}</div>
+                <div className="game-info">
+                  <div className="game-name">{game.name}</div>
+                  <div className="game-description">{game.description}</div>
+                </div>
+                {selectedGame === game.id && (
+                  <div className="selected-badge">✓</div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 

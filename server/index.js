@@ -209,6 +209,7 @@ io.on("connection", (socket) => {
       }],
       maxPlayers: maxPlayers || 4,
       status: "waiting",
+      selectedGame: "clickBattle", // 기본 게임
     };
 
     rooms.set(roomId, newRoom);
@@ -280,16 +281,31 @@ io.on("connection", (socket) => {
     }
   });
 
+  // 게임 선택
+  socket.on("selectGame", ({ roomId, gameId }) => {
+    const room = rooms.get(roomId);
+    if (room && room.players[0].id === socket.id) {
+      // 방장만 게임 선택 가능
+      room.selectedGame = gameId;
+      io.to(roomId).emit("roomUpdated", room);
+      console.log(`게임 선택: ${roomId} -> ${gameId}`);
+    }
+  });
+
   // 게임 시작
-  socket.on("startGame", ({ roomId }) => {
+  socket.on("startGame", ({ roomId, gameType = "clickBattle" }) => {
     const room = rooms.get(roomId);
     if (room && room.players.length > 0) {
       // 방장만 게임 시작 가능 (첫 번째 플레이어)
       if (room.players[0].id === socket.id) {
         room.status = "playing";
         
+        // 선택된 게임 타입 저장
+        room.selectedGame = gameType;
+        
         // 게임 상태 초기화
         const gameState = {
+          gameType: gameType,
           startTime: Date.now(),
           duration: 30000, // 30초
           clicks: {},
