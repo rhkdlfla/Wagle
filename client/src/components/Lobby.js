@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import "./Lobby.css";
 
 // 게임 목록
@@ -26,6 +27,8 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [selectedGame, setSelectedGame] = useState(
     currentRoom?.selectedGame || GAMES[0].id
   );
+  const [copied, setCopied] = useState(false);
+  const location = useLocation();
   const isHost = currentRoom?.players[0]?.id === socket.id;
 
   useEffect(() => {
@@ -88,6 +91,31 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     socket.emit("leaveRoom", { roomId: currentRoom.id });
   };
 
+  const handleCopyInviteLink = async () => {
+    const inviteLink = `${window.location.origin}${location.pathname}`;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // 클립보드 API가 지원되지 않는 경우 대체 방법
+      const textArea = document.createElement("textarea");
+      textArea.value = inviteLink;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        alert("링크 복사에 실패했습니다. 수동으로 복사해주세요: " + inviteLink);
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
   if (!currentRoom) {
     return null;
   }
@@ -100,6 +128,13 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
           <span className="room-name-badge">{currentRoom.name}</span>
           <span className="room-id">방 ID: {currentRoom.id.substring(0, 15)}...</span>
         </div>
+        <button
+          onClick={handleCopyInviteLink}
+          className="invite-link-button"
+          title="초대 링크 복사"
+        >
+          {copied ? "✓ 복사됨!" : "🔗 초대 링크 복사"}
+        </button>
       </div>
 
       <div className="lobby-content">

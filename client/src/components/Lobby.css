@@ -22,6 +22,7 @@
   align-items: center;
   gap: 15px;
   flex-wrap: wrap;
+  margin-bottom: 15px;
 }
 
 .room-name-badge {
@@ -39,6 +40,29 @@
   font-size: 0.9rem;
   opacity: 0.8;
   font-family: monospace;
+}
+
+.invite-link-button {
+  padding: 10px 20px;
+  background: rgba(33, 150, 243, 0.8);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 10px;
+}
+
+.invite-link-button:hover {
+  background: rgba(33, 150, 243, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+}
+
+.invite-link-button:active {
+  transform: translateY(0);
 }
 
 .lobby-content {

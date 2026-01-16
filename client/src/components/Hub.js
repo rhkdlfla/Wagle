@@ -5,6 +5,7 @@ function Hub({ socket, onJoinRoom, user }) {
   const [roomList, setRoomList] = useState([]);
   const [roomName, setRoomName] = useState("");
   const [maxPlayers, setMaxPlayers] = useState(4);
+  const [isPublic, setIsPublic] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
@@ -16,7 +17,7 @@ function Hub({ socket, onJoinRoom, user }) {
       setRoomList(rooms);
     });
 
-    // 방 생성 성공
+    // 방 생성 성공 (이제 라우터로 처리하므로 여기서는 처리하지 않음)
     socket.on("roomCreated", (room) => {
       setIsCreating(false);
       onJoinRoom(room);
@@ -29,12 +30,13 @@ function Hub({ socket, onJoinRoom, user }) {
   }, [socket, onJoinRoom]);
 
   const handleCreateRoom = () => {
-    if (roomName.trim() === "") {
-      alert("방 이름을 입력해주세요!");
-      return;
-    }
     setIsCreating(true);
-    socket.emit("createRoom", { roomName: roomName.trim(), maxPlayers });
+    // 방 이름이 비어있으면 빈 문자열로 전송 (서버에서 랜덤 이름 생성)
+    socket.emit("createRoom", { 
+      roomName: roomName.trim() || "", 
+      maxPlayers,
+      isPublic 
+    });
   };
 
   const handleJoinRoom = (roomId) => {
@@ -71,7 +73,7 @@ function Hub({ socket, onJoinRoom, user }) {
           <div className="create-room-form">
             <input
               type="text"
-              placeholder="방 이름을 입력하세요"
+              placeholder="방 이름을 입력하세요 (비워두면 랜덤 이름 생성)"
               value={roomName}
               onChange={(e) => setRoomName(e.target.value)}
               maxLength={20}
@@ -86,6 +88,33 @@ function Hub({ socket, onJoinRoom, user }) {
                 <option value={3}>3명</option>
                 <option value={4}>4명</option>
               </select>
+            </div>
+            <div className="room-visibility">
+              <label>방 공개 여부:</label>
+              <div className="visibility-options">
+                <label className="visibility-option">
+                  <input
+                    type="radio"
+                    name="visibility"
+                    value="public"
+                    checked={isPublic}
+                    onChange={() => setIsPublic(true)}
+                  />
+                  <span>🌐 공개</span>
+                  <small>방 목록에 표시됨</small>
+                </label>
+                <label className="visibility-option">
+                  <input
+                    type="radio"
+                    name="visibility"
+                    value="private"
+                    checked={!isPublic}
+                    onChange={() => setIsPublic(false)}
+                  />
+                  <span>🔒 비공개</span>
+                  <small>링크로만 입장 가능</small>
+                </label>
+              </div>
             </div>
             <button
               onClick={handleCreateRoom}

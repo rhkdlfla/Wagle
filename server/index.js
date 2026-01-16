@@ -165,15 +165,17 @@ const rooms = new Map(); // roomId -> { id, name, players: [], maxPlayers: 4, st
 // 게임 상태 관리
 const gameStates = new Map(); // roomId -> { startTime, duration, clicks: { socketId: count }, isActive }
 
-// 방 목록 조회
+// 방 목록 조회 (공개 방만)
 function getRoomList() {
-  return Array.from(rooms.values()).map((room) => ({
-    id: room.id,
-    name: room.name,
-    playerCount: room.players.length,
-    maxPlayers: room.maxPlayers,
-    status: room.status,
-  }));
+  return Array.from(rooms.values())
+    .filter((room) => room.isPublic !== false) // 비공개 방 제외
+    .map((room) => ({
+      id: room.id,
+      name: room.name,
+      playerCount: room.players.length,
+      maxPlayers: room.maxPlayers,
+      status: room.status,
+    }));
 }
 
 io.on("connection", (socket) => {
@@ -192,14 +194,58 @@ io.on("connection", (socket) => {
     socket.emit("roomList", getRoomList());
   });
 
+  // 랜덤 방 이름 생성 함수
+  function generateRandomRoomName() {
+    const adjectives = [
+      "멋진", "재미있는", "신나는", "즐거운", "화려한", "빠른", "강한", "똑똑한",
+      "용감한", "친절한", "활발한", "차분한", "밝은", "신비로운", "특별한", "멋쟁이",
+      "최고의", "대단한", "훌륭한", "완벽한", "놀라운", "인기있는", "유명한", "독특한"
+    ];
+    const nouns = [
+      "게임방", "파티룸", "모임방", "대전방", "경기장", "플레이룸", "배틀존", "챌린지",
+      "아레나", "스타디움", "콜로세움", "경기장", "플레이그라운드", "배틀필드", "워존",
+      "게임존", "플레이존", "배틀룸", "챌린지룸", "대전장", "경쟁장", "플레이스페이스"
+    ];
+    
+    const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+    const randomNumber = Math.floor(Math.random() * 999) + 1;
+    
+    return `${randomAdjective} ${randomNoun} ${randomNumber}`;
+  }
+
   // 방 생성
-  socket.on("createRoom", ({ roomName, maxPlayers = 4 }) => {
+  socket.on("createRoom", ({ roomName, maxPlayers = 4, isPublic = true }) => {
+    // 이전 방에서 나가기 (다른 방에 있으면 먼저 나감)
+    let previousRooms = [];
+    rooms.forEach((room, existingRoomId) => {
+      const existingPlayer = room.players.find((p) => p.id === socket.id);
+      if (existingPlayer) {
+        previousRooms.push(existingRoomId);
+        room.players = room.players.filter((p) => p.id !== socket.id);
+        socket.leave(existingRoomId);
+        
+        // 방에 플레이어가 없으면 방 삭제
+        if (room.players.length === 0) {
+          rooms.delete(existingRoomId);
+        } else {
+          io.to(existingRoomId).emit("roomUpdated", room);
+        }
+      }
+    });
+    
     const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const currentUser = user || null;
     const playerName = currentUser ? currentUser.name : `플레이어 ${socket.id.substring(0, 6)}`;
+    
+    // 방 이름이 없으면 랜덤 이름 생성
+    const finalRoomName = roomName && roomName.trim() 
+      ? roomName.trim() 
+      : generateRandomRoomName();
+    
     const newRoom = {
       id: roomId,
-      name: roomName || `방 ${rooms.size + 1}`,
+      name: finalRoomName,
       players: [{ 
         id: socket.id, 
         name: playerName,
@@ -210,6 +256,7 @@ io.on("connection", (socket) => {
       maxPlayers: maxPlayers || 4,
       status: "waiting",
       selectedGame: "clickBattle", // 기본 게임
+      isPublic: isPublic !== false, // 기본값은 true (공개)
     };
 
     rooms.set(roomId, newRoom);
@@ -221,18 +268,47 @@ io.on("connection", (socket) => {
 
   // 방 입장
   socket.on("joinRoom", ({ roomId }) => {
+    // 이전 방에서 나가기 (다른 방에 있으면 먼저 나감)
+    let previousRooms = [];
+    rooms.forEach((existingRoom, existingRoomId) => {
+      if (existingRoomId !== roomId) {
+        const existingPlayer = existingRoom.players.find((p) => p.id === socket.id);
+        if (existingPlayer) {
+          previousRooms.push(existingRoomId);
+          existingRoom.players = existingRoom.players.filter((p) => p.id !== socket.id);
+          socket.leave(existingRoomId);
+          
+          // 방에 플레이어가 없으면 방 삭제
+          if (existingRoom.players.length === 0) {
+            rooms.delete(existingRoomId);
+          } else {
+            io.to(existingRoomId).emit("roomUpdated", existingRoom);
+          }
+        }
+      }
+    });
+    
     const room = rooms.get(roomId);
     if (!room) {
       socket.emit("joinRoomError", { message: "방을 찾을 수 없습니다." });
       return;
     }
 
+    // 비공개 방인 경우 링크로만 입장 가능 (방 목록에 표시되지 않으므로 링크로만 접근 가능)
+    // 추가 검증은 필요 없음 (이미 방 목록에서 필터링됨)
+
     if (room.players.length >= room.maxPlayers) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/80805081-a969-4bd3-8dce-3883cd4dfc97',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:286',message:'방이 가득 참',data:{socketId:socket.id,roomId,playerCount:room.players.length,maxPlayers:room.maxPlayers},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       socket.emit("joinRoomError", { message: "방이 가득 찼습니다." });
       return;
     }
 
     if (room.status === "playing") {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/80805081-a969-4bd3-8dce-3883cd4dfc97',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:292',message:'게임 진행 중',data:{socketId:socket.id,roomId,status:room.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       socket.emit("joinRoomError", { message: "이미 게임이 진행 중인 방입니다." });
       return;
     }
@@ -240,7 +316,15 @@ io.on("connection", (socket) => {
     // 이미 방에 있는지 확인
     const existingPlayer = room.players.find((p) => p.id === socket.id);
     if (existingPlayer) {
-      socket.emit("joinRoomError", { message: "이미 방에 있습니다." });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/80805081-a969-4bd3-8dce-3883cd4dfc97',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:299',message:'이미 방에 있음 - 성공 응답 반환',data:{socketId:socket.id,roomId,existingPlayerId:existingPlayer.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      // 이미 방에 있으면 에러 대신 현재 방 정보 반환 (중복 입장 허용)
+      socket.join(roomId);
+      socket.emit("joinedRoom", room);
+      io.to(roomId).emit("roomUpdated", room);
+      io.emit("roomList", getRoomList());
+      console.log(`${socket.id}가 이미 방 ${roomId}에 있었지만 재입장 처리됨`);
       return;
     }
 
@@ -254,6 +338,11 @@ io.on("connection", (socket) => {
       photo: currentUser?.photo || null,
     });
     socket.join(roomId);
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/80805081-a969-4bd3-8dce-3883cd4dfc97',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:310',message:'방 입장 완료',data:{socketId:socket.id,roomId,playerCount:room.players.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
     socket.emit("joinedRoom", room);
     io.to(roomId).emit("roomUpdated", room); // 방의 모든 플레이어에게 업데이트
     io.emit("roomList", getRoomList()); // 모든 클라이언트에 방 목록 업데이트
