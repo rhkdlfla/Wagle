@@ -120,6 +120,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+const SERVER_URL = process.env.SERVER_URL || "http://localhost:4000";
 
 // CORS 설정 (세션 쿠키 포함)
 app.use(
@@ -154,7 +155,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: "/auth/google/callback",
+        callbackURL: `${SERVER_URL}/auth/google/callback`,
       },
       // [수정] 구글 로그인 시 DB 조회 및 저장 로직 적용
       async (accessToken, refreshToken, profile, done) => {
@@ -190,12 +191,15 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 
 // 카카오 OAuth 전략
 if (process.env.KAKAO_CLIENT_ID) {
+  const kakaoCallbackURL = `${SERVER_URL}/auth/kakao/callback`;
+  console.log("🔗 카카오 콜백 URL:", kakaoCallbackURL);
+  console.log("   → 카카오 개발자 콘솔에 이 URL을 리다이렉트 URI로 등록하세요!");
   passport.use(
     "kakao",
     new KakaoStrategy(
       {
         clientID: process.env.KAKAO_CLIENT_ID,
-        callbackURL: "/auth/kakao/callback",
+        callbackURL: kakaoCallbackURL,
       },
       // [수정] 카카오 로그인 시 DB 조회 및 저장 로직 적용
       async (accessToken, refreshToken, profile, done) => {
@@ -241,7 +245,9 @@ app.get(
 );
 
 app.get("/auth/kakao", (req, res, next) => {
+  console.log("🔵 카카오 로그인 시도");
   if (!process.env.KAKAO_CLIENT_ID) {
+    console.error("❌ KAKAO_CLIENT_ID 미설정");
     return res.redirect(`${CLIENT_URL}/login?error=kakao_config`);
   }
   passport.authenticate("kakao")(req, res, next);
@@ -250,13 +256,44 @@ app.get("/auth/kakao", (req, res, next) => {
 app.get(
   "/auth/kakao/callback",
   (req, res, next) => {
+    console.log("🔄 카카오 콜백 수신:", req.query);
     if (!process.env.KAKAO_CLIENT_ID) {
+      console.error("❌ KAKAO_CLIENT_ID 미설정");
       return res.redirect(`${CLIENT_URL}/login?error=kakao_config`);
     }
-    passport.authenticate("kakao", { failureRedirect: `${CLIENT_URL}/login?error=kakao` })(req, res, next);
-  },
-  (req, res) => {
-    res.redirect(`${CLIENT_URL}/auth/success`);
+    passport.authenticate(
+      "kakao",
+      {
+        failureRedirect: `${CLIENT_URL}/login?error=kakao`,
+        failureFlash: false,
+      },
+      (err, user, info) => {
+        if (err) {
+          console.error("❌ 카카오 인증 에러:", err);
+          console.error("   에러 상세:", err.message, err.stack);
+          return res.redirect(`${CLIENT_URL}/login?error=kakao`);
+        }
+        if (!user) {
+          console.error("❌ 카카오 인증 실패: 사용자 정보 없음");
+          console.error("   정보:", info);
+          return res.redirect(`${CLIENT_URL}/login?error=kakao`);
+        }
+        console.log("✅ 카카오 사용자 정보 수신:", {
+          id: user.id || user._id,
+          name: user.name,
+          provider: user.provider
+        });
+        req.logIn(user, (loginErr) => {
+          if (loginErr) {
+            console.error("❌ 카카오 로그인 세션 생성 에러:", loginErr);
+            return res.redirect(`${CLIENT_URL}/login?error=kakao`);
+          }
+          console.log("✅ 카카오 로그인 성공:", user.name);
+          console.log("   리다이렉트:", `${CLIENT_URL}/auth/success`);
+          res.redirect(`${CLIENT_URL}/auth/success`);
+        });
+      }
+    )(req, res, next);
   }
 );
 
@@ -276,8 +313,12 @@ app.get("/auth/logout", (req, res) => {
 // 현재 사용자 정보 조회
 app.get("/auth/user", (req, res) => {
   if (req.isAuthenticated()) {
+    console.log("✅ 인증된 사용자:", req.user.name, `(${req.user.provider})`);
     res.json({ user: req.user, authenticated: true });
   } else {
+    console.log("❌ 인증되지 않은 사용자 요청");
+    console.log("   세션 ID:", req.sessionID);
+    console.log("   세션 데이터:", req.session);
     res.json({ user: null, authenticated: false });
   }
 });
