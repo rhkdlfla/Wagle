@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import "./Lobby.css";
 
@@ -28,6 +28,9 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     currentRoom?.selectedGame || GAMES[0].id
   );
   const [copied, setCopied] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [messageInput, setMessageInput] = useState("");
+  const messagesEndRef = useRef(null);
   const location = useLocation();
   const isHost = currentRoom?.players[0]?.id === socket.id;
 
@@ -51,12 +54,29 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       onLeaveRoom();
     });
 
+    // 채팅 메시지 수신
+    socket.on("messageReceived", (messageData) => {
+      setMessages((prev) => [...prev, messageData]);
+    });
+
+    // 메시지 에러 수신
+    socket.on("messageError", ({ message }) => {
+      console.error("채팅 에러:", message);
+    });
+
     return () => {
       socket.off("roomUpdated");
       socket.off("gameStarted");
       socket.off("leftRoom");
+      socket.off("messageReceived");
+      socket.off("messageError");
     };
   }, [socket, onLeaveRoom, onStartGame]);
+
+  // 메시지 목록이 업데이트될 때마다 스크롤을 맨 아래로
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleUpdateName = () => {
     if (playerName.trim() !== "") {
@@ -116,6 +136,23 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     }
   };
 
+  const handleSendMessage = () => {
+    if (messageInput.trim() && currentRoom) {
+      socket.emit("sendMessage", {
+        roomId: currentRoom.id,
+        message: messageInput.trim(),
+      });
+      setMessageInput("");
+    }
+  };
+
+  const formatTime = (timestamp) => {
+    const date = new Date(timestamp);
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
   if (!currentRoom) {
     return null;
   }
@@ -138,6 +175,65 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       </div>
 
       <div className="lobby-content">
+        <div className="chat-section">
+          <h2>💬 채팅</h2>
+          <div className="chat-messages">
+            {messages.length === 0 ? (
+              <div className="chat-empty">아직 메시지가 없습니다.</div>
+            ) : (
+              messages.map((msg) => {
+                const isMyMessage = msg.playerId === socket.id;
+                return (
+                  <div
+                    key={msg.id}
+                    className={`chat-message ${isMyMessage ? "my-message" : ""}`}
+                  >
+                    {!isMyMessage && (
+                      <div className="message-sender">
+                        {msg.playerPhoto ? (
+                          <img
+                            src={msg.playerPhoto}
+                            alt={msg.playerName}
+                            className="message-avatar"
+                          />
+                        ) : (
+                          <div className="message-avatar-placeholder">
+                            {msg.playerName.charAt(0)}
+                          </div>
+                        )}
+                        <span className="message-player-name">{msg.playerName}</span>
+                      </div>
+                    )}
+                    <div className="message-content">
+                      <p>{msg.message}</p>
+                      <span className="message-time">{formatTime(msg.timestamp)}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+          <div className="chat-input-group">
+            <input
+              type="text"
+              placeholder="메시지를 입력하세요..."
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              maxLength={500}
+            />
+            <button onClick={handleSendMessage} disabled={!messageInput.trim()}>
+              전송
+            </button>
+          </div>
+        </div>
+
         <div className="players-section">
           <h2>플레이어 목록 ({currentRoom.players.length}/{currentRoom.maxPlayers})</h2>
           <div className="players-list">
