@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import io from "socket.io-client";
 import Hub from "./components/Hub";
 import Lobby from "./components/Lobby";
 import Login from "./components/Login";
+import ClickBattle from "./components/ClickBattle";
+import AppleBattle from "./components/AppleBattle";
 import "./App.css";
 
 // 서버 주소 (nginx를 통해 /api 경로로 접근)
@@ -12,10 +15,222 @@ const socket = io.connect("", {
   withCredentials: true,
 });
 
+// 메인 게임 컴포넌트 (인증 필요)
+function GameApp({ socket, user, onLogout }) {
+  const navigate = useNavigate();
+
+  const handleJoinRoom = (room) => {
+    navigate(`/room/${room.id}`);
+  };
+
+  const handleLeaveRoom = () => {
+    navigate("/");
+  };
+
+  const handleStartGame = (room) => {
+    navigate(`/room/${room.id}/game`);
+  };
+
+  return (
+    <div className="App">
+      <div className="user-header">
+        <div className="user-info">
+          {user.photo && (
+            <img src={user.photo} alt={user.name} className="user-avatar" />
+          )}
+          <span className="user-name">{user.name}</span>
+          <span className="user-provider">
+            {user.provider === "google" ? "🔵" : user.provider === "kakao" ? "🟡" : "👤"}
+          </span>
+          {user.provider === "guest" && (
+            <span className="guest-badge">게스트</span>
+          )}
+        </div>
+        <button onClick={onLogout} className="logout-button">
+          로그아웃
+        </button>
+      </div>
+
+      <Routes>
+        <Route
+          path="/"
+          element={<Hub socket={socket} onJoinRoom={handleJoinRoom} user={user} />}
+        />
+        <Route
+          path="/room/:roomId"
+          element={
+            <RoomLobby
+              socket={socket}
+              onLeaveRoom={handleLeaveRoom}
+              onStartGame={handleStartGame}
+              user={user}
+            />
+          }
+        />
+        <Route
+          path="/room/:roomId/game"
+          element={<RoomGame socket={socket} user={user} />}
+        />
+      </Routes>
+    </div>
+  );
+}
+
+// 방 로비 컴포넌트
+function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
+  const { roomId } = useParams();
+  const navigate = useNavigate();
+  const [room, setRoom] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const hasJoinedRef = useRef(false);
+  const currentRoomIdRef = useRef(null);
+
+  useEffect(() => {
+    // 이벤트 리스너는 항상 등록 (중복 등록 방지를 위해 먼저 제거)
+    socket.off("joinedRoom");
+    socket.off("joinRoomError");
+    socket.off("roomUpdated");
+    socket.off("gameStarted");
+    socket.off("leftRoom");
+
+    socket.on("joinedRoom", (roomData) => {
+      setRoom(roomData);
+      setIsLoading(false);
+    });
+
+    socket.on("joinRoomError", ({ message }) => {
+      alert(message);
+      navigate("/");
+    });
+
+    socket.on("roomUpdated", (updatedRoom) => {
+      setRoom(updatedRoom);
+    });
+
+    socket.on("gameStarted", ({ room: gameRoom }) => {
+      setRoom(gameRoom);
+      onStartGame(gameRoom);
+    });
+
+    socket.on("leftRoom", () => {
+      onLeaveRoom();
+    });
+
+    // roomId가 변경되면 리셋하고 입장 시도
+    if (currentRoomIdRef.current !== roomId) {
+      hasJoinedRef.current = false;
+      currentRoomIdRef.current = roomId;
+      setIsLoading(true);
+    }
+
+    // 이미 입장 시도를 했다면 다시 호출하지 않음
+    if (!hasJoinedRef.current) {
+      // 방 입장 시도
+      hasJoinedRef.current = true;
+      socket.emit("joinRoom", { roomId });
+    }
+
+    return () => {
+      socket.off("joinedRoom");
+      socket.off("joinRoomError");
+      socket.off("roomUpdated");
+      socket.off("gameStarted");
+      socket.off("leftRoom");
+    };
+  }, [socket, roomId, navigate, onLeaveRoom, onStartGame]);
+
+  if (isLoading) {
+    return (
+      <div className="connection-status">
+        <h2>방 입장 중...</h2>
+        <p>잠시만 기다려주세요.</p>
+      </div>
+    );
+  }
+
+  if (!room) {
+    return (
+      <div className="connection-status">
+        <h2>방을 찾을 수 없습니다.</h2>
+        <button onClick={() => navigate("/")}>홈으로 돌아가기</button>
+      </div>
+    );
+  }
+
+  return (
+    <Lobby
+      socket={socket}
+      room={room}
+      onLeaveRoom={onLeaveRoom}
+      onStartGame={onStartGame}
+      user={user}
+    />
+  );
+}
+
+// 게임 컴포넌트
+function RoomGame({ socket, user }) {
+  const { roomId } = useParams();
+  const navigate = useNavigate();
+  const [room, setRoom] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // 게임 상태 요청
+    if (roomId) {
+      socket.emit("getGameState", { roomId });
+    }
+
+    socket.on("gameStarted", ({ room: gameRoom }) => {
+      setRoom(gameRoom);
+      setIsLoading(false);
+    });
+
+    socket.on("roomUpdated", (updatedRoom) => {
+      setRoom(updatedRoom);
+    });
+
+    return () => {
+      socket.off("gameStarted");
+      socket.off("roomUpdated");
+    };
+  }, [socket, roomId]);
+
+  if (isLoading || !room) {
+    return (
+      <div className="connection-status">
+        <h2>게임 로딩 중...</h2>
+        <p>잠시만 기다려주세요.</p>
+      </div>
+    );
+  }
+
+  const handleBackToLobby = () => {
+    navigate(`/room/${roomId}`);
+  };
+
+  // 게임 타입에 따라 다른 컴포넌트 렌더링
+  if (room.selectedGame === "appleBattle") {
+    return (
+      <AppleBattle
+        socket={socket}
+        room={room}
+        onBackToLobby={handleBackToLobby}
+      />
+    );
+  }
+
+  return (
+    <ClickBattle
+      socket={socket}
+      room={room}
+      onBackToLobby={handleBackToLobby}
+    />
+  );
+}
+
 function App() {
   const [isConnected, setIsConnected] = useState(socket.connected);
-  const [currentView, setCurrentView] = useState("hub"); // 'hub' | 'lobby' | 'game'
-  const [currentRoom, setCurrentRoom] = useState(null);
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -93,8 +308,6 @@ function App() {
         });
       }
       setUser(null);
-      setCurrentView("hub");
-      setCurrentRoom(null);
     } catch (error) {
       console.error("로그아웃 오류:", error);
     }
@@ -104,23 +317,6 @@ function App() {
     setUser(guestInfo);
   };
 
-  const handleJoinRoom = (room) => {
-    setCurrentRoom(room);
-    setCurrentView("lobby");
-  };
-
-  const handleLeaveRoom = () => {
-    setCurrentRoom(null);
-    setCurrentView("hub");
-  };
-
-  const handleStartGame = (room) => {
-    setCurrentRoom(room);
-    setCurrentView("game");
-    // 여기서 실제 게임 화면으로 전환
-    // 지금은 로비에 머물도록 함 (게임 로직은 나중에 구현)
-    console.log("게임 시작!", room);
-  };
 
   if (isLoading) {
     return (
@@ -145,49 +341,7 @@ function App() {
     return <Login onLoginSuccess={handleGuestLogin} />;
   }
 
-  return (
-    <div className="App">
-      <div className="user-header">
-        <div className="user-info">
-          {user.photo && (
-            <img src={user.photo} alt={user.name} className="user-avatar" />
-          )}
-          <span className="user-name">{user.name}</span>
-          <span className="user-provider">
-            {user.provider === "google" ? "🔵" : user.provider === "kakao" ? "🟡" : "👤"}
-          </span>
-          {user.provider === "guest" && (
-            <span className="guest-badge">게스트</span>
-          )}
-        </div>
-        <button onClick={handleLogout} className="logout-button">
-          로그아웃
-        </button>
-      </div>
-
-      {currentView === "hub" && (
-        <Hub socket={socket} onJoinRoom={handleJoinRoom} user={user} />
-      )}
-      {currentView === "lobby" && currentRoom && (
-        <Lobby
-          socket={socket}
-          room={currentRoom}
-          onLeaveRoom={handleLeaveRoom}
-          onStartGame={handleStartGame}
-          user={user}
-        />
-      )}
-      {currentView === "game" && currentRoom && (
-        <div className="game-container">
-          <h1>🎮 게임 화면</h1>
-          <p>게임 로직은 여기에 구현하세요!</p>
-          <button onClick={() => setCurrentView("lobby")}>
-            로비로 돌아가기
-          </button>
-        </div>
-      )}
-    </div>
-  );
+  return <GameApp socket={socket} user={user} onLogout={handleLogout} />;
 }
 
 export default App;

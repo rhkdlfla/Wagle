@@ -1,19 +1,49 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import "./Lobby.css";
+
+// 게임 목록
+const GAMES = [
+  {
+    id: "clickBattle",
+    name: "클릭 대결",
+    description: "30초 동안 최대한 많이 클릭하세요!",
+    icon: "👆",
+    minPlayers: 1,
+  },
+  {
+    id: "appleBattle",
+    name: "사과배틀",
+    description: "합이 10이 되는 사과를 선택해 땅따먹기!",
+    icon: "🍎",
+    minPlayers: 1,
+  },
+];
 
 function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [playerName, setPlayerName] = useState("");
   const [currentRoom, setCurrentRoom] = useState(room);
+  const [selectedGame, setSelectedGame] = useState(
+    currentRoom?.selectedGame || GAMES[0].id
+  );
+  const [copied, setCopied] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [messageInput, setMessageInput] = useState("");
+  const messagesEndRef = useRef(null);
+  const location = useLocation();
   const isHost = currentRoom?.players[0]?.id === socket.id;
 
   useEffect(() => {
     // 방 업데이트 수신
     socket.on("roomUpdated", (updatedRoom) => {
       setCurrentRoom(updatedRoom);
+      if (updatedRoom.selectedGame) {
+        setSelectedGame(updatedRoom.selectedGame);
+      }
     });
 
     // 게임 시작 수신
-    socket.on("gameStarted", (room) => {
+    socket.on("gameStarted", ({ room }) => {
       setCurrentRoom(room);
       onStartGame(room);
     });
@@ -23,12 +53,29 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       onLeaveRoom();
     });
 
+    // 채팅 메시지 수신
+    socket.on("messageReceived", (messageData) => {
+      setMessages((prev) => [...prev, messageData]);
+    });
+
+    // 메시지 에러 수신
+    socket.on("messageError", ({ message }) => {
+      console.error("채팅 에러:", message);
+    });
+
     return () => {
       socket.off("roomUpdated");
       socket.off("gameStarted");
       socket.off("leftRoom");
+      socket.off("messageReceived");
+      socket.off("messageError");
     };
   }, [socket, onLeaveRoom, onStartGame]);
+
+  // 메시지 목록이 업데이트될 때마다 스크롤을 맨 아래로
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleUpdateName = () => {
     if (playerName.trim() !== "") {
@@ -40,14 +87,69 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     }
   };
 
+  const handleGameSelect = (gameId) => {
+    if (isHost) {
+      setSelectedGame(gameId);
+      socket.emit("selectGame", {
+        roomId: currentRoom.id,
+        gameId: gameId,
+      });
+    }
+  };
+
   const handleStartGame = () => {
     if (isHost && currentRoom.players.length > 0) {
-      socket.emit("startGame", { roomId: currentRoom.id });
+      socket.emit("startGame", {
+        roomId: currentRoom.id,
+        gameType: selectedGame,
+      });
     }
   };
 
   const handleLeaveRoom = () => {
     socket.emit("leaveRoom", { roomId: currentRoom.id });
+  };
+
+  const handleCopyInviteLink = async () => {
+    const inviteLink = `${window.location.origin}${location.pathname}`;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // 클립보드 API가 지원되지 않는 경우 대체 방법
+      const textArea = document.createElement("textarea");
+      textArea.value = inviteLink;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        alert("링크 복사에 실패했습니다. 수동으로 복사해주세요: " + inviteLink);
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (messageInput.trim() && currentRoom) {
+      socket.emit("sendMessage", {
+        roomId: currentRoom.id,
+        message: messageInput.trim(),
+      });
+      setMessageInput("");
+    }
+  };
+
+  const formatTime = (timestamp) => {
+    const date = new Date(timestamp);
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    return `${hours}:${minutes}`;
   };
 
   if (!currentRoom) {
@@ -62,9 +164,75 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
           <span className="room-name-badge">{currentRoom.name}</span>
           <span className="room-id">방 ID: {currentRoom.id.substring(0, 15)}...</span>
         </div>
+        <button
+          onClick={handleCopyInviteLink}
+          className="invite-link-button"
+          title="초대 링크 복사"
+        >
+          {copied ? "✓ 복사됨!" : "🔗 초대 링크 복사"}
+        </button>
       </div>
 
       <div className="lobby-content">
+        <div className="chat-section">
+          <h2>💬 채팅</h2>
+          <div className="chat-messages">
+            {messages.length === 0 ? (
+              <div className="chat-empty">아직 메시지가 없습니다.</div>
+            ) : (
+              messages.map((msg) => {
+                const isMyMessage = msg.playerId === socket.id;
+                return (
+                  <div
+                    key={msg.id}
+                    className={`chat-message ${isMyMessage ? "my-message" : ""}`}
+                  >
+                    {!isMyMessage && (
+                      <div className="message-sender">
+                        {msg.playerPhoto ? (
+                          <img
+                            src={msg.playerPhoto}
+                            alt={msg.playerName}
+                            className="message-avatar"
+                          />
+                        ) : (
+                          <div className="message-avatar-placeholder">
+                            {msg.playerName.charAt(0)}
+                          </div>
+                        )}
+                        <span className="message-player-name">{msg.playerName}</span>
+                      </div>
+                    )}
+                    <div className="message-content">
+                      <p>{msg.message}</p>
+                      <span className="message-time">{formatTime(msg.timestamp)}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+          <div className="chat-input-group">
+            <input
+              type="text"
+              placeholder="메시지를 입력하세요..."
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              maxLength={500}
+            />
+            <button onClick={handleSendMessage} disabled={!messageInput.trim()}>
+              전송
+            </button>
+          </div>
+        </div>
+
         <div className="players-section">
           <h2>플레이어 목록 ({currentRoom.players.length}/{currentRoom.maxPlayers})</h2>
           <div className="players-list">
@@ -122,6 +290,30 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
               />
               <button onClick={handleUpdateName}>변경</button>
             </div>
+          </div>
+        </div>
+
+        <div className="game-selection-section">
+          <h2>게임 선택</h2>
+          <div className="games-list">
+            {GAMES.map((game) => (
+              <div
+                key={game.id}
+                className={`game-item ${
+                  selectedGame === game.id ? "selected" : ""
+                } ${!isHost ? "disabled" : ""}`}
+                onClick={() => isHost && handleGameSelect(game.id)}
+              >
+                <div className="game-icon">{game.icon}</div>
+                <div className="game-info">
+                  <div className="game-name">{game.name}</div>
+                  <div className="game-description">{game.description}</div>
+                </div>
+                {selectedGame === game.id && (
+                  <div className="selected-badge">✓</div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
