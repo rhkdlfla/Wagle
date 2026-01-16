@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import io from "socket.io-client";
 import Hub from "./components/Hub";
 import Lobby from "./components/Lobby";
 import Login from "./components/Login";
 import ClickBattle from "./components/ClickBattle";
+import AppleBattle from "./components/AppleBattle";
 import "./App.css";
 
 // 서버 주소 (아까 만든 Node.js 서버 포트)
@@ -79,10 +80,16 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
   const navigate = useNavigate();
   const [room, setRoom] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const hasJoinedRef = useRef(false);
+  const currentRoomIdRef = useRef(null);
 
   useEffect(() => {
-    // 방 입장 시도
-    socket.emit("joinRoom", { roomId });
+    // 이벤트 리스너는 항상 등록 (중복 등록 방지를 위해 먼저 제거)
+    socket.off("joinedRoom");
+    socket.off("joinRoomError");
+    socket.off("roomUpdated");
+    socket.off("gameStarted");
+    socket.off("leftRoom");
 
     socket.on("joinedRoom", (roomData) => {
       setRoom(roomData);
@@ -106,6 +113,20 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
     socket.on("leftRoom", () => {
       onLeaveRoom();
     });
+
+    // roomId가 변경되면 리셋하고 입장 시도
+    if (currentRoomIdRef.current !== roomId) {
+      hasJoinedRef.current = false;
+      currentRoomIdRef.current = roomId;
+      setIsLoading(true);
+    }
+
+    // 이미 입장 시도를 했다면 다시 호출하지 않음
+    if (!hasJoinedRef.current) {
+      // 방 입장 시도
+      hasJoinedRef.current = true;
+      socket.emit("joinRoom", { roomId });
+    }
 
     return () => {
       socket.off("joinedRoom");
@@ -182,11 +203,26 @@ function RoomGame({ socket, user }) {
     );
   }
 
+  const handleBackToLobby = () => {
+    navigate(`/room/${roomId}`);
+  };
+
+  // 게임 타입에 따라 다른 컴포넌트 렌더링
+  if (room.selectedGame === "appleBattle") {
+    return (
+      <AppleBattle
+        socket={socket}
+        room={room}
+        onBackToLobby={handleBackToLobby}
+      />
+    );
+  }
+
   return (
     <ClickBattle
       socket={socket}
       room={room}
-      onBackToLobby={() => navigate(`/room/${roomId}`)}
+      onBackToLobby={handleBackToLobby}
     />
   );
 }

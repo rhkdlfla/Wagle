@@ -163,7 +163,7 @@ const io = new Server(server, {
 const rooms = new Map(); // roomId -> { id, name, players: [], maxPlayers: 4, status: 'waiting' | 'playing' }
 
 // 게임 상태 관리
-const gameStates = new Map(); // roomId -> { startTime, duration, clicks: { socketId: count }, isActive }
+const gameStates = new Map(); // roomId -> { startTime, duration, clicks: { socketId: count }, isActive, gameType, grid, scores }
 
 // 방 목록 조회 (공개 방만)
 function getRoomList() {
@@ -298,17 +298,11 @@ io.on("connection", (socket) => {
     // 추가 검증은 필요 없음 (이미 방 목록에서 필터링됨)
 
     if (room.players.length >= room.maxPlayers) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/80805081-a969-4bd3-8dce-3883cd4dfc97',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:286',message:'방이 가득 참',data:{socketId:socket.id,roomId,playerCount:room.players.length,maxPlayers:room.maxPlayers},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       socket.emit("joinRoomError", { message: "방이 가득 찼습니다." });
       return;
     }
 
     if (room.status === "playing") {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/80805081-a969-4bd3-8dce-3883cd4dfc97',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:292',message:'게임 진행 중',data:{socketId:socket.id,roomId,status:room.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       socket.emit("joinRoomError", { message: "이미 게임이 진행 중인 방입니다." });
       return;
     }
@@ -316,15 +310,11 @@ io.on("connection", (socket) => {
     // 이미 방에 있는지 확인
     const existingPlayer = room.players.find((p) => p.id === socket.id);
     if (existingPlayer) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/80805081-a969-4bd3-8dce-3883cd4dfc97',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:299',message:'이미 방에 있음 - 성공 응답 반환',data:{socketId:socket.id,roomId,existingPlayerId:existingPlayer.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       // 이미 방에 있으면 에러 대신 현재 방 정보 반환 (중복 입장 허용)
+      // socket.join은 idempotent하므로 안전하게 호출 가능
       socket.join(roomId);
       socket.emit("joinedRoom", room);
-      io.to(roomId).emit("roomUpdated", room);
-      io.emit("roomList", getRoomList());
-      console.log(`${socket.id}가 이미 방 ${roomId}에 있었지만 재입장 처리됨`);
+      // 중복 로그 제거 - 이미 방에 있는 경우 조용히 처리
       return;
     }
 
@@ -338,11 +328,6 @@ io.on("connection", (socket) => {
       photo: currentUser?.photo || null,
     });
     socket.join(roomId);
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/80805081-a969-4bd3-8dce-3883cd4dfc97',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:310',message:'방 입장 완료',data:{socketId:socket.id,roomId,playerCount:room.players.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
-    
     socket.emit("joinedRoom", room);
     io.to(roomId).emit("roomUpdated", room); // 방의 모든 플레이어에게 업데이트
     io.emit("roomList", getRoomList()); // 모든 클라이언트에 방 목록 업데이트
@@ -396,15 +381,35 @@ io.on("connection", (socket) => {
         const gameState = {
           gameType: gameType,
           startTime: Date.now(),
-          duration: 30000, // 30초
+          duration: gameType === "appleBattle" ? 120000 : 30000, // 사과배틀: 2분, 클릭대결: 30초
           clicks: {},
           isActive: true,
         };
         
-        // 모든 플레이어의 클릭 카운트 초기화
-        room.players.forEach((player) => {
-          gameState.clicks[player.id] = 0;
-        });
+        // 사과배틀 게임 초기화
+        if (gameType === "appleBattle") {
+          // 17×10 그리드 생성 (1~9 숫자)
+          const grid = [];
+          for (let row = 0; row < 10; row++) {
+            grid[row] = [];
+            for (let col = 0; col < 17; col++) {
+              grid[row][col] = {
+                value: Math.floor(Math.random() * 9) + 1, // 1~9
+                owner: null, // 칸의 소유자 (플레이어 ID)
+              };
+            }
+          }
+          gameState.grid = grid;
+          gameState.scores = {}; // 플레이어별 점수 (칸 개수)
+          room.players.forEach((player) => {
+            gameState.scores[player.id] = 0;
+          });
+        } else {
+          // 클릭 대결 게임
+          room.players.forEach((player) => {
+            gameState.clicks[player.id] = 0;
+          });
+        }
         
         gameStates.set(roomId, gameState);
         
@@ -414,39 +419,72 @@ io.on("connection", (socket) => {
           gameState: {
             duration: gameState.duration,
             startTime: gameState.startTime,
+            gameType: gameType,
+            grid: gameType === "appleBattle" ? gameState.grid : undefined,
           },
         });
         
         io.emit("roomList", getRoomList());
-        console.log(`게임 시작: ${roomId}, 시작 시간: ${new Date(gameState.startTime).toISOString()}`);
+        console.log(`게임 시작: ${roomId}, 게임 타입: ${gameType}, 시작 시간: ${new Date(gameState.startTime).toISOString()}`);
         
-        // 주기적으로 클릭 업데이트 전송 (1초마다)
-        const updateInterval = setInterval(() => {
-          const elapsed = Date.now() - gameState.startTime;
-          const remaining = Math.max(0, gameState.duration - elapsed);
+        if (gameType === "clickBattle") {
+          // 클릭 대결: 주기적으로 클릭 업데이트 전송 (1초마다)
+          const updateInterval = setInterval(() => {
+            const elapsed = Date.now() - gameState.startTime;
+            const remaining = Math.max(0, gameState.duration - elapsed);
+            
+            if (remaining <= 0) {
+              clearInterval(updateInterval);
+              endGame(roomId);
+              return;
+            }
+            
+            const clickUpdates = room.players.map((p) => ({
+              id: p.id,
+              clicks: gameState.clicks[p.id] || 0,
+            }));
+            
+            io.to(roomId).emit("clickUpdate", {
+              updates: clickUpdates,
+              timeRemaining: remaining,
+            });
+          }, 1000);
           
-          if (remaining <= 0) {
+          // 게임 종료 타이머
+          setTimeout(() => {
             clearInterval(updateInterval);
             endGame(roomId);
-            return;
-          }
+          }, gameState.duration);
+        } else if (gameType === "appleBattle") {
+          // 사과배틀: 주기적으로 상태 업데이트 전송 (1초마다)
+          const updateInterval = setInterval(() => {
+            const elapsed = Date.now() - gameState.startTime;
+            const remaining = Math.max(0, gameState.duration - elapsed);
+            
+            if (remaining <= 0) {
+              clearInterval(updateInterval);
+              endGame(roomId);
+              return;
+            }
+            
+            const scoreUpdates = room.players.map((p) => ({
+              id: p.id,
+              score: gameState.scores[p.id] || 0,
+            }));
+            
+            io.to(roomId).emit("appleBattleUpdate", {
+              scores: scoreUpdates,
+              timeRemaining: remaining,
+              grid: gameState.grid,
+            });
+          }, 1000);
           
-          const clickUpdates = room.players.map((p) => ({
-            id: p.id,
-            clicks: gameState.clicks[p.id] || 0,
-          }));
-          
-          io.to(roomId).emit("clickUpdate", {
-            updates: clickUpdates,
-            timeRemaining: remaining,
-          });
-        }, 1000); // 1초마다 업데이트
-        
-        // 게임 종료 타이머
-        setTimeout(() => {
-          clearInterval(updateInterval);
-          endGame(roomId);
-        }, gameState.duration);
+          // 게임 종료 타이머
+          setTimeout(() => {
+            clearInterval(updateInterval);
+            endGame(roomId);
+          }, gameState.duration);
+        }
       }
     }
   });
@@ -460,37 +498,62 @@ io.on("connection", (socket) => {
     
     gameState.isActive = false;
     
-    // 승자 결정
-    let maxClicks = 0;
-    const winners = [];
+    let winners = [];
+    let results = [];
+    let maxScore = 0;
     
-    Object.entries(gameState.clicks).forEach(([playerId, clicks]) => {
-      if (clicks > maxClicks) {
-        maxClicks = clicks;
-        winners.length = 0;
-        winners.push(playerId);
-      } else if (clicks === maxClicks && maxClicks > 0) {
-        winners.push(playerId);
-      }
-    });
-    
-    // 최종 결과 생성
-    const results = room.players.map((player) => ({
-      id: player.id,
-      name: player.name,
-      photo: player.photo,
-      clicks: gameState.clicks[player.id] || 0,
-      isWinner: winners.includes(player.id),
-    }));
-    
-    // 결과를 클릭 수로 정렬
-    results.sort((a, b) => b.clicks - a.clicks);
+    if (gameState.gameType === "clickBattle") {
+      // 클릭 대결: 클릭 수로 승자 결정
+      Object.entries(gameState.clicks).forEach(([playerId, clicks]) => {
+        if (clicks > maxScore) {
+          maxScore = clicks;
+          winners.length = 0;
+          winners.push(playerId);
+        } else if (clicks === maxScore && maxScore > 0) {
+          winners.push(playerId);
+        }
+      });
+      
+      // 최종 결과 생성
+      results = room.players.map((player) => ({
+        id: player.id,
+        name: player.name,
+        photo: player.photo,
+        score: gameState.clicks[player.id] || 0,
+        isWinner: winners.includes(player.id),
+      }));
+      
+      // 결과를 클릭 수로 정렬
+      results.sort((a, b) => b.score - a.score);
+    } else if (gameState.gameType === "appleBattle") {
+      // 사과배틀: 점수(칸 개수)로 승자 결정
+      Object.entries(gameState.scores).forEach(([playerId, score]) => {
+        if (score > maxScore) {
+          maxScore = score;
+          winners.length = 0;
+          winners.push(playerId);
+        } else if (score === maxScore && maxScore > 0) {
+          winners.push(playerId);
+        }
+      });
+      
+      // 최종 결과 생성
+      results = room.players.map((player) => ({
+        id: player.id,
+        name: player.name,
+        photo: player.photo,
+        score: gameState.scores[player.id] || 0,
+        isWinner: winners.includes(player.id),
+      }));
+      
+      // 결과를 점수로 정렬
+      results.sort((a, b) => b.score - a.score);
+    }
     
     // 게임 종료 이벤트 전송
     io.to(roomId).emit("gameEnded", {
       results: results,
       winners: winners,
-      maxClicks: maxClicks,
     });
     
     // 게임 상태 삭제
@@ -517,30 +580,56 @@ io.on("connection", (socket) => {
     });
     
     if (gameState && room && gameState.isActive) {
-      // 게임이 진행 중이면 현재 상태 전송
-      const clickUpdates = room.players.map((p) => ({
-        id: p.id,
-        clicks: gameState.clicks[p.id] || 0,
-      }));
-      
       const elapsed = Date.now() - gameState.startTime;
       const remaining = Math.max(0, gameState.duration - elapsed);
       
       console.log(`게임 상태 전송: ${roomId}, 남은 시간: ${remaining}ms`);
       
-      socket.emit("gameStarted", {
-        room: room,
-        gameState: {
-          duration: gameState.duration,
-          startTime: gameState.startTime,
-        },
-      });
-      
-      // 현재 클릭 상태도 전송
-      socket.emit("clickUpdate", {
-        updates: clickUpdates,
-        timeRemaining: remaining,
-      });
+      if (gameState.gameType === "clickBattle") {
+        // 클릭 대결 게임 상태 전송
+        const clickUpdates = room.players.map((p) => ({
+          id: p.id,
+          clicks: gameState.clicks[p.id] || 0,
+        }));
+        
+        socket.emit("gameStarted", {
+          room: room,
+          gameState: {
+            duration: gameState.duration,
+            startTime: gameState.startTime,
+            gameType: gameState.gameType,
+          },
+        });
+        
+        // 현재 클릭 상태도 전송
+        socket.emit("clickUpdate", {
+          updates: clickUpdates,
+          timeRemaining: remaining,
+        });
+      } else if (gameState.gameType === "appleBattle") {
+        // 사과배틀 게임 상태 전송
+        const scoreUpdates = room.players.map((p) => ({
+          id: p.id,
+          score: gameState.scores[p.id] || 0,
+        }));
+        
+        socket.emit("gameStarted", {
+          room: room,
+          gameState: {
+            duration: gameState.duration,
+            startTime: gameState.startTime,
+            gameType: gameState.gameType,
+            grid: gameState.grid,
+          },
+        });
+        
+        // 현재 상태 전송
+        socket.emit("appleBattleUpdate", {
+          scores: scoreUpdates,
+          timeRemaining: remaining,
+          grid: gameState.grid,
+        });
+      }
     } else {
       console.log(`게임이 진행 중이 아닙니다. roomId: ${roomId}, roomStatus: ${room?.status}`);
     }
@@ -582,6 +671,109 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("clickUpdate", {
       updates: clickUpdates,
       timeRemaining: Math.max(0, gameState.duration - (Date.now() - gameState.startTime)),
+    });
+  });
+
+  // 사과배틀: 사과 제거 및 땅따먹기
+  socket.on("appleBattleRemove", ({ roomId, startRow, startCol, endRow, endCol }) => {
+    const gameState = gameStates.get(roomId);
+    const room = rooms.get(roomId);
+    
+    if (!gameState || !room || gameState.gameType !== "appleBattle") {
+      socket.emit("gameError", { message: "게임이 진행 중이 아닙니다." });
+      return;
+    }
+    
+    if (!gameState.isActive) {
+      return;
+    }
+    
+    // 플레이어가 방에 있는지 확인
+    const player = room.players.find((p) => p.id === socket.id);
+    if (!player) {
+      return;
+    }
+    
+    // 선택된 영역의 사과 합 계산
+    let sum = 0;
+    const selectedCells = []; // 합 계산에 사용되는 칸 (value > 0)
+    const allSelectedCells = []; // 모든 선택된 칸 (덮어쓰기용)
+    
+    const minRow = Math.min(startRow, endRow);
+    const maxRow = Math.max(startRow, endRow);
+    const minCol = Math.min(startCol, endCol);
+    const maxCol = Math.max(startCol, endCol);
+    
+    for (let row = minRow; row <= maxRow; row++) {
+      for (let col = minCol; col <= maxCol; col++) {
+        if (row >= 0 && row < 10 && col >= 0 && col < 17) {
+          const cell = gameState.grid[row][col];
+          // 모든 칸을 allSelectedCells에 추가 (덮어쓰기용)
+          allSelectedCells.push({ row, col });
+          
+          // 합 계산은 value > 0인 칸만
+          if (cell && cell.value && cell.value > 0) {
+            sum += cell.value;
+            selectedCells.push({ row, col });
+          }
+        }
+      }
+    }
+    
+    // 합이 10이 아니면 무시
+    if (sum !== 10) {
+      return;
+    }
+    
+    // 사과 제거 및 땅따먹기
+    let newScore = gameState.scores[socket.id] || 0;
+    
+    // 먼저 기존 소유자의 점수 감소 (덮어쓰기) - 모든 선택된 칸에 대해
+    const cellsToUpdate = [];
+    allSelectedCells.forEach(({ row, col }) => {
+      const cell = gameState.grid[row][col];
+      const oldOwner = cell.owner;
+      const wasOwned = oldOwner && oldOwner !== socket.id;
+      
+      cellsToUpdate.push({
+        row,
+        col,
+        oldOwner,
+        wasOwned,
+        cellValue: cell.value,
+      });
+      
+      // 기존 소유자의 점수 감소
+      if (wasOwned && gameState.scores[oldOwner]) {
+        gameState.scores[oldOwner] = Math.max(0, gameState.scores[oldOwner] - 1);
+      }
+    });
+    
+    // 그 다음 새 소유자로 설정하고 점수 증가
+    cellsToUpdate.forEach(({ row, col }) => {
+      const cell = gameState.grid[row][col];
+      
+      // 사과가 있는 칸(value > 0)만 제거하고, 모든 칸은 땅따먹기
+      if (cell.value && cell.value > 0) {
+        cell.value = 0;
+      }
+      // 땅따먹기 (덮어쓰기 가능) - 모든 칸에 대해
+      cell.owner = socket.id;
+      newScore++;
+    });
+    
+    gameState.scores[socket.id] = newScore;
+    
+    // 모든 플레이어에게 업데이트 전송
+    const scoreUpdates = room.players.map((p) => ({
+      id: p.id,
+      score: gameState.scores[p.id] || 0,
+    }));
+    
+    io.to(roomId).emit("appleBattleUpdate", {
+      scores: scoreUpdates,
+      timeRemaining: Math.max(0, gameState.duration - (Date.now() - gameState.startTime)),
+      grid: gameState.grid,
     });
   });
 

@@ -11,14 +11,13 @@ const GAMES = [
     icon: "👆",
     minPlayers: 1,
   },
-  // 추후 추가할 게임들
-  // {
-  //   id: "typingRace",
-  //   name: "타이핑 레이스",
-  //   description: "빠르게 타이핑하세요!",
-  //   icon: "⌨️",
-  //   minPlayers: 2,
-  // },
+  {
+    id: "appleBattle",
+    name: "사과배틀",
+    description: "합이 10이 되는 사과를 선택해 땅따먹기!",
+    icon: "🍎",
+    minPlayers: 1,
+  },
 ];
 
 function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
