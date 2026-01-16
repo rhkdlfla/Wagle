@@ -1,0 +1,232 @@
+.hub-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+  color: white;
+}
+
+.hub-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.hub-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.hub-header p {
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+.hub-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 30px;
+}
+
+.create-room-section {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.create-room-section h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+}
+
+.create-room-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.create-room-form input {
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+}
+
+.create-room-form input:focus {
+  outline: none;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+.max-players-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.max-players-input label {
+  font-size: 0.9rem;
+}
+
+.max-players-input select {
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  cursor: pointer;
+}
+
+.create-button {
+  padding: 12px 24px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.create-button:hover:not(:disabled) {
+  background: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.create-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.room-list-section {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.room-list-section h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+}
+
+.room-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.room-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.room-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.room-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.room-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.room-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 20px;
+  border-radius: 10px;
+  transition: all 0.3s;
+}
+
+.room-item:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateX(5px);
+}
+
+.room-info {
+  flex: 1;
+}
+
+.room-name {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.room-details {
+  display: flex;
+  gap: 15px;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.room-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.room-status.waiting {
+  background: rgba(76, 175, 80, 0.3);
+  color: #4caf50;
+}
+
+.room-status.playing {
+  background: rgba(255, 152, 0, 0.3);
+  color: #ff9800;
+}
+
+.join-button {
+  padding: 10px 20px;
+  background: #2196f3;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.join-button:hover:not(:disabled) {
+  background: #1976d2;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.join-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.no-rooms {
+  text-align: center;
+  padding: 40px;
+  opacity: 0.7;
+  font-size: 1.1rem;
+}
+
+@media (max-width: 768px) {
+  .hub-content {
+    grid-template-columns: 1fr;
+  }
+}
