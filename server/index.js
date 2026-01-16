@@ -8,6 +8,35 @@ const session = require("express-session");
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const KakaoStrategy = require("passport-kakao").Strategy;
+const mongoose = require("mongoose");
+const MONGO_URI = process.env.MONGO_URI;
+
+mongoose
+  .connect(process.env.MONGO_URI, {
+    // IPv4를 강제로 사용하게 하여 IP 인식 오류를 해결합니다
+    family: 4 
+  })
+  .then(() => console.log("✅ MongoDB 연결 성공!"))
+  .catch((err) => {
+    console.log("❌ MongoDB 연결 실패 원인:");
+    console.error(err);
+  });
+
+// 유저 스키마 정의: DB에 저장할 사용자 정보 구조
+const userSchema = new mongoose.Schema({
+  provider: { type: String, required: true }, // google, kakao
+  providerId: { type: String, required: true }, // 플랫폼별 고유 ID
+  name: { type: String, required: true },
+  email: { type: String },
+  photo: { type: String },
+  createdAt: { type: Date, default: Date.now },
+});
+
+// 중복 가입 방지
+userSchema.index({ provider: 1, providerId: 1 }, { unique: true });
+
+// User 모델 생성
+const User = mongoose.model("User", userSchema);
 
 // 세션 설정
 app.use(
@@ -39,12 +68,17 @@ app.use(express.urlencoded({ extended: true }));
 
 // 사용자 직렬화 (세션에 저장)
 passport.serializeUser((user, done) => {
-  done(null, user);
+  done(null, user._id);
 });
 
 // 사용자 역직렬화 (세션에서 복원)
-passport.deserializeUser((user, done) => {
-  done(null, user);
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (err) {
+    done(err, null);
+  }
 });
 
 // 구글 OAuth 전략
@@ -56,15 +90,33 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
         callbackURL: "/auth/google/callback",
       },
-      (accessToken, refreshToken, profile, done) => {
-        const user = {
-          id: profile.id,
-          provider: "google",
-          name: profile.displayName,
-          email: profile.emails?.[0]?.value,
-          photo: profile.photos?.[0]?.value,
-        };
-        return done(null, user);
+      // [수정] 구글 로그인 시 DB 조회 및 저장 로직 적용
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          // DB에 이미 있는 유저인지 확인
+          let existingUser = await User.findOne({ 
+            provider: "google", 
+            providerId: profile.id 
+          });
+
+          if (existingUser) {
+            return done(null, existingUser);
+          }
+
+          // 없으면 DB에 새로 생성
+          const newUser = await User.create({
+            provider: "google",
+            providerId: profile.id,
+            name: profile.displayName,
+            email: profile.emails?.[0]?.value,
+            photo: profile.photos?.[0]?.value,
+          });
+          
+          return done(null, newUser);
+        } catch (err) {
+          console.error("구글 로그인 에러:", err);
+          return done(err, null);
+        }
       }
     )
   );
@@ -79,21 +131,36 @@ if (process.env.KAKAO_CLIENT_ID) {
         clientID: process.env.KAKAO_CLIENT_ID,
         callbackURL: "/auth/kakao/callback",
       },
-      (accessToken, refreshToken, profile, done) => {
-        const user = {
-          id: profile.id,
-          provider: "kakao",
-          name: profile.displayName || profile.username || profile._json?.properties?.nickname,
-          email: profile._json?.kakao_account?.email,
-          photo: profile._json?.properties?.profile_image,
-        };
-        return done(null, user);
+      // [수정] 카카오 로그인 시 DB 조회 및 저장 로직 적용
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          let existingUser = await User.findOne({ 
+            provider: "kakao", 
+            providerId: profile.id.toString() 
+          });
+
+          if (existingUser) {
+            return done(null, existingUser);
+          }
+
+          const newUser = await User.create({
+            provider: "kakao",
+            providerId: profile.id.toString(),
+            name: profile.displayName || profile.username || profile._json?.properties?.nickname,
+            email: profile._json?.kakao_account?.email,
+            photo: profile._json?.properties?.profile_image,
+          });
+
+          return done(null, newUser);
+        } catch (err) {
+          console.error("카카오 로그인 에러:", err);
+          return done(err, null);
+        }
       }
     )
   );
-  console.log("✅ 카카오 OAuth 전략이 등록되었습니다.");
 } else {
-  console.warn("⚠️  KAKAO_CLIENT_ID가 설정되지 않아 카카오 로그인이 비활성화됩니다.");
+  console.warn("⚠️ KAKAO_CLIENT_ID 미설정");
 }
 
 // 인증 라우트
@@ -133,7 +200,10 @@ app.get("/auth/logout", (req, res) => {
     if (err) {
       return res.status(500).json({ error: "로그아웃 실패" });
     }
-    res.json({ success: true });
+    req.session.destroy(() => {
+      res.clearCookie('connect.sid');
+      res.json({ success: true });
+    });
   });
 });
 
@@ -194,6 +264,7 @@ io.on("connection", (socket) => {
     const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const currentUser = user || null;
     const playerName = currentUser ? currentUser.name : `플레이어 ${socket.id.substring(0, 6)}`;
+    const dbUserId = currentUser && currentUser._id ? currentUser._id : (currentUser?.id || null);
     const newRoom = {
       id: roomId,
       name: roomName || `방 ${rooms.size + 1}`,
@@ -242,6 +313,8 @@ io.on("connection", (socket) => {
 
     const currentUser = user || null;
     const playerName = currentUser ? currentUser.name : `플레이어 ${socket.id.substring(0, 6)}`;
+    const dbUserId = currentUser && currentUser._id ? currentUser._id : (currentUser?.id || null);
+
     room.players.push({ 
       id: socket.id, 
       name: playerName,
