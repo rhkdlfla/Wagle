@@ -1,10 +1,150 @@
+require("dotenv").config();
 const express = require("express");
 const app = express();
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
+const session = require("express-session");
+const passport = require("passport");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const KakaoStrategy = require("passport-kakao").Strategy;
 
-app.use(cors());
+// 세션 설정
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "wagle-secret-key-change-in-production",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: false, // HTTPS 사용 시 true로 변경
+      maxAge: 24 * 60 * 60 * 1000, // 24시간
+    },
+  })
+);
+
+// Passport 초기화
+app.use(passport.initialize());
+app.use(passport.session());
+
+// CORS 설정 (세션 쿠키 포함)
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  })
+);
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// 사용자 직렬화 (세션에 저장)
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+
+// 사용자 역직렬화 (세션에서 복원)
+passport.deserializeUser((user, done) => {
+  done(null, user);
+});
+
+// 구글 OAuth 전략
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: "/auth/google/callback",
+      },
+      (accessToken, refreshToken, profile, done) => {
+        const user = {
+          id: profile.id,
+          provider: "google",
+          name: profile.displayName,
+          email: profile.emails?.[0]?.value,
+          photo: profile.photos?.[0]?.value,
+        };
+        return done(null, user);
+      }
+    )
+  );
+}
+
+// 카카오 OAuth 전략
+if (process.env.KAKAO_CLIENT_ID) {
+  passport.use(
+    "kakao",
+    new KakaoStrategy(
+      {
+        clientID: process.env.KAKAO_CLIENT_ID,
+        callbackURL: "/auth/kakao/callback",
+      },
+      (accessToken, refreshToken, profile, done) => {
+        const user = {
+          id: profile.id,
+          provider: "kakao",
+          name: profile.displayName || profile.username || profile._json?.properties?.nickname,
+          email: profile._json?.kakao_account?.email,
+          photo: profile._json?.properties?.profile_image,
+        };
+        return done(null, user);
+      }
+    )
+  );
+  console.log("✅ 카카오 OAuth 전략이 등록되었습니다.");
+} else {
+  console.warn("⚠️  KAKAO_CLIENT_ID가 설정되지 않아 카카오 로그인이 비활성화됩니다.");
+}
+
+// 인증 라우트
+app.get("/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+app.get(
+  "/auth/google/callback",
+  passport.authenticate("google", { failureRedirect: "http://localhost:3000/login?error=google" }),
+  (req, res) => {
+    res.redirect("http://localhost:3000/auth/success");
+  }
+);
+
+app.get("/auth/kakao", (req, res, next) => {
+  if (!process.env.KAKAO_CLIENT_ID) {
+    return res.redirect("http://localhost:3000/login?error=kakao_config");
+  }
+  passport.authenticate("kakao")(req, res, next);
+});
+
+app.get(
+  "/auth/kakao/callback",
+  (req, res, next) => {
+    if (!process.env.KAKAO_CLIENT_ID) {
+      return res.redirect("http://localhost:3000/login?error=kakao_config");
+    }
+    passport.authenticate("kakao", { failureRedirect: "http://localhost:3000/login?error=kakao" })(req, res, next);
+  },
+  (req, res) => {
+    res.redirect("http://localhost:3000/auth/success");
+  }
+);
+
+// 로그아웃
+app.get("/auth/logout", (req, res) => {
+  req.logout((err) => {
+    if (err) {
+      return res.status(500).json({ error: "로그아웃 실패" });
+    }
+    res.json({ success: true });
+  });
+});
+
+// 현재 사용자 정보 조회
+app.get("/auth/user", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.json({ user: req.user, authenticated: true });
+  } else {
+    res.json({ user: null, authenticated: false });
+  }
+});
 
 const server = http.createServer(app);
 
@@ -12,8 +152,12 @@ const io = new Server(server, {
   cors: {
     origin: "http://localhost:3000", // 리액트 주소
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
+
+// Socket.IO 미들웨어: 세션 정보 가져오기
+// 주의: Socket.IO에서 세션 접근은 복잡하므로, 클라이언트에서 사용자 정보를 전송받는 방식 사용
 
 // 방 관리 데이터 구조
 const rooms = new Map(); // roomId -> { id, name, players: [], maxPlayers: 4, status: 'waiting' | 'playing' }
@@ -30,7 +174,15 @@ function getRoomList() {
 }
 
 io.on("connection", (socket) => {
-  console.log(`유저 접속됨: ${socket.id}`);
+  let user = null;
+  
+  // 클라이언트에서 사용자 정보 전송 받기
+  socket.on("setUser", (userData) => {
+    user = userData;
+    console.log(`유저 접속됨: ${socket.id}`, user ? `(${user.name})` : "(비로그인)");
+  });
+  
+  console.log(`소켓 연결됨: ${socket.id}`);
 
   // 방 목록 조회
   socket.on("getRoomList", () => {
@@ -40,10 +192,18 @@ io.on("connection", (socket) => {
   // 방 생성
   socket.on("createRoom", ({ roomName, maxPlayers = 4 }) => {
     const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const currentUser = user || null;
+    const playerName = currentUser ? currentUser.name : `플레이어 ${socket.id.substring(0, 6)}`;
     const newRoom = {
       id: roomId,
       name: roomName || `방 ${rooms.size + 1}`,
-      players: [{ id: socket.id, name: `플레이어 ${socket.id.substring(0, 6)}` }],
+      players: [{ 
+        id: socket.id, 
+        name: playerName,
+        userId: currentUser?.id || null,
+        provider: currentUser?.provider || null,
+        photo: currentUser?.photo || null,
+      }],
       maxPlayers: maxPlayers || 4,
       status: "waiting",
     };
@@ -80,7 +240,15 @@ io.on("connection", (socket) => {
       return;
     }
 
-    room.players.push({ id: socket.id, name: `플레이어 ${socket.id.substring(0, 6)}` });
+    const currentUser = user || null;
+    const playerName = currentUser ? currentUser.name : `플레이어 ${socket.id.substring(0, 6)}`;
+    room.players.push({ 
+      id: socket.id, 
+      name: playerName,
+      userId: currentUser?.id || null,
+      provider: currentUser?.provider || null,
+      photo: currentUser?.photo || null,
+    });
     socket.join(roomId);
     socket.emit("joinedRoom", room);
     io.to(roomId).emit("roomUpdated", room); // 방의 모든 플레이어에게 업데이트

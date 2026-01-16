@@ -2,15 +2,57 @@ import React, { useEffect, useState } from "react";
 import io from "socket.io-client";
 import Hub from "./components/Hub";
 import Lobby from "./components/Lobby";
+import Login from "./components/Login";
 import "./App.css";
 
 // 서버 주소 (아까 만든 Node.js 서버 포트)
-const socket = io.connect("http://localhost:4000");
+const socket = io.connect("http://localhost:4000", {
+  withCredentials: true,
+});
 
 function App() {
   const [isConnected, setIsConnected] = useState(socket.connected);
   const [currentView, setCurrentView] = useState("hub"); // 'hub' | 'lobby' | 'game'
   const [currentRoom, setCurrentRoom] = useState(null);
+  const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 사용자 인증 상태 확인
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // 먼저 로컬 스토리지에서 게스트 정보 확인
+        const guestUser = localStorage.getItem("guestUser");
+        if (guestUser) {
+          const guestInfo = JSON.parse(guestUser);
+          setUser(guestInfo);
+          setIsLoading(false);
+          return;
+        }
+
+        // 게스트가 없으면 서버에서 OAuth 사용자 확인
+        const response = await fetch("http://localhost:4000/auth/user", {
+          credentials: "include",
+        });
+        const data = await response.json();
+        if (data.authenticated) {
+          setUser(data.user);
+        }
+      } catch (error) {
+        console.error("인증 확인 오류:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+
+    // 인증 성공 페이지에서 리다이렉트된 경우
+    if (window.location.pathname === "/auth/success") {
+      window.history.replaceState({}, "", "/");
+      checkAuth();
+    }
+  }, []);
 
   useEffect(() => {
     // 서버와 연결되었을 때 실행
@@ -30,6 +72,36 @@ function App() {
     };
   }, []);
 
+  // 사용자 정보가 변경되면 소켓에 전송
+  useEffect(() => {
+    if (user && socket.connected) {
+      socket.emit("setUser", user);
+    }
+  }, [user, socket]);
+
+  const handleLogout = async () => {
+    try {
+      // 게스트인 경우 로컬 스토리지에서 삭제
+      if (user && user.provider === "guest") {
+        localStorage.removeItem("guestUser");
+      } else {
+        // OAuth 사용자인 경우 서버에 로그아웃 요청
+        await fetch("http://localhost:4000/auth/logout", {
+          credentials: "include",
+        });
+      }
+      setUser(null);
+      setCurrentView("hub");
+      setCurrentRoom(null);
+    } catch (error) {
+      console.error("로그아웃 오류:", error);
+    }
+  };
+
+  const handleGuestLogin = (guestInfo) => {
+    setUser(guestInfo);
+  };
+
   const handleJoinRoom = (room) => {
     setCurrentRoom(room);
     setCurrentView("lobby");
@@ -48,6 +120,15 @@ function App() {
     console.log("게임 시작!", room);
   };
 
+  if (isLoading) {
+    return (
+      <div className="connection-status">
+        <h2>로딩 중...</h2>
+        <p>잠시만 기다려주세요.</p>
+      </div>
+    );
+  }
+
   if (!isConnected) {
     return (
       <div className="connection-status">
@@ -57,10 +138,33 @@ function App() {
     );
   }
 
+  // 로그인하지 않은 경우 로그인 화면 표시
+  if (!user) {
+    return <Login onLoginSuccess={handleGuestLogin} />;
+  }
+
   return (
     <div className="App">
+      <div className="user-header">
+        <div className="user-info">
+          {user.photo && (
+            <img src={user.photo} alt={user.name} className="user-avatar" />
+          )}
+          <span className="user-name">{user.name}</span>
+          <span className="user-provider">
+            {user.provider === "google" ? "🔵" : user.provider === "kakao" ? "🟡" : "👤"}
+          </span>
+          {user.provider === "guest" && (
+            <span className="guest-badge">게스트</span>
+          )}
+        </div>
+        <button onClick={handleLogout} className="logout-button">
+          로그아웃
+        </button>
+      </div>
+
       {currentView === "hub" && (
-        <Hub socket={socket} onJoinRoom={handleJoinRoom} />
+        <Hub socket={socket} onJoinRoom={handleJoinRoom} user={user} />
       )}
       {currentView === "lobby" && currentRoom && (
         <Lobby
@@ -68,6 +172,7 @@ function App() {
           room={currentRoom}
           onLeaveRoom={handleLeaveRoom}
           onStartGame={handleStartGame}
+          user={user}
         />
       )}
       {currentView === "game" && currentRoom && (

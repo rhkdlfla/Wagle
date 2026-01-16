@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./Hub.css";
 
-function Hub({ socket, onJoinRoom }) {
+function Hub({ socket, onJoinRoom, user }) {
   const [roomList, setRoomList] = useState([]);
   const [roomName, setRoomName] = useState("");
   const [maxPlayers, setMaxPlayers] = useState(4);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./Lobby.css";
 
-function Lobby({ socket, room, onLeaveRoom, onStartGame }) {
+function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [playerName, setPlayerName] = useState("");
   const [currentRoom, setCurrentRoom] = useState(room);
   const isHost = currentRoom?.players[0]?.id === socket.id;
@@ -76,7 +76,15 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame }) {
                 }`}
               >
                 <div className="player-info">
-                  <span className="player-number">{index + 1}</span>
+                  {player.photo ? (
+                    <img
+                      src={player.photo}
+                      alt={player.name}
+                      className="player-avatar"
+                    />
+                  ) : (
+                    <span className="player-number">{index + 1}</span>
+                  )}
                   <span className="player-name">
                     {player.name}
                     {index === 0 && <span className="host-badge">👑 방장</span>}
