@@ -13,7 +13,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     });
 
     // 게임 시작 수신
-    socket.on("gameStarted", (room) => {
+    socket.on("gameStarted", ({ room }) => {
       setCurrentRoom(room);
       onStartGame(room);
     });

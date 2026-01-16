@@ -3,6 +3,7 @@ import io from "socket.io-client";
 import Hub from "./components/Hub";
 import Lobby from "./components/Lobby";
 import Login from "./components/Login";
+import ClickBattle from "./components/ClickBattle";
 import "./App.css";
 
 // 서버 주소 (아까 만든 Node.js 서버 포트)
@@ -176,13 +177,11 @@ function App() {
         />
       )}
       {currentView === "game" && currentRoom && (
-        <div className="game-container">
-          <h1>🎮 게임 화면</h1>
-          <p>게임 로직은 여기에 구현하세요!</p>
-          <button onClick={() => setCurrentView("lobby")}>
-            로비로 돌아가기
-          </button>
-        </div>
+        <ClickBattle
+          socket={socket}
+          room={currentRoom}
+          onBackToLobby={() => setCurrentView("lobby")}
+        />
       )}
     </div>
   );

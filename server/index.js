@@ -162,6 +162,9 @@ const io = new Server(server, {
 // 방 관리 데이터 구조
 const rooms = new Map(); // roomId -> { id, name, players: [], maxPlayers: 4, status: 'waiting' | 'playing' }
 
+// 게임 상태 관리
+const gameStates = new Map(); // roomId -> { startTime, duration, clicks: { socketId: count }, isActive }
+
 // 방 목록 조회
 function getRoomList() {
   return Array.from(rooms.values()).map((room) => ({
@@ -284,11 +287,197 @@ io.on("connection", (socket) => {
       // 방장만 게임 시작 가능 (첫 번째 플레이어)
       if (room.players[0].id === socket.id) {
         room.status = "playing";
-        io.to(roomId).emit("gameStarted", room);
+        
+        // 게임 상태 초기화
+        const gameState = {
+          startTime: Date.now(),
+          duration: 30000, // 30초
+          clicks: {},
+          isActive: true,
+        };
+        
+        // 모든 플레이어의 클릭 카운트 초기화
+        room.players.forEach((player) => {
+          gameState.clicks[player.id] = 0;
+        });
+        
+        gameStates.set(roomId, gameState);
+        
+        // 게임 시작 이벤트 전송
+        io.to(roomId).emit("gameStarted", {
+          room: room,
+          gameState: {
+            duration: gameState.duration,
+            startTime: gameState.startTime,
+          },
+        });
+        
         io.emit("roomList", getRoomList());
-        console.log(`게임 시작: ${roomId}`);
+        console.log(`게임 시작: ${roomId}, 시작 시간: ${new Date(gameState.startTime).toISOString()}`);
+        
+        // 주기적으로 클릭 업데이트 전송 (1초마다)
+        const updateInterval = setInterval(() => {
+          const elapsed = Date.now() - gameState.startTime;
+          const remaining = Math.max(0, gameState.duration - elapsed);
+          
+          if (remaining <= 0) {
+            clearInterval(updateInterval);
+            endGame(roomId);
+            return;
+          }
+          
+          const clickUpdates = room.players.map((p) => ({
+            id: p.id,
+            clicks: gameState.clicks[p.id] || 0,
+          }));
+          
+          io.to(roomId).emit("clickUpdate", {
+            updates: clickUpdates,
+            timeRemaining: remaining,
+          });
+        }, 1000); // 1초마다 업데이트
+        
+        // 게임 종료 타이머
+        setTimeout(() => {
+          clearInterval(updateInterval);
+          endGame(roomId);
+        }, gameState.duration);
       }
     }
+  });
+
+  // 게임 종료 함수
+  function endGame(roomId) {
+    const gameState = gameStates.get(roomId);
+    const room = rooms.get(roomId);
+    
+    if (!gameState || !room) return;
+    
+    gameState.isActive = false;
+    
+    // 승자 결정
+    let maxClicks = 0;
+    const winners = [];
+    
+    Object.entries(gameState.clicks).forEach(([playerId, clicks]) => {
+      if (clicks > maxClicks) {
+        maxClicks = clicks;
+        winners.length = 0;
+        winners.push(playerId);
+      } else if (clicks === maxClicks && maxClicks > 0) {
+        winners.push(playerId);
+      }
+    });
+    
+    // 최종 결과 생성
+    const results = room.players.map((player) => ({
+      id: player.id,
+      name: player.name,
+      photo: player.photo,
+      clicks: gameState.clicks[player.id] || 0,
+      isWinner: winners.includes(player.id),
+    }));
+    
+    // 결과를 클릭 수로 정렬
+    results.sort((a, b) => b.clicks - a.clicks);
+    
+    // 게임 종료 이벤트 전송
+    io.to(roomId).emit("gameEnded", {
+      results: results,
+      winners: winners,
+      maxClicks: maxClicks,
+    });
+    
+    // 게임 상태 삭제
+    gameStates.delete(roomId);
+    
+    // 방 상태를 대기 중으로 변경
+    room.status = "waiting";
+    io.emit("roomList", getRoomList());
+    
+    console.log(`게임 종료: ${roomId}, 승자: ${winners.join(", ")}`);
+  }
+
+  // 게임 상태 요청
+  socket.on("getGameState", ({ roomId }) => {
+    console.log(`게임 상태 요청 받음: ${roomId} from ${socket.id}`);
+    const gameState = gameStates.get(roomId);
+    const room = rooms.get(roomId);
+    
+    console.log("게임 상태:", { 
+      hasGameState: !!gameState, 
+      hasRoom: !!room, 
+      isActive: gameState?.isActive,
+      roomStatus: room?.status 
+    });
+    
+    if (gameState && room && gameState.isActive) {
+      // 게임이 진행 중이면 현재 상태 전송
+      const clickUpdates = room.players.map((p) => ({
+        id: p.id,
+        clicks: gameState.clicks[p.id] || 0,
+      }));
+      
+      const elapsed = Date.now() - gameState.startTime;
+      const remaining = Math.max(0, gameState.duration - elapsed);
+      
+      console.log(`게임 상태 전송: ${roomId}, 남은 시간: ${remaining}ms`);
+      
+      socket.emit("gameStarted", {
+        room: room,
+        gameState: {
+          duration: gameState.duration,
+          startTime: gameState.startTime,
+        },
+      });
+      
+      // 현재 클릭 상태도 전송
+      socket.emit("clickUpdate", {
+        updates: clickUpdates,
+        timeRemaining: remaining,
+      });
+    } else {
+      console.log(`게임이 진행 중이 아닙니다. roomId: ${roomId}, roomStatus: ${room?.status}`);
+    }
+  });
+
+  // 클릭 이벤트
+  socket.on("gameClick", ({ roomId }) => {
+    const gameState = gameStates.get(roomId);
+    const room = rooms.get(roomId);
+    
+    if (!gameState || !room) {
+      socket.emit("gameError", { message: "게임이 진행 중이 아닙니다." });
+      return;
+    }
+    
+    if (!gameState.isActive) {
+      return;
+    }
+    
+    // 플레이어가 방에 있는지 확인
+    const player = room.players.find((p) => p.id === socket.id);
+    if (!player) {
+      socket.emit("gameError", { message: "플레이어를 찾을 수 없습니다." });
+      return;
+    }
+    
+    // 클릭 카운트 증가
+    if (!gameState.clicks[socket.id]) {
+      gameState.clicks[socket.id] = 0;
+    }
+    gameState.clicks[socket.id]++;
+    
+    // 모든 플레이어에게 클릭 업데이트 전송
+    const clickUpdates = room.players.map((p) => ({
+      id: p.id,
+      clicks: gameState.clicks[p.id] || 0,
+    }));
+    
+    io.to(roomId).emit("clickUpdate", {
+      updates: clickUpdates,
+      timeRemaining: Math.max(0, gameState.duration - (Date.now() - gameState.startTime)),
+    });
   });
 
   // 플레이어 이름 변경
