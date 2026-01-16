@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import "./Login.css";
 
 function Login({ onLoginSuccess }) {
+  const SERVER_URL = process.env.REACT_APP_SERVER_URL || "/api";
   useEffect(() => {
     // URL에서 인증 성공 여부 확인
     const urlParams = new URLSearchParams(window.location.search);
@@ -16,11 +17,11 @@ function Login({ onLoginSuccess }) {
   }, []);
 
   const handleGoogleLogin = () => {
-    window.location.href = "http://localhost:4000/auth/google";
+    window.location.href = `${SERVER_URL}/auth/google`;
   };
 
   const handleKakaoLogin = () => {
-    window.location.href = "http://localhost:4000/auth/kakao";
+    window.location.href = `${SERVER_URL}/auth/kakao`;
   };
 
   const handleGuestLogin = () => {

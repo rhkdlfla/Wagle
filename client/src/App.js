@@ -5,8 +5,10 @@ import Lobby from "./components/Lobby";
 import Login from "./components/Login";
 import "./App.css";
 
-// 서버 주소 (아까 만든 Node.js 서버 포트)
-const socket = io.connect("http://localhost:4000", {
+// 서버 주소 (nginx를 통해 /api 경로로 접근)
+const SERVER_URL = process.env.REACT_APP_SERVER_URL || "/api";
+const socket = io.connect("", {
+  path: "/socket.io/",
   withCredentials: true,
 });
 
@@ -31,7 +33,7 @@ function App() {
         }
 
         // 게스트가 없으면 서버에서 OAuth 사용자 확인
-        const response = await fetch("http://localhost:4000/auth/user", {
+        const response = await fetch(`${SERVER_URL}/auth/user`, {
           credentials: "include",
         });
         const data = await response.json();
@@ -86,7 +88,7 @@ function App() {
         localStorage.removeItem("guestUser");
       } else {
         // OAuth 사용자인 경우 서버에 로그아웃 요청
-        await fetch("http://localhost:4000/auth/logout", {
+        await fetch(`${SERVER_URL}/auth/logout`, {
           credentials: "include",
         });
       }
