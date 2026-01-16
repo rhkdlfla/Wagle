@@ -26,10 +26,12 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
+const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+
 // CORS 설정 (세션 쿠키 포함)
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: CLIENT_URL,
     credentials: true,
   })
 );
@@ -101,15 +103,15 @@ app.get("/auth/google", passport.authenticate("google", { scope: ["profile", "em
 
 app.get(
   "/auth/google/callback",
-  passport.authenticate("google", { failureRedirect: "http://localhost:3000/login?error=google" }),
+  passport.authenticate("google", { failureRedirect: `${CLIENT_URL}/login?error=google` }),
   (req, res) => {
-    res.redirect("http://localhost:3000/auth/success");
+    res.redirect(`${CLIENT_URL}/auth/success`);
   }
 );
 
 app.get("/auth/kakao", (req, res, next) => {
   if (!process.env.KAKAO_CLIENT_ID) {
-    return res.redirect("http://localhost:3000/login?error=kakao_config");
+    return res.redirect(`${CLIENT_URL}/login?error=kakao_config`);
   }
   passport.authenticate("kakao")(req, res, next);
 });
@@ -118,12 +120,12 @@ app.get(
   "/auth/kakao/callback",
   (req, res, next) => {
     if (!process.env.KAKAO_CLIENT_ID) {
-      return res.redirect("http://localhost:3000/login?error=kakao_config");
+      return res.redirect(`${CLIENT_URL}/login?error=kakao_config`);
     }
-    passport.authenticate("kakao", { failureRedirect: "http://localhost:3000/login?error=kakao" })(req, res, next);
+    passport.authenticate("kakao", { failureRedirect: `${CLIENT_URL}/login?error=kakao` })(req, res, next);
   },
   (req, res) => {
-    res.redirect("http://localhost:3000/auth/success");
+    res.redirect(`${CLIENT_URL}/auth/success`);
   }
 );
 
@@ -150,7 +152,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000", // 리액트 주소
+    origin: CLIENT_URL,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -326,6 +328,6 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(4000, () => {
+server.listen(4000, "0.0.0.0", () => {
   console.log("서버가 4000번 포트에서 돌아가고 있어요!");
 });
