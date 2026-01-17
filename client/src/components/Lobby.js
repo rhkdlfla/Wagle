@@ -191,8 +191,25 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
 
   // 내가 만든 퀴즈인지 확인 (로그인된 사용자만, 게스트 제외)
   const isMyQuiz = (quiz) => {
-    if (!user || user.provider === "guest" || !quiz.creator || !quiz.creator.userId) return false;
-    return user.id === quiz.creator.userId;
+    if (!user || user.provider === "guest" || !quiz.creator || !quiz.creator.userId) {
+      return false;
+    }
+    // user.id 또는 user._id 사용 (서버에서 id로 변환하여 반환)
+    const userId = String(user.id || user._id || "");
+    const creatorUserId = String(quiz.creator.userId || "");
+    const isMine = userId === creatorUserId && userId !== "";
+    
+    // 디버깅용 로그 (필요시 주석 해제)
+    // console.log("퀴즈 소유자 확인:", {
+    //   userId,
+    //   creatorUserId,
+    //   isMine,
+    //   quizTitle: quiz.title,
+    //   userProvider: user.provider,
+    //   userObject: { id: user.id, _id: user._id }
+    // });
+    
+    return isMine;
   };
 
   const handleStartGame = () => {

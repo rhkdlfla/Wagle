@@ -285,6 +285,164 @@
   background: rgba(255, 152, 0, 1);
 }
 
+/* 파일 업로드 스타일 */
+.file-upload-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+.file-upload-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.file-upload-area:hover,
+.file-upload-group:focus-within .file-upload-area {
+  border-color: rgba(33, 150, 243, 0.8);
+  background: rgba(33, 150, 243, 0.1);
+}
+
+.file-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.file-input-label {
+  padding: 8px 16px;
+  background: rgba(33, 150, 243, 0.8);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.3s;
+  display: inline-block;
+  width: fit-content;
+}
+
+.file-input-label:hover {
+  background: rgba(33, 150, 243, 1);
+}
+
+.file-upload-hint {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  margin-top: 4px;
+}
+
+.file-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.preview-audio {
+  width: 100%;
+  margin-top: 5px;
+}
+
+.remove-file-button {
+  padding: 6px 12px;
+  background: rgba(244, 67, 54, 0.8);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  align-self: flex-start;
+}
+
+.remove-file-button:hover {
+  background: rgba(244, 67, 54, 1);
+}
+
+/* 문제 유형 선택 버튼 */
+.question-type-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.type-button {
+  flex: 1;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.type-button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.type-button.active {
+  background: rgba(33, 150, 243, 0.8);
+  border-color: rgba(33, 150, 243, 1);
+  color: white;
+}
+
+.type-button.active:hover {
+  background: rgba(33, 150, 243, 1);
+}
+
+/* 주관식 정답 입력 */
+.correct-answer-input {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
+  margin-top: 8px;
+}
+
+.correct-answer-input:focus {
+  outline: none;
+  background: white;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.5);
+}
+
+.hint-text {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 8px;
+  font-style: italic;
+}
+
 .time-limit-slider {
   width: 100%;
   height: 8px;

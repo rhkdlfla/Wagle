@@ -6,6 +6,7 @@ import "./QuizBattle.css";
 function QuizBattle({ socket, room, onBackToLobby }) {
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [essayAnswer, setEssayAnswer] = useState(""); // 주관식 답변
   const [questionTimeRemaining, setQuestionTimeRemaining] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [scores, setScores] = useState({});
@@ -64,6 +65,7 @@ function QuizBattle({ socket, room, onBackToLobby }) {
       console.log("새 문제 수신:", questionData);
       setCurrentQuestion(questionData);
       setSelectedAnswer(null);
+      setEssayAnswer(""); // 주관식 답변 초기화
       setQuestionTimeRemaining(null); // 시간 제한 없음
       setQuestionResult(null);
       questionStartTimeRef.current = Date.now();
@@ -135,7 +137,7 @@ function QuizBattle({ socket, room, onBackToLobby }) {
     }
   }, [socket, room]);
 
-  // 정답 제출
+  // 정답 제출 (객관식)
   const handleSubmitAnswer = (answerIndex) => {
     if (selectedAnswer !== null || !currentQuestion) return; // 이미 답했거나 문제가 없으면 무시
 
@@ -150,6 +152,23 @@ function QuizBattle({ socket, room, onBackToLobby }) {
     });
 
     setSelectedAnswer(answerIndex);
+  };
+
+  // 주관식 답변 제출
+  const handleSubmitEssayAnswer = () => {
+    if (selectedAnswer !== null || !currentQuestion || !essayAnswer.trim()) return;
+
+    const timeSpent = questionStartTimeRef.current
+      ? Date.now() - questionStartTimeRef.current
+      : 0;
+
+    socket.emit("submitAnswer", {
+      roomId: room.id,
+      answer: essayAnswer.trim(),
+      timeSpent,
+    });
+
+    setSelectedAnswer(essayAnswer.trim()); // 제출 완료 표시용
   };
 
   const formatTime = (ms) => {
@@ -294,31 +313,69 @@ function QuizBattle({ socket, room, onBackToLobby }) {
                 </div>
               )}
 
-              <div className="answer-options">
-                {currentQuestion.options.map((option, index) => {
-                  let optionClass = "answer-option";
-                  if (selectedAnswer === index) {
-                    optionClass += " selected";
-                  }
-                  if (selectedAnswer !== null) {
-                    optionClass += " disabled";
-                  }
-
-                  return (
-                    <button
-                      key={index}
-                      className={optionClass}
-                      onClick={() => handleSubmitAnswer(index)}
+              {currentQuestion.questionType === "주관식" ? (
+                <div className="essay-answer-section">
+                  <div className="essay-input-group">
+                    <label htmlFor="essay-answer-input" className="essay-label">
+                      답변을 입력하세요:
+                    </label>
+                    <input
+                      id="essay-answer-input"
+                      type="text"
+                      value={essayAnswer}
+                      onChange={(e) => setEssayAnswer(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter" && essayAnswer.trim() && selectedAnswer === null) {
+                          handleSubmitEssayAnswer();
+                        }
+                      }}
+                      placeholder="정답을 입력하세요"
+                      className="essay-input"
                       disabled={selectedAnswer !== null}
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleSubmitEssayAnswer()}
+                      disabled={!essayAnswer.trim() || selectedAnswer !== null}
+                      className="submit-essay-button"
                     >
-                      <span className="option-number">{index + 1}</span>
-                      <span className="option-text">{option}</span>
+                      제출
                     </button>
-                  );
-                })}
-              </div>
+                  </div>
+                  {selectedAnswer !== null && (
+                    <div className="answer-submitted-message">
+                      <p>답변을 제출했습니다!</p>
+                      <p>다른 플레이어들이 답변할 때까지 기다려주세요.</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="answer-options">
+                  {currentQuestion.options && currentQuestion.options.map((option, index) => {
+                    let optionClass = "answer-option";
+                    if (selectedAnswer === index) {
+                      optionClass += " selected";
+                    }
+                    if (selectedAnswer !== null) {
+                      optionClass += " disabled";
+                    }
 
-              {selectedAnswer !== null && (
+                    return (
+                      <button
+                        key={index}
+                        className={optionClass}
+                        onClick={() => handleSubmitAnswer(index)}
+                        disabled={selectedAnswer !== null}
+                      >
+                        <span className="option-number">{index + 1}</span>
+                        <span className="option-text">{option}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {selectedAnswer !== null && currentQuestion.questionType !== "주관식" && (
                 <div className="answer-submitted-message">
                   <p>답변을 제출했습니다!</p>
                   <p>다른 플레이어들이 답변할 때까지 기다려주세요.</p>

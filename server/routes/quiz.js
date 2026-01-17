@@ -16,7 +16,7 @@ router.post("/create", requireAuth, async (req, res) => {
   console.log("퀴즈 생성 요청 수신:", req.method, req.path, req.body?.title);
   
   // 게스트 사용자는 퀴즈 생성 불가
-  if (!req.user || !req.user.id) {
+  if (!req.user || !req.user._id) {
     return res.status(403).json({ error: "퀴즈 생성을 위해서는 로그인이 필요합니다." });
   }
   
@@ -48,8 +48,9 @@ router.post("/create", requireAuth, async (req, res) => {
     }
 
     // 사용자 정보 가져오기 (인증된 사용자만 가능)
+    // req.user._id는 MongoDB ObjectId이므로 문자열로 변환하여 저장
     const creator = {
-      userId: req.user.id,
+      userId: String(req.user._id),
       name: req.user.name,
       photo: req.user.photo,
     };
@@ -136,7 +137,7 @@ router.get("/:quizId", async (req, res) => {
 // 내가 만든 퀴즈 목록
 router.get("/my/list", requireAuth, async (req, res) => {
   try {
-    const userId = req.user?.id || null;
+    const userId = req.user?._id ? String(req.user._id) : null;
     const query = { "creator.userId": userId };
 
     const quizzes = await Quiz.find(query)
@@ -154,7 +155,7 @@ router.get("/my/list", requireAuth, async (req, res) => {
 router.put("/:quizId", requireAuth, async (req, res) => {
   try {
     // 게스트 사용자는 퀴즈 수정 불가
-    if (!req.user || !req.user.id) {
+    if (!req.user || !req.user._id) {
       return res.status(403).json({ error: "퀴즈 수정을 위해서는 로그인이 필요합니다." });
     }
 
@@ -167,7 +168,8 @@ router.put("/:quizId", requireAuth, async (req, res) => {
     }
 
     // 권한 확인 - 본인이 만든 퀴즈만 수정 가능
-    if (!quiz.creator.userId || quiz.creator.userId !== req.user.id) {
+    const currentUserId = String(req.user._id);
+    if (!quiz.creator.userId || quiz.creator.userId !== currentUserId) {
       return res.status(403).json({ error: "퀴즈를 수정할 권한이 없습니다." });
     }
 

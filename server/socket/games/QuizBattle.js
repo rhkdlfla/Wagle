@@ -89,7 +89,23 @@ class QuizBattle {
     }
 
     const question = this.gameState.quiz.questions[this.gameState.currentQuestionIndex];
-    const isCorrect = answer === question.correctAnswer;
+    const questionType = question.questionType || "객관식";
+    
+    // 주관식/객관식에 따라 정답 비교
+    let isCorrect = false;
+    if (questionType === "주관식") {
+      // 주관식: 문자열 비교 (대소문자 무시, 앞뒤 공백 제거)
+      const userAnswer = String(answer || "").trim().toLowerCase();
+      const correctAnswer = String(question.correctAnswer || "").trim().toLowerCase();
+      isCorrect = userAnswer === correctAnswer;
+    } else {
+      // 객관식: 섞인 선택지 기준으로 정답 인덱스 비교
+      // 섞인 선택지가 있으면 섞인 배열 기준 인덱스, 없으면 원본 기준
+      const correctIndex = this.gameState.currentCorrectAnswerIndex !== null
+        ? this.gameState.currentCorrectAnswerIndex
+        : question.correctAnswer;
+      isCorrect = answer === correctIndex;
+    }
 
     // 점수 계산 (정답만 점수)
     let points = 0;
@@ -136,9 +152,27 @@ class QuizBattle {
   nextQuestion() {
     // 정답 공개 및 결과 전송
     const question = this.gameState.quiz.questions[this.gameState.currentQuestionIndex];
+    const questionType = question.questionType || "객관식";
+    
+    let correctAnswerText = "";
+    if (questionType === "주관식") {
+      correctAnswerText = String(question.correctAnswer);
+    } else {
+      // 객관식: 섞인 선택지가 있으면 섞인 배열에서 정답 텍스트 가져오기
+      if (this.gameState.currentShuffledOptions && this.gameState.currentCorrectAnswerIndex !== null) {
+        correctAnswerText = this.gameState.currentShuffledOptions[this.gameState.currentCorrectAnswerIndex] || "";
+      } else {
+        // 섞인 선택지가 없으면 원본 기준
+        correctAnswerText = question.options && question.options[question.correctAnswer] 
+          ? question.options[question.correctAnswer] 
+          : "";
+      }
+    }
+    
     this.io.to(this.room.id).emit("questionResult", {
+      questionType,
       correctAnswer: question.correctAnswer,
-      correctAnswerText: question.options[question.correctAnswer],
+      correctAnswerText,
       answers: this.gameState.answers,
       scores: this.gameState.scores,
       teamScores: this.room.teamMode ? this.gameState.teamScores : null,
@@ -149,6 +183,9 @@ class QuizBattle {
       this.gameState.currentQuestionIndex++;
       this.gameState.answers = {};
       this.gameState.questionStartTime = Date.now();
+      // 섞인 선택지 정보 초기화
+      this.gameState.currentShuffledOptions = null;
+      this.gameState.currentCorrectAnswerIndex = null;
 
       if (
         this.gameState.currentQuestionIndex >= this.gameState.quiz.questions.length
@@ -161,16 +198,52 @@ class QuizBattle {
     }, 4000); // 4초 후 다음 문제 (정답 공개 시간 포함)
   }
 
+  // 배열 섞기 (Fisher-Yates 알고리즘)
+  shuffleArray(array) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
   // 문제 전송
   sendQuestion() {
     const question =
       this.gameState.quiz.questions[this.gameState.currentQuestionIndex];
     this.gameState.questionStartTime = Date.now();
 
+    let options = question.options || [];
+    let correctAnswerIndex = 0;
+
+    // 객관식인 경우 선택지 섞기
+    if (question.questionType !== "주관식" && options.length > 0) {
+      // 정답(첫 번째 옵션)의 원래 인덱스는 0
+      const originalCorrectAnswer = options[0];
+      
+      // 선택지 섞기
+      const shuffledOptions = this.shuffleArray(options);
+      
+      // 섞인 배열에서 정답의 새 인덱스 찾기
+      correctAnswerIndex = shuffledOptions.findIndex(opt => opt === originalCorrectAnswer);
+      
+      // gameState에 섞인 선택지와 정답 인덱스 저장 (답안 제출 시 사용)
+      this.gameState.currentShuffledOptions = shuffledOptions;
+      this.gameState.currentCorrectAnswerIndex = correctAnswerIndex;
+      
+      options = shuffledOptions;
+    } else {
+      // 주관식이거나 선택지가 없으면 그대로
+      this.gameState.currentShuffledOptions = null;
+      this.gameState.currentCorrectAnswerIndex = null;
+    }
+
     this.io.to(this.room.id).emit("newQuestion", {
+      questionType: question.questionType || "객관식",
       imageUrl: question.imageUrl,
       audioUrl: question.audioUrl,
-      options: question.options,
+      options: options,
       questionNumber: this.gameState.currentQuestionIndex + 1,
       totalQuestions: this.gameState.quiz.questions.length,
     });
