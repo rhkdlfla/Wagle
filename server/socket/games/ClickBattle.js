@@ -36,32 +36,11 @@ class ClickBattle {
         return;
       }
       
-      const clickUpdates = this.room.players.map((p) => ({
-        id: p.id,
-        clicks: this.gameState.clicks[p.id] || 0,
-        teamId: p.teamId || null,
-      }));
+      // 클라이언트 업데이트 데이터 사용 (일관성 유지)
+      const clientUpdateData = this.getClientUpdateData();
+      clientUpdateData.timeRemaining = remaining; // 시간은 실시간으로 업데이트
       
-      // 팀별 점수 계산
-      let teamScores = {};
-      if (this.room.teamMode && this.room.teams && this.room.teams.length > 0) {
-        this.room.teams.forEach((team) => {
-          teamScores[team.id] = 0;
-        });
-        Object.entries(this.gameState.clicks).forEach(([playerId, clicks]) => {
-          const player = this.room.players.find((p) => p.id === playerId);
-          if (player && player.teamId) {
-            teamScores[player.teamId] = (teamScores[player.teamId] || 0) + clicks;
-          }
-        });
-      }
-      
-      this.io.to(this.room.id).emit("clickUpdate", {
-        updates: clickUpdates,
-        teamScores: this.room.teamMode ? teamScores : null,
-        timeRemaining: remaining,
-        teamActivePlayers: this.gameState.relayMode ? this.gameState.teamActivePlayers : null,
-      });
+      this.io.to(this.room.id).emit(this.getUpdateEventName(), clientUpdateData);
     }, 1000);
     
     return updateInterval;
@@ -87,32 +66,11 @@ class ClickBattle {
     }
     this.gameState.clicks[socketId]++;
     
-    const clickUpdates = this.room.players.map((p) => ({
-      id: p.id,
-      clicks: this.gameState.clicks[p.id] || 0,
-      teamId: p.teamId || null,
-    }));
+    // 클라이언트 업데이트 데이터 사용 (일관성 유지)
+    const clientUpdateData = this.getClientUpdateData();
+    clientUpdateData.timeRemaining = Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime));
     
-    // 팀별 점수 계산
-    let teamScores = {};
-    if (this.room.teamMode && this.room.teams && this.room.teams.length > 0) {
-      this.room.teams.forEach((team) => {
-        teamScores[team.id] = 0;
-      });
-      Object.entries(this.gameState.clicks).forEach(([playerId, clicks]) => {
-        const player = this.room.players.find((p) => p.id === playerId);
-        if (player && player.teamId) {
-          teamScores[player.teamId] = (teamScores[player.teamId] || 0) + clicks;
-        }
-      });
-    }
-    
-    this.io.to(this.room.id).emit("clickUpdate", {
-      updates: clickUpdates,
-      teamScores: this.room.teamMode ? teamScores : null,
-      timeRemaining: Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime)),
-      teamActivePlayers: this.gameState.relayMode ? this.gameState.teamActivePlayers : null,
-    });
+    this.io.to(this.room.id).emit(this.getUpdateEventName(), clientUpdateData);
   }
   
   // 이어달리기 모드: 다음 팀원에게 순서 넘기기
@@ -147,32 +105,12 @@ class ClickBattle {
     const nextIndex = (currentIndex + 1) % teamPlayers.length;
     this.gameState.teamActivePlayers[player.teamId] = teamPlayers[nextIndex].id;
     
-    // 업데이트 전송
-    const clickUpdates = this.room.players.map((p) => ({
-      id: p.id,
-      clicks: this.gameState.clicks[p.id] || 0,
-      teamId: p.teamId || null,
-    }));
+    // 업데이트 전송 (클라이언트 형식 사용)
+    const clientUpdateData = this.getClientUpdateData();
+    clientUpdateData.timeRemaining = Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime));
+    clientUpdateData.teamActivePlayers = this.gameState.teamActivePlayers; // 최신 상태 반영
     
-    let teamScores = {};
-    if (this.room.teamMode && this.room.teams && this.room.teams.length > 0) {
-      this.room.teams.forEach((team) => {
-        teamScores[team.id] = 0;
-      });
-      Object.entries(this.gameState.clicks).forEach(([playerId, clicks]) => {
-        const p = this.room.players.find((pl) => pl.id === playerId);
-        if (p && p.teamId) {
-          teamScores[p.teamId] = (teamScores[p.teamId] || 0) + clicks;
-        }
-      });
-    }
-    
-    this.io.to(this.room.id).emit("clickUpdate", {
-      updates: clickUpdates,
-      teamScores: this.room.teamMode ? teamScores : null,
-      timeRemaining: Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime)),
-      teamActivePlayers: this.gameState.teamActivePlayers,
-    });
+    this.io.to(this.room.id).emit(this.getUpdateEventName(), clientUpdateData);
     
     return true;
   }
@@ -276,9 +214,9 @@ class ClickBattle {
     const elapsed = Date.now() - this.gameState.startTime;
     const remaining = Math.max(0, this.gameState.duration - elapsed);
     
-    const clickUpdates = this.room.players.map((p) => ({
+    const clickUpdates = (this.room.players || []).map((p) => ({
       id: p.id,
-      clicks: this.gameState.clicks[p.id] || 0,
+      clicks: this.gameState.clicks?.[p.id] || 0,
       teamId: p.teamId || null,
     }));
     
@@ -288,23 +226,41 @@ class ClickBattle {
       this.room.teams.forEach((team) => {
         teamScores[team.id] = 0;
       });
-      Object.entries(this.gameState.clicks).forEach(([playerId, clicks]) => {
-        const player = this.room.players.find((p) => p.id === playerId);
-        if (player && player.teamId) {
-          teamScores[player.teamId] = (teamScores[player.teamId] || 0) + clicks;
-        }
-      });
+      if (this.gameState.clicks) {
+        Object.entries(this.gameState.clicks).forEach(([playerId, clicks]) => {
+          const player = (this.room.players || []).find((p) => p.id === playerId);
+          if (player && player.teamId) {
+            teamScores[player.teamId] = (teamScores[player.teamId] || 0) + clicks;
+          }
+        });
+      }
     }
     
     return {
-      duration: this.gameState.duration,
-      startTime: this.gameState.startTime,
+      duration: this.gameState.duration || 0,
+      startTime: this.gameState.startTime || Date.now(),
       gameType: this.gameState.gameType,
-      clickUpdates,
+      clickUpdates: clickUpdates || [],
       teamScores: this.room.teamMode ? teamScores : null,
       timeRemaining: remaining,
       teamActivePlayers: this.gameState.relayMode ? this.gameState.teamActivePlayers : null,
     };
+  }
+
+  // 클라이언트 업데이트 데이터 반환 (클라이언트가 기대하는 형식)
+  getClientUpdateData() {
+    const gameStateData = this.getGameStateData();
+    return {
+      updates: gameStateData.clickUpdates || [],
+      teamScores: gameStateData.teamScores || null,
+      timeRemaining: gameStateData.timeRemaining || 0,
+      teamActivePlayers: gameStateData.teamActivePlayers || null,
+    };
+  }
+
+  // 업데이트 이벤트 이름 반환
+  getUpdateEventName() {
+    return "clickUpdate";
   }
 }
 

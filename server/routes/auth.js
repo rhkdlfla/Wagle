@@ -17,7 +17,6 @@ router.get(
 
 // 카카오 로그인
 router.get("/kakao", (req, res, next) => {
-  console.log("🔵 카카오 로그인 시도");
   if (!process.env.KAKAO_CLIENT_ID) {
     console.error("❌ KAKAO_CLIENT_ID 미설정");
     return res.redirect(`${CLIENT_URL}/login?error=kakao_config`);
@@ -28,40 +27,34 @@ router.get("/kakao", (req, res, next) => {
 router.get(
   "/kakao/callback",
   (req, res, next) => {
-    console.log("🔄 카카오 콜백 수신:", req.query);
     if (!process.env.KAKAO_CLIENT_ID) {
       console.error("❌ KAKAO_CLIENT_ID 미설정");
       return res.redirect(`${CLIENT_URL}/login?error=kakao_config`);
+    }
+    if (req.query?.error) {
+      console.error("❌ 카카오 콜백 에러:", req.query);
     }
     passport.authenticate(
       "kakao",
       {
         failureRedirect: `${CLIENT_URL}/login?error=kakao`,
         failureFlash: false,
+        failWithError: true,
       },
       (err, user, info) => {
         if (err) {
-          console.error("❌ 카카오 인증 에러:", err);
-          console.error("   에러 상세:", err.message, err.stack);
-          return res.redirect(`${CLIENT_URL}/login?error=kakao`);
+          console.error("❌ 카카오 인증 에러:", err, info || "");
+          return res.redirect(`${CLIENT_URL}/login?error=kakao&reason=auth_error`);
         }
         if (!user) {
-          console.error("❌ 카카오 인증 실패: 사용자 정보 없음");
-          console.error("   정보:", info);
-          return res.redirect(`${CLIENT_URL}/login?error=kakao`);
+          console.error("❌ 카카오 인증 실패: 사용자 정보 없음", info || "");
+          return res.redirect(`${CLIENT_URL}/login?error=kakao&reason=no_user`);
         }
-        console.log("✅ 카카오 사용자 정보 수신:", {
-          id: user.id || user._id,
-          name: user.name,
-          provider: user.provider
-        });
         req.logIn(user, (loginErr) => {
           if (loginErr) {
             console.error("❌ 카카오 로그인 세션 생성 에러:", loginErr);
-            return res.redirect(`${CLIENT_URL}/login?error=kakao`);
+            return res.redirect(`${CLIENT_URL}/login?error=kakao&reason=session_error`);
           }
-          console.log("✅ 카카오 로그인 성공:", user.name);
-          console.log("   리다이렉트:", `${CLIENT_URL}/auth/success`);
           res.redirect(`${CLIENT_URL}/auth/success`);
         });
       }
@@ -71,11 +64,28 @@ router.get(
 
 // 로그아웃
 router.get("/logout", (req, res) => {
+  const currentUser = req.user || null;
+  const provider = currentUser?.provider || null;
+  const providerId = currentUser?.providerId || currentUser?.id || currentUser?._id || null;
+  const userKey = provider && providerId ? `${provider}:${providerId}` : null;
+
   req.logout((err) => {
     if (err) {
       return res.status(500).json({ error: "로그아웃 실패" });
     }
     req.session.destroy(() => {
+      if (userKey && req.app?.locals?.userToSocket) {
+        const userToSocket = req.app.locals.userToSocket;
+        const existing = userToSocket.get(userKey);
+        const socketId = existing?.socketId;
+        if (socketId && req.app?.locals?.io) {
+          const socket = req.app.locals.io.sockets.sockets.get(socketId);
+          if (socket) {
+            socket.disconnect(true);
+          }
+        }
+        userToSocket.delete(userKey);
+      }
       res.clearCookie('connect.sid');
       res.json({ success: true });
     });
@@ -92,10 +102,15 @@ router.get("/user", (req, res) => {
       userData.id = String(userData._id);
     }
     res.json({ user: userData, authenticated: true });
+    // MongoDB의 _id를 id로 변환하여 반환
+    const userData = req.user.toObject ? req.user.toObject() : req.user;
+    const userWithId = {
+      ...userData,
+      id: userData._id || userData.id, // _id를 id로 변환
+    };
+    delete userWithId._id; // _id 제거
+    res.json({ user: userWithId, authenticated: true });
   } else {
-    console.log("❌ 인증되지 않은 사용자 요청");
-    console.log("   세션 ID:", req.sessionID);
-    console.log("   세션 데이터:", req.session);
     res.json({ user: null, authenticated: false });
   }
 });

@@ -8,6 +8,7 @@ import ClickBattle from "./components/ClickBattle";
 import AppleBattle from "./components/AppleBattle";
 import QuizBattle from "./components/QuizBattle";
 import QuizForm from "./components/QuizForm";
+import { getGameComponent } from "./games";
 import "./App.css";
 
 // 서버 주소 (nginx를 통해 /api 경로로 접근)
@@ -16,6 +17,18 @@ const socket = io.connect("", {
   path: "/socket.io/",
   withCredentials: true,
 });
+const CLIENT_ID_KEY = "clientId";
+const clientId = (() => {
+  const existing = sessionStorage.getItem(CLIENT_ID_KEY);
+  if (existing) return existing;
+  const newId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  sessionStorage.setItem(CLIENT_ID_KEY, newId);
+  return newId;
+})();
+
+async function updateGameResult() {
+  return Promise.resolve();
+}
 
 // 메인 게임 컴포넌트 (인증 필요)
 function GameApp({ socket, user, onLogout }) {
@@ -106,6 +119,7 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
 
     let sessionRestoreTimeout = null;
 
+
     socket.on("joinedRoom", (roomData) => {
       setRoom(roomData);
       setIsLoading(false);
@@ -118,6 +132,18 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
     socket.on("joinRoomError", ({ message }) => {
       alert(message);
       navigate("/");
+    });
+
+    // 서버측 소켓 이벤트 예시
+    socket.on("game_finished", async (data) => {
+      const { winnerId, loserId } = data;
+
+      // 여기서 위에서 만든 함수를 호출
+      await updateGameResult(winnerId, true);  // 승리 처리
+      await updateGameResult(loserId, false);  // 패배 처리
+
+      // 변경된 점수를 모든 클라이언트에게 알림
+      io.emit("update_leaderboard");
     });
 
     socket.on("roomUpdated", (updatedRoom) => {
@@ -271,14 +297,16 @@ function RoomGame({ socket, user }) {
     navigate(`/room/${roomId}`);
   };
 
-  // 게임 타입에 따라 다른 컴포넌트 렌더링
-  if (room.selectedGame === "appleBattle") {
+  // 게임 타입에 따라 동적으로 컴포넌트 로딩
+  const GameComponent = getGameComponent(room.selectedGame);
+  
+  if (!GameComponent) {
     return (
-      <AppleBattle
-        socket={socket}
-        room={room}
-        onBackToLobby={handleBackToLobby}
-      />
+      <div className="connection-status">
+        <h2>게임을 찾을 수 없습니다.</h2>
+        <p>알 수 없는 게임 타입: {room.selectedGame}</p>
+        <button onClick={handleBackToLobby}>로비로 돌아가기</button>
+      </div>
     );
   }
 
@@ -293,7 +321,7 @@ function RoomGame({ socket, user }) {
   }
 
   return (
-    <ClickBattle
+    <GameComponent
       socket={socket}
       room={room}
       onBackToLobby={handleBackToLobby}
@@ -431,6 +459,7 @@ function App() {
       // 사용자 정보가 있으면 저장
       if (user) {
         sessionStorage.setItem("userData", JSON.stringify(user));
+        socket.emit("setUser", { user, clientId });
       }
     });
     
@@ -445,6 +474,19 @@ function App() {
         }
       }
     });
+    
+    socket.on("duplicateLogin", async ({ message }) => {
+      if (message) {
+        alert(message);
+      } else {
+        alert("이미 로그인된 계정입니다.");
+      }
+
+      sessionStorage.removeItem("socketId");
+      sessionStorage.removeItem("userData");
+      sessionStorage.removeItem("currentRoomId");
+      setUser(null);
+    });
 
     // 연결이 끊겼을 때 실행
     socket.on("disconnect", () => {
@@ -456,13 +498,14 @@ function App() {
       socket.off("connect");
       socket.off("disconnect");
       socket.off("sessionRestored");
+      socket.off("duplicateLogin");
     };
   }, [socket, user]);
 
   // 사용자 정보가 변경되면 소켓에 전송 및 세션 스토리지 저장
   useEffect(() => {
     if (user && socket.connected) {
-      socket.emit("setUser", user);
+      socket.emit("setUser", { user, clientId });
       sessionStorage.setItem("userData", JSON.stringify(user));
     }
   }, [user, socket]);

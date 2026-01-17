@@ -31,7 +31,23 @@ function getRoomList(rooms) {
     }));
 }
 
-function setupRoomHandlers(socket, io, rooms, user) {
+function getUserFromSocket(socket) {
+  const currentUser = socket?.data?.user || null;
+  const provider = currentUser?.provider || null;
+  const providerId = currentUser?.providerId || null;
+  const userId = currentUser?.id || currentUser?._id || null;
+  const userKey = provider
+    ? providerId
+      ? `${provider}:${providerId}`
+      : userId
+        ? `${provider}:${userId}`
+        : null
+    : null;
+
+  return { currentUser, userKey, userId, providerId };
+}
+
+function setupRoomHandlers(socket, io, rooms) {
   // 방 목록 조회
   socket.on("getRoomList", () => {
     socket.emit("roomList", getRoomList(rooms));
@@ -56,7 +72,7 @@ function setupRoomHandlers(socket, io, rooms, user) {
     });
     
     const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const currentUser = user || null;
+    const { currentUser, userKey, userId, providerId } = getUserFromSocket(socket);
     const playerName = currentUser ? currentUser.name : `플레이어 ${socket.id.substring(0, 6)}`;
     
     // 방 이름이 없으면 랜덤 이름 생성
@@ -70,8 +86,10 @@ function setupRoomHandlers(socket, io, rooms, user) {
       players: [{ 
         id: socket.id, 
         name: playerName,
-        userId: currentUser?.id || null,
+        userId: userId,
+        userKey: userKey,
         provider: currentUser?.provider || null,
+        providerId: providerId,
         photo: currentUser?.photo || null,
         teamId: null, // 팀 ID (null이면 팀 없음)
       }],
@@ -127,26 +145,57 @@ function setupRoomHandlers(socket, io, rooms, user) {
       return;
     }
 
-    // 이미 방에 있는지 확인
-    const existingPlayer = room.players.find((p) => p.id === socket.id);
-    if (existingPlayer) {
+    const { currentUser, userKey, userId, providerId } = getUserFromSocket(socket);
+    
+    // 이미 방에 있는지 확인 (socket.id로 먼저 확인)
+    const existingPlayerBySocket = room.players.find((p) => p.id === socket.id);
+    if (existingPlayerBySocket) {
       // 이미 방에 있으면 에러 대신 현재 방 정보 반환 (중복 입장 허용)
       socket.join(roomId);
       socket.emit("joinedRoom", room);
       return;
     }
+    
+    // OAuth 사용자의 경우: 같은 계정이 이미 방에 있는지 확인 (userKey 우선)
+    if (userKey) {
+      const existingPlayerByUserKey = room.players.find((p) => p.userKey === userKey);
+      if (existingPlayerByUserKey) {
+        existingPlayerByUserKey.id = socket.id;
+        existingPlayerByUserKey.userId = userId || existingPlayerByUserKey.userId;
+        existingPlayerByUserKey.provider = currentUser?.provider || existingPlayerByUserKey.provider;
+        existingPlayerByUserKey.providerId = providerId || existingPlayerByUserKey.providerId;
+        existingPlayerByUserKey.photo = currentUser?.photo || existingPlayerByUserKey.photo;
+        existingPlayerByUserKey.name = currentUser?.name || existingPlayerByUserKey.name;
+        socket.join(roomId);
+        socket.emit("joinedRoom", room);
+        io.to(roomId).emit("roomUpdated", room);
+        console.log(`${socket.id}가 기존 플레이어의 소켓 ID를 업데이트했습니다. (userKey: ${userKey})`);
+        return;
+      }
+    } else if (userId) {
+      const existingPlayerByUserId = room.players.find((p) => p.userId && p.userId.toString() === userId.toString());
+      if (existingPlayerByUserId) {
+        existingPlayerByUserId.id = socket.id;
+        socket.join(roomId);
+        socket.emit("joinedRoom", room);
+        io.to(roomId).emit("roomUpdated", room);
+        console.log(`${socket.id}가 기존 플레이어의 소켓 ID를 업데이트했습니다. (userId: ${userId})`);
+        return;
+      }
+    }
 
-    const currentUser = user || null;
     const playerName = currentUser ? currentUser.name : `플레이어 ${socket.id.substring(0, 6)}`;
 
-          room.players.push({ 
-            id: socket.id, 
-            name: playerName,
-            userId: currentUser?.id || null,
-            provider: currentUser?.provider || null,
-            photo: currentUser?.photo || null,
-            teamId: null, // 팀 ID (null이면 팀 없음)
-          });
+    room.players.push({ 
+      id: socket.id, 
+      name: playerName,
+      userId: userId,
+      userKey: userKey,
+      provider: currentUser?.provider || null,
+      providerId: providerId,
+      photo: currentUser?.photo || null,
+      teamId: null, // 팀 ID (null이면 팀 없음)
+    });
     socket.join(roomId);
     socket.emit("joinedRoom", room);
     io.to(roomId).emit("roomUpdated", room); // 방의 모든 플레이어에게 업데이트

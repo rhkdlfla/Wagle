@@ -58,18 +58,11 @@ class AppleBattle {
         return;
       }
       
-      const scoreUpdates = this.room.players.map((p) => ({
-        id: p.id,
-        score: this.gameState.scores[p.id] || 0,
-      }));
+      // 클라이언트 업데이트 데이터 사용 (일관성 유지)
+      const clientUpdateData = this.getClientUpdateData();
+      clientUpdateData.timeRemaining = remaining; // 시간은 실시간으로 업데이트
       
-      this.io.to(this.room.id).emit("appleBattleUpdate", {
-        scores: scoreUpdates,
-        teamScores: this.room.teamMode ? this.gameState.teamScores : null,
-        timeRemaining: remaining,
-        grid: this.gameState.grid,
-        teamActivePlayers: this.gameState.relayMode ? this.gameState.teamActivePlayers : null,
-      });
+      this.io.to(this.room.id).emit(this.getUpdateEventName(), clientUpdateData);
     }, 1000);
     
     return updateInterval;
@@ -167,19 +160,11 @@ class AppleBattle {
       this.gameState.teamScores[playerTeamId] = (this.gameState.teamScores[playerTeamId] || 0) + cellsCount;
     }
     
-    // 모든 플레이어에게 업데이트 전송
-    const scoreUpdates = this.room.players.map((p) => ({
-      id: p.id,
-      score: this.gameState.scores[p.id] || 0,
-    }));
+    // 모든 플레이어에게 업데이트 전송 (클라이언트 형식 사용)
+    const clientUpdateData = this.getClientUpdateData();
+    clientUpdateData.timeRemaining = Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime));
     
-    this.io.to(this.room.id).emit("appleBattleUpdate", {
-      scores: scoreUpdates,
-      teamScores: isTeamMode ? this.gameState.teamScores : null,
-      timeRemaining: Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime)),
-      grid: this.gameState.grid,
-      teamActivePlayers: this.gameState.relayMode ? this.gameState.teamActivePlayers : null,
-    });
+    this.io.to(this.room.id).emit(this.getUpdateEventName(), clientUpdateData);
     
     return true;
   }
@@ -216,21 +201,12 @@ class AppleBattle {
     const nextIndex = (currentIndex + 1) % teamPlayers.length;
     this.gameState.teamActivePlayers[player.teamId] = teamPlayers[nextIndex].id;
     
-    // 업데이트 전송
-    const scoreUpdates = this.room.players.map((p) => ({
-      id: p.id,
-      score: this.gameState.scores[p.id] || 0,
-    }));
+    // 업데이트 전송 (클라이언트 형식 사용)
+    const clientUpdateData = this.getClientUpdateData();
+    clientUpdateData.timeRemaining = Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime));
+    clientUpdateData.teamActivePlayers = this.gameState.teamActivePlayers; // 최신 상태 반영
     
-    const isTeamMode = this.room.teamMode && this.room.teams && this.room.teams.length > 0;
-    
-    this.io.to(this.room.id).emit("appleBattleUpdate", {
-      scores: scoreUpdates,
-      teamScores: isTeamMode ? this.gameState.teamScores : null,
-      timeRemaining: Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime)),
-      grid: this.gameState.grid,
-      teamActivePlayers: this.gameState.teamActivePlayers,
-    });
+    this.io.to(this.room.id).emit(this.getUpdateEventName(), clientUpdateData);
     
     return true;
   }
@@ -307,24 +283,41 @@ class AppleBattle {
 
   // 게임 상태 반환 (재연결 시)
   getGameStateData() {
-    const elapsed = Date.now() - this.gameState.startTime;
-    const remaining = Math.max(0, this.gameState.duration - elapsed);
+    const elapsed = Date.now() - (this.gameState.startTime || Date.now());
+    const remaining = Math.max(0, (this.gameState.duration || 0) - elapsed);
     
-    const scoreUpdates = this.room.players.map((p) => ({
+    const scoreUpdates = (this.room.players || []).map((p) => ({
       id: p.id,
-      score: this.gameState.scores[p.id] || 0,
+      score: this.gameState.scores?.[p.id] || 0,
     }));
     
     return {
-      duration: this.gameState.duration,
-      startTime: this.gameState.startTime,
+      duration: this.gameState.duration || 0,
+      startTime: this.gameState.startTime || Date.now(),
       gameType: this.gameState.gameType,
-      grid: this.gameState.grid,
-      scoreUpdates,
-      teamScores: this.room.teamMode ? this.gameState.teamScores : null,
+      grid: this.gameState.grid || [],
+      scoreUpdates: scoreUpdates || [],
+      teamScores: this.room.teamMode ? (this.gameState.teamScores || {}) : null,
       timeRemaining: remaining,
-      teamActivePlayers: this.gameState.relayMode ? this.gameState.teamActivePlayers : null,
+      teamActivePlayers: this.gameState.relayMode ? (this.gameState.teamActivePlayers || {}) : null,
     };
+  }
+
+  // 클라이언트 업데이트 데이터 반환 (클라이언트가 기대하는 형식)
+  getClientUpdateData() {
+    const gameStateData = this.getGameStateData();
+    return {
+      scores: gameStateData.scoreUpdates || [],
+      teamScores: gameStateData.teamScores || null,
+      timeRemaining: gameStateData.timeRemaining || 0,
+      grid: gameStateData.grid || [],
+      teamActivePlayers: gameStateData.teamActivePlayers || null,
+    };
+  }
+
+  // 업데이트 이벤트 이름 반환
+  getUpdateEventName() {
+    return "appleBattleUpdate";
   }
 }
 
