@@ -27,10 +27,26 @@ class ClickBattle {
       const clickUpdates = this.room.players.map((p) => ({
         id: p.id,
         clicks: this.gameState.clicks[p.id] || 0,
+        teamId: p.teamId || null,
       }));
+      
+      // 팀별 점수 계산
+      let teamScores = {};
+      if (this.room.teamMode && this.room.teams && this.room.teams.length > 0) {
+        this.room.teams.forEach((team) => {
+          teamScores[team.id] = 0;
+        });
+        Object.entries(this.gameState.clicks).forEach(([playerId, clicks]) => {
+          const player = this.room.players.find((p) => p.id === playerId);
+          if (player && player.teamId) {
+            teamScores[player.teamId] = (teamScores[player.teamId] || 0) + clicks;
+          }
+        });
+      }
       
       this.io.to(this.room.id).emit("clickUpdate", {
         updates: clickUpdates,
+        teamScores: this.room.teamMode ? teamScores : null,
         timeRemaining: remaining,
       });
     }, 1000);
@@ -48,10 +64,26 @@ class ClickBattle {
     const clickUpdates = this.room.players.map((p) => ({
       id: p.id,
       clicks: this.gameState.clicks[p.id] || 0,
+      teamId: p.teamId || null,
     }));
+    
+    // 팀별 점수 계산
+    let teamScores = {};
+    if (this.room.teamMode && this.room.teams && this.room.teams.length > 0) {
+      this.room.teams.forEach((team) => {
+        teamScores[team.id] = 0;
+      });
+      Object.entries(this.gameState.clicks).forEach(([playerId, clicks]) => {
+        const player = this.room.players.find((p) => p.id === playerId);
+        if (player && player.teamId) {
+          teamScores[player.teamId] = (teamScores[player.teamId] || 0) + clicks;
+        }
+      });
+    }
     
     this.io.to(this.room.id).emit("clickUpdate", {
       updates: clickUpdates,
+      teamScores: this.room.teamMode ? teamScores : null,
       timeRemaining: Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime)),
     });
   }
@@ -62,6 +94,59 @@ class ClickBattle {
     console.log(`[ClickBattle] gameState.clicks:`, this.gameState.clicks);
     console.log(`[ClickBattle] room.players:`, this.room.players.map(p => ({ id: p.id, name: p.name })));
     
+    // 팀전 모드인 경우 팀별 점수 계산
+    if (this.room.teamMode && this.room.teams && this.room.teams.length > 0) {
+      const teamScores = {};
+      this.room.teams.forEach((team) => {
+        teamScores[team.id] = 0;
+      });
+      
+      Object.entries(this.gameState.clicks).forEach(([playerId, clicks]) => {
+        const player = this.room.players.find((p) => p.id === playerId);
+        if (player && player.teamId) {
+          teamScores[player.teamId] = (teamScores[player.teamId] || 0) + clicks;
+        }
+      });
+      
+      // 팀 승자 결정
+      let winningTeams = [];
+      let maxTeamScore = 0;
+      Object.entries(teamScores).forEach(([teamId, score]) => {
+        if (score > maxTeamScore) {
+          maxTeamScore = score;
+          winningTeams = [Number(teamId)];
+        } else if (score === maxTeamScore && maxTeamScore > 0) {
+          winningTeams.push(Number(teamId));
+        }
+      });
+      
+      // 플레이어 결과 생성 (팀 점수 포함)
+      const results = this.room.players.map((player) => {
+        const score = this.gameState.clicks[player.id] || 0;
+        const isWinner = player.teamId && winningTeams.includes(player.teamId);
+        return {
+          id: player.id,
+          name: player.name,
+          photo: player.photo,
+          score: score,
+          teamId: player.teamId || null,
+          teamScore: player.teamId ? teamScores[player.teamId] : null,
+          isWinner: isWinner,
+        };
+      });
+      
+      results.sort((a, b) => {
+        // 팀 점수로 먼저 정렬, 그 다음 개인 점수
+        if (a.teamScore !== null && b.teamScore !== null) {
+          if (b.teamScore !== a.teamScore) return b.teamScore - a.teamScore;
+        }
+        return b.score - a.score;
+      });
+      
+      return { results, winners: winningTeams, teamScores };
+    }
+    
+    // 개인전 모드 (기존 로직)
     let winners = [];
     let maxScore = 0;
     
@@ -105,13 +190,29 @@ class ClickBattle {
     const clickUpdates = this.room.players.map((p) => ({
       id: p.id,
       clicks: this.gameState.clicks[p.id] || 0,
+      teamId: p.teamId || null,
     }));
+    
+    // 팀별 점수 계산
+    let teamScores = {};
+    if (this.room.teamMode && this.room.teams && this.room.teams.length > 0) {
+      this.room.teams.forEach((team) => {
+        teamScores[team.id] = 0;
+      });
+      Object.entries(this.gameState.clicks).forEach(([playerId, clicks]) => {
+        const player = this.room.players.find((p) => p.id === playerId);
+        if (player && player.teamId) {
+          teamScores[player.teamId] = (teamScores[player.teamId] || 0) + clicks;
+        }
+      });
+    }
     
     return {
       duration: this.gameState.duration,
       startTime: this.gameState.startTime,
       gameType: this.gameState.gameType,
       clickUpdates,
+      teamScores: this.room.teamMode ? teamScores : null,
       timeRemaining: remaining,
     };
   }

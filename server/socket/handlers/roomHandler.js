@@ -38,7 +38,7 @@ function setupRoomHandlers(socket, io, rooms, user) {
   });
 
   // 방 생성
-  socket.on("createRoom", ({ roomName, maxPlayers = 4, isPublic = true }) => {
+  socket.on("createRoom", ({ roomName, maxPlayers = 20, isPublic = true }) => {
     // 이전 방에서 나가기 (다른 방에 있으면 먼저 나감)
     rooms.forEach((room, existingRoomId) => {
       const existingPlayer = room.players.find((p) => p.id === socket.id);
@@ -73,11 +73,14 @@ function setupRoomHandlers(socket, io, rooms, user) {
         userId: currentUser?.id || null,
         provider: currentUser?.provider || null,
         photo: currentUser?.photo || null,
+        teamId: null, // 팀 ID (null이면 팀 없음)
       }],
-      maxPlayers: maxPlayers || 4,
+      maxPlayers: maxPlayers || 20,
       status: "waiting",
       selectedGame: "clickBattle", // 기본 게임
       isPublic: isPublic !== false, // 기본값은 true (공개)
+      teams: [], // 팀 목록: [{ id: 1, name: "팀 1", color: "#FF5733" }, ...]
+      teamMode: false, // 팀전 모드 활성화 여부
     };
 
     rooms.set(roomId, newRoom);
@@ -135,13 +138,14 @@ function setupRoomHandlers(socket, io, rooms, user) {
     const currentUser = user || null;
     const playerName = currentUser ? currentUser.name : `플레이어 ${socket.id.substring(0, 6)}`;
 
-    room.players.push({ 
-      id: socket.id, 
-      name: playerName,
-      userId: currentUser?.id || null,
-      provider: currentUser?.provider || null,
-      photo: currentUser?.photo || null,
-    });
+          room.players.push({ 
+            id: socket.id, 
+            name: playerName,
+            userId: currentUser?.id || null,
+            provider: currentUser?.provider || null,
+            photo: currentUser?.photo || null,
+            teamId: null, // 팀 ID (null이면 팀 없음)
+          });
     socket.join(roomId);
     socket.emit("joinedRoom", room);
     io.to(roomId).emit("roomUpdated", room); // 방의 모든 플레이어에게 업데이트
@@ -191,6 +195,116 @@ function setupRoomHandlers(socket, io, rooms, user) {
         io.to(roomId).emit("roomUpdated", room);
       }
     }
+  });
+
+  // 팀 설정 (방장만 가능)
+  socket.on("setTeams", ({ roomId, teamCount, teamNames, teamColors }) => {
+    const room = rooms.get(roomId);
+    if (!room) {
+      socket.emit("setTeamsError", { message: "방을 찾을 수 없습니다." });
+      return;
+    }
+
+    // 방장만 팀 설정 가능 (첫 번째 플레이어)
+    if (room.players[0].id !== socket.id) {
+      socket.emit("setTeamsError", { message: "방장만 팀을 설정할 수 있습니다." });
+      return;
+    }
+
+    // 팀 개수 검증 (2~8개)
+    const finalTeamCount = Math.max(2, Math.min(8, teamCount || 2));
+    
+    // 팀 생성
+    const teamColorsList = [
+      "#FF5733", // 빨간색
+      "#33C3F0", // 파란색
+      "#33FF57", // 초록색
+      "#FFD933", // 노란색
+      "#9D33FF", // 보라색
+      "#FF33A1", // 분홍색
+      "#33FFF0", // 청록색
+      "#FF8C33", // 주황색
+    ];
+
+    room.teams = [];
+    for (let i = 0; i < finalTeamCount; i++) {
+      room.teams.push({
+        id: i + 1,
+        name: teamNames && teamNames[i] ? teamNames[i] : `팀 ${i + 1}`,
+        color: teamColors && teamColors[i] ? teamColors[i] : teamColorsList[i % teamColorsList.length],
+      });
+    }
+
+    // 모든 플레이어의 팀 초기화
+    room.players.forEach((player) => {
+      player.teamId = null;
+    });
+
+    room.teamMode = true;
+    io.to(roomId).emit("roomUpdated", room);
+    console.log(`방 ${roomId}의 팀 설정됨: ${finalTeamCount}개 팀`);
+  });
+
+  // 팀 모드 해제 (방장만 가능)
+  socket.on("disableTeamMode", ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room) {
+      socket.emit("setTeamsError", { message: "방을 찾을 수 없습니다." });
+      return;
+    }
+
+    if (room.players[0].id !== socket.id) {
+      socket.emit("setTeamsError", { message: "방장만 팀 모드를 해제할 수 있습니다." });
+      return;
+    }
+
+    room.teamMode = false;
+    room.teams = [];
+    room.players.forEach((player) => {
+      player.teamId = null;
+    });
+
+    io.to(roomId).emit("roomUpdated", room);
+    console.log(`방 ${roomId}의 팀 모드 해제됨`);
+  });
+
+  // 플레이어 팀 배치/변경
+  socket.on("assignPlayerToTeam", ({ roomId, playerId, teamId }) => {
+    const room = rooms.get(roomId);
+    if (!room) {
+      socket.emit("assignTeamError", { message: "방을 찾을 수 없습니다." });
+      return;
+    }
+
+    if (!room.teamMode) {
+      socket.emit("assignTeamError", { message: "팀 모드가 활성화되지 않았습니다." });
+      return;
+    }
+
+    // 방장이거나 본인만 팀 배치 가능
+    const isHost = room.players[0].id === socket.id;
+    const isSelf = playerId === socket.id;
+    
+    if (!isHost && !isSelf) {
+      socket.emit("assignTeamError", { message: "자신의 팀만 변경할 수 있습니다." });
+      return;
+    }
+
+    const player = room.players.find((p) => p.id === playerId);
+    if (!player) {
+      socket.emit("assignTeamError", { message: "플레이어를 찾을 수 없습니다." });
+      return;
+    }
+
+    // teamId가 null이거나 유효한 팀 ID인지 확인
+    if (teamId !== null && !room.teams.find((t) => t.id === teamId)) {
+      socket.emit("assignTeamError", { message: "유효하지 않은 팀입니다." });
+      return;
+    }
+
+    player.teamId = teamId;
+    io.to(roomId).emit("roomUpdated", room);
+    console.log(`플레이어 ${playerId}를 팀 ${teamId || "없음"}에 배치함 (방 ${roomId})`);
   });
 }
 

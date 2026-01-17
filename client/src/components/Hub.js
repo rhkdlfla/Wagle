@@ -4,7 +4,7 @@ import "./Hub.css";
 function Hub({ socket, onJoinRoom, user }) {
   const [roomList, setRoomList] = useState([]);
   const [roomName, setRoomName] = useState("");
-  const [maxPlayers, setMaxPlayers] = useState(4);
+  const [maxPlayers, setMaxPlayers] = useState(20);
   const [isPublic, setIsPublic] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -87,6 +87,12 @@ function Hub({ socket, onJoinRoom, user }) {
                 <option value={2}>2명</option>
                 <option value={3}>3명</option>
                 <option value={4}>4명</option>
+                <option value={5}>5명</option>
+                <option value={6}>6명</option>
+                <option value={8}>8명</option>
+                <option value={10}>10명</option>
+                <option value={15}>15명</option>
+                <option value={20}>20명</option>
               </select>
             </div>
             <div className="room-visibility">

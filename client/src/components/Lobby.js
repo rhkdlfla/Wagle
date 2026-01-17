@@ -64,12 +64,24 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       console.error("채팅 에러:", message);
     });
 
+    // 팀 설정 에러 수신
+    socket.on("setTeamsError", ({ message }) => {
+      alert(message);
+    });
+
+    // 팀 배치 에러 수신
+    socket.on("assignTeamError", ({ message }) => {
+      alert(message);
+    });
+
     return () => {
       socket.off("roomUpdated");
       socket.off("gameStarted");
       socket.off("leftRoom");
       socket.off("messageReceived");
       socket.off("messageError");
+      socket.off("setTeamsError");
+      socket.off("assignTeamError");
     };
   }, [socket, onLeaveRoom, onStartGame]);
 
@@ -77,6 +89,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
 
   const handleUpdateName = () => {
     if (playerName.trim() !== "") {
@@ -107,6 +120,60 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         duration: duration,
       });
     }
+  };
+
+  const handleSetTeams = (teamCount) => {
+    if (isHost) {
+      socket.emit("setTeams", {
+        roomId: currentRoom.id,
+        teamCount: teamCount,
+      });
+    }
+  };
+
+  const handleDisableTeamMode = () => {
+    if (isHost) {
+      socket.emit("disableTeamMode", {
+        roomId: currentRoom.id,
+      });
+    }
+  };
+
+  const handleAssignPlayerToTeam = (playerId, teamId) => {
+    socket.emit("assignPlayerToTeam", {
+      roomId: currentRoom.id,
+      playerId: playerId,
+      teamId: teamId,
+    });
+  };
+
+  const getPlayersByTeam = () => {
+    if (!currentRoom.teamMode || !currentRoom.teams || currentRoom.teams.length === 0) {
+      return null;
+    }
+
+    const teamsMap = {};
+    currentRoom.teams.forEach((team) => {
+      teamsMap[team.id] = {
+        team,
+        players: [],
+      };
+    });
+
+    // 팀 없는 플레이어들
+    teamsMap[null] = {
+      team: { id: null, name: "팀 없음", color: "#666" },
+      players: [],
+    };
+
+    currentRoom.players.forEach((player) => {
+      const teamId = player.teamId || null;
+      if (teamsMap[teamId]) {
+        teamsMap[teamId].players.push(player);
+      }
+    });
+
+    return teamsMap;
   };
 
   // 시간을 초 단위로 포맷팅
@@ -250,47 +317,158 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
 
         <div className="players-section">
           <h2>플레이어 목록 ({currentRoom.players.length}/{currentRoom.maxPlayers})</h2>
-          <div className="players-list">
-            {currentRoom.players.map((player, index) => (
-              <div
-                key={player.id}
-                className={`player-item ${player.id === socket.id ? "me" : ""} ${
-                  index === 0 ? "host" : ""
-                }`}
-              >
-                <div className="player-info">
-                  {player.photo ? (
-                    <img
-                      src={player.photo}
-                      alt={player.name}
-                      className="player-avatar"
+          
+          {/* 팀 설정 UI (방장만) */}
+          {isHost && (
+            <div className="team-settings">
+              {!currentRoom.teamMode ? (
+                <div className="team-mode-toggle">
+                  <h3>팀전 모드</h3>
+                  <div className="team-count-buttons">
+                    {[2, 3, 4, 5, 6].map((count) => (
+                      <button
+                        key={count}
+                        onClick={() => handleSetTeams(count)}
+                        className="team-count-button"
+                      >
+                        {count}팀
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="team-mode-active">
+                  <div className="team-mode-header">
+                    <h3>팀전 모드 활성화됨 ({currentRoom.teams?.length || 0}팀)</h3>
+                    <button
+                      onClick={handleDisableTeamMode}
+                      className="disable-team-mode-button"
+                    >
+                      팀전 모드 해제
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 팀별 플레이어 목록 또는 일반 플레이어 목록 */}
+          {currentRoom.teamMode && currentRoom.teams && currentRoom.teams.length > 0 ? (
+            <div className="teams-list">
+              {Object.values(getPlayersByTeam()).map(({ team, players }) => (
+                <div key={team.id || "no-team"} className="team-group">
+                  <div
+                    className="team-header"
+                    style={{ borderLeftColor: team.color }}
+                  >
+                    <div
+                      className="team-color-indicator"
+                      style={{ backgroundColor: team.color }}
                     />
-                  ) : (
-                    <span className="player-number">{index + 1}</span>
-                  )}
-                  <span className="player-name">
-                    {player.name}
-                    {index === 0 && <span className="host-badge">👑 방장</span>}
-                    {player.id === socket.id && (
-                      <span className="me-badge">나</span>
+                    <span className="team-name">{team.name}</span>
+                    <span className="team-count">({players.length}명)</span>
+                  </div>
+                  <div className="team-players">
+                    {players.map((player, index) => {
+                      const isPlayerHost = currentRoom.players[0].id === player.id;
+                      const canChangeTeam = isHost || player.id === socket.id;
+                      return (
+                        <div
+                          key={player.id}
+                          className={`player-item ${player.id === socket.id ? "me" : ""} ${
+                            isPlayerHost ? "host" : ""
+                          }`}
+                        >
+                          <div className="player-info">
+                            {player.photo ? (
+                              <img
+                                src={player.photo}
+                                alt={player.name}
+                                className="player-avatar"
+                              />
+                            ) : (
+                              <span className="player-number">{index + 1}</span>
+                            )}
+                            <span className="player-name">
+                              {player.name}
+                              {isPlayerHost && (
+                                <span className="host-badge">👑 방장</span>
+                              )}
+                              {player.id === socket.id && (
+                                <span className="me-badge">나</span>
+                              )}
+                            </span>
+                          </div>
+                          {canChangeTeam && (
+                            <div className="team-select">
+                              <select
+                                value={player.teamId || ""}
+                                onChange={(e) =>
+                                  handleAssignPlayerToTeam(
+                                    player.id,
+                                    e.target.value === "" ? null : Number(e.target.value)
+                                  )
+                                }
+                              >
+                                <option value="">팀 없음</option>
+                                {currentRoom.teams.map((team) => (
+                                  <option key={team.id} value={team.id}>
+                                    {team.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="players-list">
+              {currentRoom.players.map((player, index) => (
+                <div
+                  key={player.id}
+                  className={`player-item ${player.id === socket.id ? "me" : ""} ${
+                    index === 0 ? "host" : ""
+                  }`}
+                >
+                  <div className="player-info">
+                    {player.photo ? (
+                      <img
+                        src={player.photo}
+                        alt={player.name}
+                        className="player-avatar"
+                      />
+                    ) : (
+                      <span className="player-number">{index + 1}</span>
                     )}
-                  </span>
+                    <span className="player-name">
+                      {player.name}
+                      {index === 0 && <span className="host-badge">👑 방장</span>}
+                      {player.id === socket.id && (
+                        <span className="me-badge">나</span>
+                      )}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
-            {Array.from({
-              length: currentRoom.maxPlayers - currentRoom.players.length,
-            }).map((_, index) => (
-              <div key={`empty-${index}`} className="player-item empty">
-                <div className="player-info">
-                  <span className="player-number">
-                    {currentRoom.players.length + index + 1}
-                  </span>
-                  <span className="player-name empty-name">대기 중...</span>
+              ))}
+              {Array.from({
+                length: currentRoom.maxPlayers - currentRoom.players.length,
+              }).map((_, index) => (
+                <div key={`empty-${index}`} className="player-item empty">
+                  <div className="player-info">
+                    <span className="player-number">
+                      {currentRoom.players.length + index + 1}
+                    </span>
+                    <span className="player-name empty-name">대기 중...</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           <div className="name-input-section">
             <h3>내 이름 변경</h3>
