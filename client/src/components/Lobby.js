@@ -25,17 +25,36 @@ const GAMES = [
     icon: "🧩",
     minPlayers: 1,
   },
+  {
+    id: "numberRush",
+    name: "넘버 러시",
+    description: "숫자를 빠르게 입력하세요!",
+    icon: "🔢",
+    minPlayers: 1,
+  },
 ];
-import { useLocation } from "react-router-dom";
-import { GAME_METADATA, getGameMetadata } from "../games";
-import "./Lobby.css";
 
-// 게임 목록을 중앙 레지스트리에서 가져옴
-const GAMES = GAME_METADATA;
-
-// 게임 설정 가져오기 (하위 호환성 유지)
+// 게임 설정 가져오기 함수
 function getGameConfig(gameId) {
-  return getGameMetadata(gameId);
+  const game = GAMES.find(g => g.id === gameId);
+  if (!game) {
+    return {
+      supportsDuration: false,
+      supportsRelayMode: false,
+      defaultDuration: 30,
+      minDuration: 5,
+      maxDuration: 300,
+      durationPresets: [],
+    };
+  }
+  return {
+    supportsDuration: game.supportsDuration || false,
+    supportsRelayMode: game.supportsRelayMode || false,
+    defaultDuration: game.defaultDuration || 30,
+    minDuration: game.minDuration || 5,
+    maxDuration: game.maxDuration || 300,
+    durationPresets: game.durationPresets || [],
+  };
 }
 
 function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
@@ -180,11 +199,11 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       fetchAvailableQuizzes();
       
       // 게임 변경 시 해당 게임의 기본 duration 설정 (없으면)
-      const gameConfig = getGameConfig(gameId);
-      if (gameConfig.supportsDuration && !gameDurations[gameId]) {
+      const gameConfig = getGameConfig(selectedGame);
+      if (gameConfig.supportsDuration && !gameDurations[selectedGame]) {
         setGameDurations((prev) => ({
           ...prev,
-          [gameId]: gameConfig.defaultDuration,
+          [selectedGame]: gameConfig.defaultDuration,
         }));
       }
     }
@@ -225,7 +244,6 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         alert("퀴즈를 선택해주세요.");
         return;
       }
-      const duration = selectedGame === "clickBattle" ? gameDuration * 1000 : undefined;
       const gameConfig = getGameConfig(selectedGame);
       const duration = gameConfig.supportsDuration
         ? (gameDurations[selectedGame] || gameConfig.defaultDuration) * 1000
@@ -849,6 +867,11 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                   >
                     5분
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 게임 시간 설정 UI (범용) */}
           {(() => {
             const gameConfig = getGameConfig(selectedGame);
