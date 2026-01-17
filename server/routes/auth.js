@@ -95,6 +95,7 @@ router.get("/logout", (req, res) => {
 // 현재 사용자 정보 조회
 router.get("/user", (req, res) => {
   if (req.isAuthenticated()) {
+    console.log("✅ 인증된 사용자:", req.user.name, `(${req.user.provider})`);
     // MongoDB의 _id를 id로 변환하여 반환
     const userData = req.user.toObject ? req.user.toObject() : req.user;
     const userWithId = {

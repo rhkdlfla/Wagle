@@ -4,6 +4,10 @@ import io from "socket.io-client";
 import Hub from "./components/Hub";
 import Lobby from "./components/Lobby";
 import Login from "./components/Login";
+import ClickBattle from "./components/ClickBattle";
+import AppleBattle from "./components/AppleBattle";
+import QuizBattle from "./components/QuizBattle";
+import QuizForm from "./components/QuizForm";
 import { getGameComponent } from "./games";
 import "./App.css";
 
@@ -81,6 +85,14 @@ function GameApp({ socket, user, onLogout }) {
         <Route
           path="/room/:roomId/game"
           element={<RoomGame socket={socket} user={user} />}
+        />
+        <Route
+          path="/quiz/create"
+          element={<QuizFormPage user={user} />}
+        />
+        <Route
+          path="/quiz/edit/:quizId"
+          element={<QuizFormPage user={user} />}
         />
       </Routes>
     </div>
@@ -298,11 +310,80 @@ function RoomGame({ socket, user }) {
     );
   }
 
+  if (room.selectedGame === "quizBattle") {
+    return (
+      <QuizBattle
+        socket={socket}
+        room={room}
+        onBackToLobby={handleBackToLobby}
+      />
+    );
+  }
+
   return (
     <GameComponent
       socket={socket}
       room={room}
       onBackToLobby={handleBackToLobby}
+    />
+  );
+}
+
+// 퀴즈 폼 페이지 컴포넌트
+function QuizFormPage({ user }) {
+  const navigate = useNavigate();
+  const { quizId } = useParams();
+  const [quizToEdit, setQuizToEdit] = useState(null);
+  const [isLoading, setIsLoading] = useState(!!quizId);
+
+  useEffect(() => {
+    // 편집 모드인 경우 퀴즈 데이터 로드
+    if (quizId) {
+      const fetchQuiz = async () => {
+        try {
+          const response = await fetch(`/api/quiz/${quizId}`);
+          if (response.ok) {
+            const quiz = await response.json();
+            setQuizToEdit(quiz);
+          } else {
+            alert("퀴즈를 불러올 수 없습니다.");
+            navigate(-1);
+          }
+        } catch (error) {
+          console.error("퀴즈 로드 실패:", error);
+          alert("퀴즈를 불러올 수 없습니다.");
+          navigate(-1);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchQuiz();
+    }
+  }, [quizId, navigate]);
+
+  const handleClose = () => {
+    navigate(-1);
+  };
+
+  const handleSuccess = () => {
+    navigate(-1);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="connection-status">
+        <h2>퀴즈 로딩 중...</h2>
+        <p>잠시만 기다려주세요.</p>
+      </div>
+    );
+  }
+
+  return (
+    <QuizForm
+      onClose={handleClose}
+      onSuccess={handleSuccess}
+      user={user}
+      quizToEdit={quizToEdit}
     />
   );
 }

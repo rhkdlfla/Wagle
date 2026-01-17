@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 const http = require("http");
+const path = require("path");
 const { Server } = require("socket.io");
 const cors = require("cors");
 const session = require("express-session");
@@ -11,6 +12,8 @@ const passport = require("passport");
 require("./config/database"); // MongoDB 연결
 require("./config/passport"); // Passport 인증 설정
 const authRoutes = require("./routes/auth");
+const quizRoutes = require("./routes/quiz");
+const uploadRoutes = require("./routes/upload");
 
 // 환경 변수
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
@@ -41,11 +44,16 @@ app.use(
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// 정적 파일 서빙 (업로드된 파일)
+app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
 
 // 라우트 설정
 app.use("/auth", authRoutes);
+app.use("/api/quiz", quizRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // HTTP 서버 및 Socket.IO 설정
 const server = http.createServer(app);

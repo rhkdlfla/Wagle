@@ -1,5 +1,6 @@
 const ClickBattle = require("../games/ClickBattle");
 const AppleBattle = require("../games/AppleBattle");
+const QuizBattle = require("../games/QuizBattle");
 const NumberRush = require("../games/NumberRush");
 
 // 게임 인스턴스 저장 (updateInterval 관리를 위해)
@@ -62,90 +63,116 @@ function calculateGameDuration(gameType, requestedDuration) {
 
 function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
   // 게임 시작
-  socket.on("startGame", ({ roomId, gameType = "clickBattle", duration }) => {
+  socket.on("startGame", async ({ roomId, gameType = "clickBattle", duration, quizId }) => {
     const room = rooms.get(roomId);
-    if (!room || room.players.length === 0) {
-      return;
-    }
-
-    // 방장만 게임 시작 가능
-    if (room.players[0].id !== socket.id) {
-      socket.emit("gameError", { message: "방장만 게임을 시작할 수 있습니다." });
-      return;
-    }
-
-    // 게임 타입 검증
-    if (!GAME_CLASSES[gameType]) {
-      socket.emit("gameError", { message: "알 수 없는 게임 타입입니다." });
-      return;
-    }
-
-    room.status = "playing";
-    room.selectedGame = gameType;
-
-    // 게임 시간 계산
-    const gameDuration = calculateGameDuration(gameType, duration);
-    const config = getGameConfig(gameType);
-
-    // 게임 상태 초기화
-    const gameState = {
-      gameType: gameType,
-      startTime: Date.now(),
-      duration: gameDuration,
-      clicks: {},
-      isActive: true,
-      relayMode:
-        config.supportsRelayMode &&
-        room.teamMode &&
-        room.relayMode
-          ? true
-          : false,
-    };
-
-    // 게임 인스턴스 생성 및 초기화
-    try {
-      const game = createGame(gameType, io, gameState, room);
-      game.initialize();
-      gameStates.set(roomId, gameState);
-
-      // 게임 시작 이벤트 전송
-      const gameStateData = game.getGameStateData();
-      io.to(roomId).emit("gameStarted", {
-        room: room,
-        gameState: {
-          duration: gameState.duration,
-          startTime: gameState.startTime,
-          gameType: gameType,
-          // 게임별 추가 데이터는 getGameStateData에서 포함
-          ...(gameStateData.grid && { grid: gameStateData.grid }),
-        },
-      });
-
-      io.emit("roomList", getRoomList(rooms));
-      console.log(
-        `게임 시작: ${roomId}, 게임 타입: ${gameType}, 시작 시간: ${new Date(
-          gameState.startTime
-        ).toISOString()}`
-      );
-
-      // 업데이트 루프 시작
-      const updateInterval = game.startUpdateLoop(() => endGame(roomId));
-
-      // 게임 인스턴스 저장
-      gameInstances.set(roomId, { game, updateInterval, gameType });
-
-      // 게임 종료 타이머
-      setTimeout(() => {
-        const instance = gameInstances.get(roomId);
-        if (instance && instance.updateInterval) {
-          clearInterval(instance.updateInterval);
+    if (room && room.players.length > 0) {
+      // 방장만 게임 시작 가능 (첫 번째 플레이어)
+      if (room.players[0].id === socket.id) {
+        room.status = "playing";
+        room.selectedGame = gameType;
+        
+        // 게임 시간 설정 (밀리초)
+        let gameDuration;
+        if (gameType === "appleBattle") {
+          // 사과배틀: 기본 2분, 범위 30초 ~ 5분
+          const minDuration = 30000; // 30초
+          const maxDuration = 300000; // 5분
+          gameDuration = duration 
+            ? Math.max(minDuration, Math.min(maxDuration, parseInt(duration))) 
+            : 120000; // 기본 2분
+        } else if (gameType === "quizBattle") {
+          // 퀴즈배틀: 퀴즈 문제 수에 따라 자동 계산 (문제당 기본 30초 + 정답 공개 시간)
+          gameDuration = duration || 600000; // 기본 10분
+        } else if (gameType === "numberRush") {
+          // 넘버러시: 기본 1분, 범위 10초 ~ 5분
+          const minDuration = 10000; // 10초
+          const maxDuration = 300000; // 5분
+          gameDuration = duration 
+            ? Math.max(minDuration, Math.min(maxDuration, parseInt(duration))) 
+            : 60000; // 기본 1분
+        } else {
+          // 클릭대결: 기본 30초, 범위 5초 ~ 5분
+          const minDuration = 5000; // 5초
+          const maxDuration = 300000; // 5분
+          gameDuration = duration 
+            ? Math.max(minDuration, Math.min(maxDuration, parseInt(duration))) 
+            : 30000; // 기본 30초
         }
-        endGame(roomId);
-      }, gameState.duration);
-    } catch (error) {
-      console.error(`게임 생성 실패: ${gameType}`, error);
-      socket.emit("gameError", { message: "게임을 시작할 수 없습니다." });
-      room.status = "waiting";
+        
+        // 게임 상태 초기화
+        const gameState = {
+          gameType: gameType,
+          startTime: Date.now(),
+          duration: gameDuration,
+          clicks: {},
+          isActive: true,
+          relayMode: (gameType === "clickBattle" || gameType === "appleBattle") && room.teamMode && room.relayMode ? true : false, // 팀전 모드이고 room에 relayMode가 활성화되어 있을 때만 이어달리기 모드 활성화
+          quizId: gameType === "quizBattle" ? quizId : null, // 퀴즈 ID
+        };
+        
+        // 게임 인스턴스 생성 및 초기화
+        let game;
+        if (gameType === "clickBattle") {
+          game = new ClickBattle(io, gameState, room);
+          game.initialize();
+        } else if (gameType === "appleBattle") {
+          game = new AppleBattle(io, gameState, room);
+          game.initialize();
+        } else if (gameType === "quizBattle") {
+          if (!quizId) {
+            socket.emit("gameError", { message: "퀴즈를 선택해주세요." });
+            return;
+          }
+          game = new QuizBattle(io, gameState, room);
+          try {
+            await game.initialize(); // 비동기 초기화
+          } catch (error) {
+            socket.emit("gameError", { message: error.message || "퀴즈 로드에 실패했습니다." });
+            return;
+          }
+        } else if (gameType === "numberRush") {
+          game = new NumberRush(io, gameState, room);
+          game.initialize();
+        } else {
+          socket.emit("gameError", { message: "알 수 없는 게임 타입입니다." });
+          return;
+        }
+        
+        gameStates.set(roomId, gameState);
+        
+        // 게임 시작 이벤트 전송
+        const gameStateData = game.getGameStateData();
+        io.to(roomId).emit("gameStarted", {
+          room: room,
+          gameState: {
+            duration: gameState.duration,
+            startTime: gameState.startTime,
+            gameType: gameType,
+            grid: gameType === "appleBattle" ? gameState.grid : undefined,
+            quiz: gameType === "quizBattle" ? gameState.quiz : undefined,
+            relayMode: gameState.relayMode,
+            teamActivePlayers: gameState.teamActivePlayers,
+          },
+        });
+        
+        io.emit("roomList", getRoomList(rooms));
+        console.log(`게임 시작: ${roomId}, 게임 타입: ${gameType}, 시작 시간: ${new Date(gameState.startTime).toISOString()}`);
+        
+        // 업데이트 루프 시작
+        const updateInterval = game.startUpdateLoop(() => endGame(roomId));
+        
+        // 게임 인스턴스 저장
+        gameInstances.set(roomId, { game, updateInterval });
+        
+        // 게임 종료 타이머
+        setTimeout(() => {
+          const instance = gameInstances.get(roomId);
+          if (instance && instance.updateInterval) {
+            clearInterval(instance.updateInterval);
+          }
+          endGame(roomId);
+        }, gameState.duration);
+      }
     }
   });
 
@@ -193,41 +220,77 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     console.log(`게임 상태 요청 받음: ${roomId} from ${socket.id}`);
     const gameState = gameStates.get(roomId);
     const room = rooms.get(roomId);
-
-    if (!gameState || !room || !gameState.isActive) {
-      console.log(
-        `게임이 진행 중이 아닙니다. roomId: ${roomId}, roomStatus: ${room?.status}`
-      );
-      return;
-    }
-
-    const instance = gameInstances.get(roomId);
-    if (!instance || !instance.game) {
-      return;
-    }
-
-    try {
-      const gameStateData = instance.game.getGameStateData();
-      
-      // 게임 시작 이벤트 전송
-      socket.emit("gameStarted", {
-        room: room,
-        gameState: {
-          duration: gameStateData.duration,
-          startTime: gameStateData.startTime,
-          gameType: gameState.gameType,
-          ...(gameStateData.grid && { grid: gameStateData.grid }),
-        },
-      });
-
-      // 게임별 업데이트 이벤트 전송 (게임 클래스에서 클라이언트 형식으로 변환)
-      const updateEventName = instance.game.getUpdateEventName?.() || getUpdateEventName(gameState.gameType);
-      
-      // 게임 클래스에 getClientUpdateData 메서드가 있으면 사용, 없으면 기본 데이터 사용
-      const clientUpdateData = instance.game.getClientUpdateData?.() || gameStateData;
-      socket.emit(updateEventName, clientUpdateData);
-    } catch (error) {
-      console.error(`게임 상태 전송 실패: ${roomId}`, error);
+    
+    console.log("게임 상태:", { 
+      hasGameState: !!gameState, 
+      hasRoom: !!room, 
+      isActive: gameState?.isActive,
+      roomStatus: room?.status 
+    });
+    
+    if (gameState && room && gameState.isActive) {
+      const instance = gameInstances.get(roomId);
+      if (instance && instance.game) {
+        const gameStateData = instance.game.getGameStateData();
+        
+        if (gameState.gameType === "clickBattle") {
+          socket.emit("gameStarted", {
+            room: room,
+            gameState: {
+              duration: gameStateData.duration,
+              startTime: gameStateData.startTime,
+              gameType: gameState.gameType,
+            },
+          });
+          
+          socket.emit("clickUpdate", {
+            updates: gameStateData.clickUpdates,
+            teamScores: gameStateData.teamScores || null,
+            timeRemaining: gameStateData.timeRemaining,
+            teamActivePlayers: gameStateData.teamActivePlayers || null,
+          });
+        } else if (gameState.gameType === "appleBattle") {
+          socket.emit("gameStarted", {
+            room: room,
+            gameState: {
+              duration: gameStateData.duration,
+              startTime: gameStateData.startTime,
+              gameType: gameState.gameType,
+              grid: gameStateData.grid,
+            },
+          });
+          
+          socket.emit("appleBattleUpdate", {
+            scores: gameStateData.scoreUpdates,
+            teamScores: gameStateData.teamScores || null,
+            timeRemaining: gameStateData.timeRemaining,
+            grid: gameStateData.grid,
+            teamActivePlayers: gameStateData.teamActivePlayers || null,
+          });
+        } else if (gameState.gameType === "quizBattle") {
+          socket.emit("gameStarted", {
+            room: room,
+            gameState: {
+              duration: gameStateData.duration,
+              startTime: gameStateData.startTime,
+              gameType: gameState.gameType,
+              quiz: gameStateData.quiz,
+              currentQuestionIndex: gameStateData.currentQuestionIndex,
+            },
+          });
+        } else if (gameState.gameType === "numberRush") {
+          socket.emit("gameStarted", {
+            room: room,
+            gameState: {
+              duration: gameStateData.duration,
+              startTime: gameStateData.startTime,
+              gameType: gameState.gameType,
+            },
+          });
+        }
+      }
+    } else {
+      console.log(`게임이 진행 중이 아닙니다. roomId: ${roomId}, roomStatus: ${room?.status}`);
     }
   });
 
@@ -314,6 +377,32 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     // 게임 종료
     endGame(roomId);
     console.log(`방장이 게임을 강제 종료함: ${roomId}`);
+  });
+
+  // 정답 제출 (퀴즈배틀)
+  socket.on("submitAnswer", ({ roomId, answer, timeSpent }) => {
+    const gameState = gameStates.get(roomId);
+    const room = rooms.get(roomId);
+    
+    if (!gameState || !room || gameState.gameType !== "quizBattle") {
+      socket.emit("gameError", { message: "게임이 진행 중이 아닙니다." });
+      return;
+    }
+    
+    if (!gameState.isActive) {
+      return;
+    }
+    
+    const player = room.players.find((p) => p.id === socket.id);
+    if (!player) {
+      socket.emit("gameError", { message: "플레이어를 찾을 수 없습니다." });
+      return;
+    }
+    
+    const instance = gameInstances.get(roomId);
+    if (instance && instance.game instanceof QuizBattle) {
+      instance.game.submitAnswer(socket.id, answer, timeSpent);
+    }
   });
 
   // 사과 제거 이벤트 (사과배틀)
