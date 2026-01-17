@@ -3,12 +3,14 @@
 
 import ClickBattle from "../components/ClickBattle";
 import AppleBattle from "../components/AppleBattle";
+import NumberRush from "../components/NumberRush";
 
 // 게임 컴포넌트 맵핑
 // gameType (서버에서 사용하는 ID) -> React 컴포넌트
 export const GAME_COMPONENTS = {
   clickBattle: ClickBattle,
   appleBattle: AppleBattle,
+  numberRush: NumberRush,
   // 새로운 게임을 추가할 때 여기에 추가:
   // newGame: NewGameComponent,
 };
@@ -41,6 +43,19 @@ export const GAME_METADATA = [
     durationPresets: [30, 60, 120, 180, 300],
     supportsDuration: true,
     supportsRelayMode: true,
+  },
+  {
+    id: "numberRush",
+    name: "넘버 러시",
+    description: "1부터 N까지 순서대로 공을 클릭하세요! 5라운드 대결!",
+    icon: "🔢",
+    minPlayers: 1,
+    defaultDuration: 60, // 초 단위 (라운드 기반이지만 전체 시간 제한)
+    minDuration: 10,
+    maxDuration: 300,
+    durationPresets: [30, 60, 120, 180, 300],
+    supportsDuration: true,
+    supportsRelayMode: false, // 이어달리기 모드 미지원
   },
   // 새로운 게임을 추가할 때 여기에 추가:
   // {

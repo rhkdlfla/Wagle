@@ -1,0 +1,381 @@
+.number-rush-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.game-header {
+  width: 100%;
+  max-width: 1200px;
+  margin-bottom: 30px;
+}
+
+.game-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.game-header-content > div:first-child {
+  flex: 1;
+  text-align: center;
+}
+
+.game-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.game-header h1 {
+  font-size: 3rem;
+  margin-bottom: 10px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.game-header p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
+.end-game-button,
+.leave-game-button {
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid white;
+  border-radius: 8px;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.end-game-button:hover,
+.leave-game-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.waiting-screen {
+  text-align: center;
+  padding: 100px 20px;
+}
+
+.waiting-screen h2 {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+}
+
+.game-screen {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+/* 라운드 정보 */
+.round-info {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  backdrop-filter: blur(10px);
+}
+
+.round-badge {
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 10px 30px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 25px;
+  border: 2px solid white;
+}
+
+.round-timer-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 152, 0, 0.3);
+  border: 3px solid #FF9800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  animation: timerPulse 1s infinite;
+}
+
+@keyframes timerPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.round-timer-text {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #FFD700;
+}
+
+.round-progress {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.round-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  border: 2px solid white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.round-dot.completed {
+  background: #4CAF50;
+  border-color: #4CAF50;
+}
+
+.round-dot.current {
+  background: #FF9800;
+  border-color: #FF9800;
+  animation: currentRoundPulse 1s infinite;
+}
+
+@keyframes currentRoundPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* 라운드 완료 메시지 */
+.round-complete-message {
+  text-align: center;
+  padding: 30px;
+  background: rgba(76, 175, 80, 0.3);
+  border-radius: 15px;
+  border: 2px solid #4CAF50;
+  animation: roundCompleteAnimation 0.5s;
+}
+
+@keyframes roundCompleteAnimation {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.round-complete-message h2 {
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.round-complete-message p {
+  font-size: 1.2rem;
+  margin: 5px 0;
+}
+
+/* 게임 힌트 정보 영역 (게임 영역 밖) */
+.game-hints {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1200px;
+  margin-bottom: 20px;
+  gap: 20px;
+}
+
+.round-time-hint {
+  background: rgba(255, 152, 0, 0.8);
+  padding: 12px 25px;
+  border-radius: 20px;
+  font-size: 1.2rem;
+  border: 2px solid #FF9800;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.round-time-hint strong {
+  color: #FFD700;
+  font-size: 1.4rem;
+}
+
+.next-number-hint {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 15px 35px;
+  border-radius: 25px;
+  font-size: 1.3rem;
+  border: 2px solid white;
+  flex-grow: 1;
+  text-align: center;
+}
+
+.next-number-hint strong {
+  font-size: 1.6rem;
+  color: #FFD700;
+}
+
+/* 게임 영역 */
+.game-area {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  height: 600px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  border: 3px solid white;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+/* 공 스타일 */
+.ball {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 3px solid white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.ball:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+
+.ball.clicked {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: scale(0.8);
+}
+
+.ball-number {
+  font-size: 1.3rem;
+}
+
+.ball-check {
+  font-size: 1.5rem;
+  color: white;
+}
+
+/* 결과 화면 */
+.results-screen {
+  width: 100%;
+  max-width: 800px;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.results-screen h2 {
+  font-size: 3rem;
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.final-round-info {
+  font-size: 1.3rem;
+  margin-bottom: 30px;
+  opacity: 0.9;
+}
+
+.result-actions {
+  margin-top: 30px;
+}
+
+.back-button {
+  padding: 15px 40px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid white;
+  border-radius: 8px;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.back-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .game-header h1 {
+    font-size: 2rem;
+  }
+  
+  .game-hints {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .round-time-hint,
+  .next-number-hint {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .game-area {
+    height: 400px;
+  }
+  
+  .ball {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+  
+  .round-dot {
+    width: 30px;
+    height: 30px;
+    font-size: 1rem;
+  }
+}
