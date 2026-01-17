@@ -69,6 +69,58 @@ const gameStates = new Map(); // roomId -> { startTime, duration, clicks: { sock
 // Socket.IO 연결 처리
 io.on("connection", (socket) => {
   let user = null;
+  let restoredFromPreviousSession = false;
+  
+  // 이전 세션 복원 처리
+  socket.on("restoreSession", ({ previousSocketId }) => {
+    if (!previousSocketId) return;
+    
+    console.log(`이전 세션 복원 시도: ${previousSocketId} -> ${socket.id}`);
+    
+    const restoredRooms = [];
+    
+    // 모든 방에서 이전 소켓 ID로 플레이어 찾기
+    rooms.forEach((room, roomId) => {
+      const playerIndex = room.players.findIndex((p) => p.id === previousSocketId);
+      if (playerIndex !== -1) {
+        // 이전 소켓 ID를 새 소켓 ID로 업데이트
+        room.players[playerIndex].id = socket.id;
+        restoredFromPreviousSession = true;
+        restoredRooms.push(roomId);
+        
+        // 방에 다시 조인
+        socket.join(roomId);
+        
+        // 게임 상태의 클릭 데이터도 업데이트 (클릭 대결 게임인 경우)
+        const gameState = gameStates.get(roomId);
+        if (gameState && gameState.clicks && gameState.clicks[previousSocketId] !== undefined) {
+          gameState.clicks[socket.id] = gameState.clicks[previousSocketId];
+          delete gameState.clicks[previousSocketId];
+        }
+        
+        // 게임 상태의 점수 데이터도 업데이트 (사과배틀 게임인 경우)
+        if (gameState && gameState.scores && gameState.scores[previousSocketId] !== undefined) {
+          gameState.scores[socket.id] = gameState.scores[previousSocketId];
+          delete gameState.scores[previousSocketId];
+        }
+        
+        // 방의 모든 플레이어에게 업데이트 전송
+        io.to(roomId).emit("roomUpdated", room);
+        console.log(`세션 복원 성공: 방 ${roomId}, 플레이어 ${room.players[playerIndex].name}`);
+        
+        // 복원된 방 정보를 클라이언트에 전송 (joinRoom 이벤트 대신)
+        socket.emit("joinedRoom", room);
+      }
+    });
+    
+    if (restoredFromPreviousSession) {
+      socket.emit("sessionRestored", { 
+        success: true, 
+        restoredRooms: restoredRooms,
+        message: restoredRooms.length > 0 ? `${restoredRooms.length}개 방에서 세션이 복원되었습니다.` : "세션이 복원되었습니다."
+      });
+    }
+  });
   
   // 클라이언트에서 사용자 정보 전송 받기
   socket.on("setUser", (userData) => {
@@ -83,29 +135,35 @@ io.on("connection", (socket) => {
   setupGameHandlers(socket, io, rooms, gameStates, getRoomList);
   setupChatHandlers(socket, io, rooms);
 
-  // 연결 해제 처리
+  // 연결 해제 처리 (단, 페이지 새로고침이 아닌 경우에만)
   socket.on("disconnect", () => {
     console.log("유저 접속 끊김", socket.id);
     
-    // 모든 방에서 플레이어 제거
-    rooms.forEach((room, roomId) => {
-      const playerIndex = room.players.findIndex((p) => p.id === socket.id);
-      if (playerIndex !== -1) {
-        room.players.splice(playerIndex, 1);
-        socket.leave(roomId);
+    // 복원된 세션이 아니고 일정 시간 내에 재연결되지 않으면 플레이어 제거
+    // (새로고침의 경우 restoreSession이 먼저 호출되므로 플레이어가 이미 업데이트됨)
+    setTimeout(() => {
+      // 여전히 연결이 끊어진 상태인지 확인
+      if (!socket.connected) {
+        rooms.forEach((room, roomId) => {
+          const playerIndex = room.players.findIndex((p) => p.id === socket.id);
+          if (playerIndex !== -1) {
+            room.players.splice(playerIndex, 1);
+            socket.leave(roomId);
 
-        // 방에 플레이어가 없으면 방 삭제
-        if (room.players.length === 0) {
-          rooms.delete(roomId);
-          // 게임 상태도 함께 삭제
-          gameStates.delete(roomId);
-        } else {
-          io.to(roomId).emit("roomUpdated", room);
-        }
+            // 방에 플레이어가 없으면 방 삭제
+            if (room.players.length === 0) {
+              rooms.delete(roomId);
+              // 게임 상태도 함께 삭제
+              gameStates.delete(roomId);
+            } else {
+              io.to(roomId).emit("roomUpdated", room);
+            }
 
-        io.emit("roomList", getRoomList(rooms));
+            io.emit("roomList", getRoomList(rooms));
+          }
+        });
       }
-    });
+    }, 2000); // 2초 대기 (새로고침 재연결 시간 고려)
   });
 });
 

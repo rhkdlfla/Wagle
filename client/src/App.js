@@ -92,10 +92,17 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
     socket.off("roomUpdated");
     socket.off("gameStarted");
     socket.off("leftRoom");
+    socket.off("sessionRestored");
+
+    let sessionRestoreTimeout = null;
 
     socket.on("joinedRoom", (roomData) => {
       setRoom(roomData);
       setIsLoading(false);
+      // 방 입장 시 세션 스토리지에 방 ID 저장
+      sessionStorage.setItem("currentRoomId", roomData.id);
+      // 세션 복원 플래그 제거
+      sessionStorage.removeItem("waitingForSessionRestore");
     });
 
     socket.on("joinRoomError", ({ message }) => {
@@ -113,7 +120,24 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
     });
 
     socket.on("leftRoom", () => {
+      // 방 나갈 때 세션 스토리지에서 방 ID 제거
+      sessionStorage.removeItem("currentRoomId");
       onLeaveRoom();
+    });
+
+    // 세션 복원 확인
+    socket.on("sessionRestored", ({ success, restoredRooms }) => {
+      const waitingForRestore = sessionStorage.getItem("waitingForSessionRestore");
+      if (waitingForRestore && success && restoredRooms && restoredRooms.includes(roomId)) {
+        // 복원된 방이 현재 방이면 joinRoom 호출하지 않음 (서버에서 이미 joinedRoom 전송됨)
+        hasJoinedRef.current = true;
+        console.log("세션 복원으로 인해 방 입장이 처리되었습니다.");
+      }
+      // 타임아웃 제거
+      if (sessionRestoreTimeout) {
+        clearTimeout(sessionRestoreTimeout);
+        sessionRestoreTimeout = null;
+      }
     });
 
     // roomId가 변경되면 리셋하고 입장 시도
@@ -125,9 +149,23 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
 
     // 이미 입장 시도를 했다면 다시 호출하지 않음
     if (!hasJoinedRef.current) {
-      // 방 입장 시도
-      hasJoinedRef.current = true;
-      socket.emit("joinRoom", { roomId });
+      // 세션 복원 대기 (500ms) - 복원이 실패하면 joinRoom 호출
+      const previousSocketId = sessionStorage.getItem("socketId");
+      if (previousSocketId && previousSocketId !== socket.id) {
+        sessionStorage.setItem("waitingForSessionRestore", "true");
+        sessionRestoreTimeout = setTimeout(() => {
+          // 세션 복원 타임아웃 - 일반 입장 시도
+          if (!hasJoinedRef.current) {
+            hasJoinedRef.current = true;
+            socket.emit("joinRoom", { roomId });
+            sessionStorage.removeItem("waitingForSessionRestore");
+          }
+        }, 500);
+      } else {
+        // 세션 복원이 필요 없으면 바로 입장
+        hasJoinedRef.current = true;
+        socket.emit("joinRoom", { roomId });
+      }
     }
 
     return () => {
@@ -136,6 +174,10 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
       socket.off("roomUpdated");
       socket.off("gameStarted");
       socket.off("leftRoom");
+      socket.off("sessionRestored");
+      if (sessionRestoreTimeout) {
+        clearTimeout(sessionRestoreTimeout);
+      }
     };
   }, [socket, roomId, navigate, onLeaveRoom, onStartGame]);
 
@@ -276,23 +318,57 @@ function App() {
     socket.on("connect", () => {
       setIsConnected(true);
       console.log("서버와 연결됨! 소켓 ID:", socket.id);
+      
+      // 세션 스토리지에서 이전 소켓 ID 확인
+      const previousSocketId = sessionStorage.getItem("socketId");
+      const previousUser = sessionStorage.getItem("userData");
+      const previousRoomId = sessionStorage.getItem("currentRoomId");
+      
+      if (previousSocketId && previousSocketId !== socket.id) {
+        console.log("이전 세션 복원 시도:", previousSocketId);
+        // 서버에 이전 세션 복원 요청
+        socket.emit("restoreSession", { previousSocketId });
+      }
+      
+      // 현재 소켓 ID 저장
+      sessionStorage.setItem("socketId", socket.id);
+      
+      // 사용자 정보가 있으면 저장
+      if (user) {
+        sessionStorage.setItem("userData", JSON.stringify(user));
+      }
+    });
+    
+    // 세션 복원 성공 확인
+    socket.on("sessionRestored", ({ success, restoredRooms, message }) => {
+      if (success) {
+        console.log("세션 복원 성공!", message);
+        if (restoredRooms && restoredRooms.length > 0) {
+          console.log("복원된 방들:", restoredRooms);
+          // 복원된 방이 있으면 세션 스토리지에 표시 (중복 입장 방지)
+          sessionStorage.setItem("sessionRestored", "true");
+        }
+      }
     });
 
     // 연결이 끊겼을 때 실행
     socket.on("disconnect", () => {
       setIsConnected(false);
+      // disconnect 시 세션 스토리지는 유지 (새로고침 복원을 위해)
     });
 
     return () => {
       socket.off("connect");
       socket.off("disconnect");
+      socket.off("sessionRestored");
     };
-  }, []);
+  }, [socket, user]);
 
-  // 사용자 정보가 변경되면 소켓에 전송
+  // 사용자 정보가 변경되면 소켓에 전송 및 세션 스토리지 저장
   useEffect(() => {
     if (user && socket.connected) {
       socket.emit("setUser", user);
+      sessionStorage.setItem("userData", JSON.stringify(user));
     }
   }, [user, socket]);
 
@@ -307,6 +383,10 @@ function App() {
           credentials: "include",
         });
       }
+      // 세션 스토리지 정리
+      sessionStorage.removeItem("socketId");
+      sessionStorage.removeItem("userData");
+      sessionStorage.removeItem("currentRoomId");
       setUser(null);
     } catch (error) {
       console.error("로그아웃 오류:", error);
