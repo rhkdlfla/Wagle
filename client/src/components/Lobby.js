@@ -1,38 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { GAME_METADATA, getGameMetadata } from "../games";
 import "./Lobby.css";
 
-// 게임 목록 및 설정 (중앙 관리)
-const GAMES = [
-  {
-    id: "clickBattle",
-    name: "클릭 대결",
-    description: "일정 시간 동안 최대한 많이 클릭하세요!",
-    icon: "👆",
-    minPlayers: 1,
-    defaultDuration: 30, // 초 단위
-    minDuration: 5,
-    maxDuration: 300,
-    durationPresets: [10, 30, 60, 120, 300], // 초 단위
-    supportsDuration: true,
-  },
-  {
-    id: "appleBattle",
-    name: "사과배틀",
-    description: "합이 10이 되는 사과를 선택해 땅따먹기!",
-    icon: "🍎",
-    minPlayers: 1,
-    defaultDuration: 120, // 초 단위
-    minDuration: 30,
-    maxDuration: 300,
-    durationPresets: [30, 60, 120, 180, 300], // 초 단위
-    supportsDuration: true,
-  },
-];
+// 게임 목록을 중앙 레지스트리에서 가져옴
+const GAMES = GAME_METADATA;
 
-// 게임 설정 가져오기
+// 게임 설정 가져오기 (하위 호환성 유지)
 function getGameConfig(gameId) {
-  return GAMES.find((game) => game.id === gameId) || GAMES[0];
+  return getGameMetadata(gameId);
 }
 
 function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
@@ -702,7 +678,10 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
           })()}
           
           {/* 게임 설정 정보 표시 (모든 플레이어가 볼 수 있음) */}
-          {(selectedGame === "clickBattle" || selectedGame === "appleBattle") && currentRoom.teamMode && (
+          {(() => {
+            const gameConfig = getGameConfig(selectedGame);
+            return gameConfig.supportsRelayMode && currentRoom.teamMode;
+          })() && (
             <div className="game-setting-info">
               <h3>⚙️ 게임 모드 설정</h3>
               {isHost ? (

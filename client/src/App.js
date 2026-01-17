@@ -4,8 +4,7 @@ import io from "socket.io-client";
 import Hub from "./components/Hub";
 import Lobby from "./components/Lobby";
 import Login from "./components/Login";
-import ClickBattle from "./components/ClickBattle";
-import AppleBattle from "./components/AppleBattle";
+import { getGameComponent } from "./games";
 import "./App.css";
 
 // 서버 주소 (nginx를 통해 /api 경로로 접근)
@@ -278,19 +277,21 @@ function RoomGame({ socket, user }) {
     navigate(`/room/${roomId}`);
   };
 
-  // 게임 타입에 따라 다른 컴포넌트 렌더링
-  if (room.selectedGame === "appleBattle") {
+  // 게임 타입에 따라 동적으로 컴포넌트 로딩
+  const GameComponent = getGameComponent(room.selectedGame);
+  
+  if (!GameComponent) {
     return (
-      <AppleBattle
-        socket={socket}
-        room={room}
-        onBackToLobby={handleBackToLobby}
-      />
+      <div className="connection-status">
+        <h2>게임을 찾을 수 없습니다.</h2>
+        <p>알 수 없는 게임 타입: {room.selectedGame}</p>
+        <button onClick={handleBackToLobby}>로비로 돌아가기</button>
+      </div>
     );
   }
 
   return (
-    <ClickBattle
+    <GameComponent
       socket={socket}
       room={room}
       onBackToLobby={handleBackToLobby}
