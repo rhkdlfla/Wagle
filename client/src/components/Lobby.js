@@ -10,6 +10,7 @@ const GAMES = [
     description: "일정 시간 동안 최대한 많이 클릭하세요!",
     icon: "👆",
     minPlayers: 1,
+    supportsRelayMode: true,
   },
   {
     id: "appleBattle",
@@ -17,6 +18,7 @@ const GAMES = [
     description: "합이 10이 되는 사과를 선택해 땅따먹기!",
     icon: "🍎",
     minPlayers: 1,
+    supportsRelayMode: true,
   },
   {
     id: "quizBattle",
@@ -24,6 +26,7 @@ const GAMES = [
     description: "다양한 퀴즈를 풀어보세요!",
     icon: "🧩",
     minPlayers: 1,
+    supportsRelayMode: false,
   },
   {
     id: "numberRush",
@@ -31,6 +34,7 @@ const GAMES = [
     description: "숫자를 빠르게 입력하세요!",
     icon: "🔢",
     minPlayers: 1,
+    supportsRelayMode: false,
   },
 ];
 

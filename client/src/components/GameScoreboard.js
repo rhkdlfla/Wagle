@@ -63,6 +63,45 @@ function GameScoreboard({
                 <span className="scoreboard-team-name">{team.name}</span>
                 <span className="scoreboard-team-value">({team.score}{scoreUnit})</span>
               </div>
+              <div className="scoreboard-team-players">
+                {team.players.map((player) => {
+                  const playerPercentage = maxScore > 0 ? (player.score / maxScore) * 100 : 0;
+                  return (
+                    <div
+                      key={player.id}
+                      className={`scoreboard-player-item ${
+                        player.id === myPlayerId ? "me" : ""
+                      }`}
+                    >
+                      {player.photo && (
+                        <img
+                          src={player.photo}
+                          alt={player.name}
+                          className="scoreboard-player-avatar"
+                        />
+                      )}
+                      <div className="scoreboard-player-info">
+                        <div className="scoreboard-player-name">
+                          {player.name}
+                          {player.id === myPlayerId && <span className="me-badge">나</span>}
+                        </div>
+                        <div className="scoreboard-player-score-bar-container">
+                          <div
+                            className="scoreboard-player-score-bar"
+                            style={{
+                              width: `${playerPercentage}%`,
+                              backgroundColor: team.color,
+                            }}
+                          />
+                          <span className="scoreboard-player-score-value">
+                            {player.score}{scoreUnit}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
