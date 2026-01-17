@@ -16,10 +16,14 @@ class QuizBattle {
         if (!quiz) {
           throw new Error("퀴즈를 찾을 수 없습니다.");
         }
+        
+        // 문제 순서를 랜덤으로 섞기
+        const shuffledQuestions = this.shuffleArray([...quiz.questions]);
+        
         this.gameState.quiz = {
           id: quiz._id.toString(),
           title: quiz.title,
-          questions: quiz.questions,
+          questions: shuffledQuestions,
         };
       } catch (error) {
         console.error("퀴즈 로드 오류:", error);

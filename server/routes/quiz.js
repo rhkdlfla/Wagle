@@ -21,29 +21,44 @@ router.post("/create", requireAuth, async (req, res) => {
   }
   
   try {
-    const { title, description, questions, isPublic } = req.body;
+    let { title, description, questions, isPublic } = req.body;
 
     // 유효성 검사
     if (!title || !title.trim()) {
       return res.status(400).json({ error: "퀴즈 제목이 필요합니다." });
     }
 
-    if (!questions || !Array.isArray(questions) || questions.length === 0) {
-      return res.status(400).json({ error: "최소 1개 이상의 문제가 필요합니다." });
+    // questions가 없거나 빈 배열이면 빈 배열로 처리
+    if (!questions || !Array.isArray(questions)) {
+      questions = [];
     }
 
-    // 각 문제 유효성 검사
+    // 각 문제 유효성 검사 (문제가 있을 때만)
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      if (!q.options || q.options.length < 2) {
-        return res.status(400).json({ error: `문제 ${i + 1}의 형식이 올바르지 않습니다.` });
-      }
-      if (
-        typeof q.correctAnswer !== "number" ||
-        q.correctAnswer < 0 ||
-        q.correctAnswer >= q.options.length
-      ) {
-        return res.status(400).json({ error: `문제 ${i + 1}의 정답 인덱스가 올바르지 않습니다.` });
+      const questionType = q.questionType || "객관식";
+      
+      if (questionType === "객관식") {
+        // 객관식 검증
+        if (!q.options || !Array.isArray(q.options) || q.options.length < 2) {
+          return res.status(400).json({ error: `문제 ${i + 1}의 형식이 올바르지 않습니다. (객관식은 최소 2개의 선택지가 필요합니다)` });
+        }
+        if (
+          typeof q.correctAnswer !== "number" ||
+          q.correctAnswer < 0 ||
+          q.correctAnswer >= q.options.length
+        ) {
+          return res.status(400).json({ error: `문제 ${i + 1}의 정답 인덱스가 올바르지 않습니다.` });
+        }
+      } else if (questionType === "주관식") {
+        // 주관식 검증
+        if (typeof q.correctAnswer !== "string" || !q.correctAnswer.trim()) {
+          return res.status(400).json({ error: `문제 ${i + 1}의 정답을 입력해주세요.` });
+        }
+        // 주관식은 options가 없거나 빈 배열이어야 함
+        if (q.options && q.options.length > 0) {
+          q.options = [];
+        }
       }
     }
 
@@ -58,12 +73,25 @@ router.post("/create", requireAuth, async (req, res) => {
     const quiz = new Quiz({
       title: title.trim(),
       description: description || "",
-      questions: questions.map((q) => ({
-        imageUrl: q.imageUrl || null,
-        audioUrl: q.audioUrl || null,
-        options: q.options.map((opt) => opt.trim()),
-        correctAnswer: q.correctAnswer,
-      })),
+      questions: questions.map((q) => {
+        const questionType = q.questionType || "객관식";
+        const question = {
+          questionType,
+          imageUrl: q.imageUrl || null,
+          correctAnswerImageUrl: q.correctAnswerImageUrl || null,
+          audioUrl: q.audioUrl || null,
+          correctAnswer: q.correctAnswer,
+        };
+        
+        if (questionType === "객관식") {
+          question.options = q.options.map((opt) => opt.trim());
+        } else {
+          // 주관식은 options를 빈 배열로
+          question.options = [];
+        }
+        
+        return question;
+      }),
       creator,
       isPublic: isPublic !== false,
       createdAt: new Date(),
@@ -160,7 +188,7 @@ router.put("/:quizId", requireAuth, async (req, res) => {
     }
 
     const { quizId } = req.params;
-    const { title, description, questions, isPublic } = req.body;
+    let { title, description, questions, isPublic } = req.body;
 
     const quiz = await Quiz.findById(quizId);
     if (!quiz) {
@@ -178,34 +206,62 @@ router.put("/:quizId", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "퀴즈 제목이 필요합니다." });
     }
 
-    if (!questions || !Array.isArray(questions) || questions.length === 0) {
-      return res.status(400).json({ error: "최소 1개 이상의 문제가 필요합니다." });
+    // questions가 없거나 빈 배열이면 빈 배열로 처리
+    if (!questions || !Array.isArray(questions)) {
+      questions = [];
     }
 
-    // 각 문제 유효성 검사
+    // 각 문제 유효성 검사 (문제가 있을 때만)
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      if (!q.options || q.options.length < 2) {
-        return res.status(400).json({ error: `문제 ${i + 1}의 형식이 올바르지 않습니다.` });
-      }
-      if (
-        typeof q.correctAnswer !== "number" ||
-        q.correctAnswer < 0 ||
-        q.correctAnswer >= q.options.length
-      ) {
-        return res.status(400).json({ error: `문제 ${i + 1}의 정답 인덱스가 올바르지 않습니다.` });
+      const questionType = q.questionType || "객관식";
+      
+      if (questionType === "객관식") {
+        // 객관식 검증
+        if (!q.options || !Array.isArray(q.options) || q.options.length < 2) {
+          return res.status(400).json({ error: `문제 ${i + 1}의 형식이 올바르지 않습니다. (객관식은 최소 2개의 선택지가 필요합니다)` });
+        }
+        if (
+          typeof q.correctAnswer !== "number" ||
+          q.correctAnswer < 0 ||
+          q.correctAnswer >= q.options.length
+        ) {
+          return res.status(400).json({ error: `문제 ${i + 1}의 정답 인덱스가 올바르지 않습니다.` });
+        }
+      } else if (questionType === "주관식") {
+        // 주관식 검증
+        if (typeof q.correctAnswer !== "string" || !q.correctAnswer.trim()) {
+          return res.status(400).json({ error: `문제 ${i + 1}의 정답을 입력해주세요.` });
+        }
+        // 주관식은 options가 없거나 빈 배열이어야 함
+        if (q.options && q.options.length > 0) {
+          q.options = [];
+        }
       }
     }
 
     // 퀴즈 업데이트
     quiz.title = title.trim();
     quiz.description = description || "";
-    quiz.questions = questions.map((q) => ({
-      imageUrl: q.imageUrl || null,
-      audioUrl: q.audioUrl || null,
-      options: q.options.map((opt) => opt.trim()),
-      correctAnswer: q.correctAnswer,
-    }));
+    quiz.questions = questions.map((q) => {
+      const questionType = q.questionType || "객관식";
+      const question = {
+        questionType,
+        imageUrl: q.imageUrl || null,
+        correctAnswerImageUrl: q.correctAnswerImageUrl || null,
+        audioUrl: q.audioUrl || null,
+        correctAnswer: q.correctAnswer,
+      };
+      
+      if (questionType === "객관식") {
+        question.options = q.options.map((opt) => opt.trim());
+      } else {
+        // 주관식은 options를 빈 배열로
+        question.options = [];
+      }
+      
+      return question;
+    });
     quiz.isPublic = isPublic !== false;
 
     await quiz.save();

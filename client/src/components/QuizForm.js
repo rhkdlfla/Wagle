@@ -23,6 +23,7 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
       ? quizToEdit.questions.map((q) => ({
           questionType: q.questionType || "객관식",
           imageUrl: q.imageUrl || "",
+          correctAnswerImageUrl: q.correctAnswerImageUrl || "",
           options: q.options || ["", ""],
           correctAnswer: q.correctAnswer || (q.questionType === "주관식" ? "" : 0),
         }))
@@ -30,6 +31,7 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
           {
             questionType: "객관식",
             imageUrl: "",
+            correctAnswerImageUrl: "",
             options: ["", ""],
             correctAnswer: 0,
           },
@@ -40,15 +42,17 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
   const [editingQuestionIndex, setEditingQuestionIndex] = useState(null); // 현재 편집 중인 문제 인덱스
 
   const addQuestion = () => {
-    setQuestions([
-      ...questions,
-      {
-        questionType: defaultQuestionType,
-        imageUrl: "",
-        options: defaultQuestionType === "객관식" ? ["", ""] : [],
-        correctAnswer: defaultQuestionType === "객관식" ? 0 : "",
-      },
-    ]);
+    const newQuestion = {
+      questionType: defaultQuestionType,
+      imageUrl: "",
+      correctAnswerImageUrl: "",
+      options: defaultQuestionType === "객관식" ? ["", ""] : [],
+      correctAnswer: defaultQuestionType === "객관식" ? 0 : "",
+    };
+    const newIndex = questions.length;
+    setQuestions([...questions, newQuestion]);
+    // 새로 추가된 문제의 인덱스로 편집 모달 열기
+    setEditingQuestionIndex(newIndex);
   };
 
   const removeQuestion = (index) => {
@@ -108,18 +112,86 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
     setQuestions(updated);
   };
 
+  // 이미지 리사이징 함수
+  const resizeImage = (file, maxWidth = 1920, maxHeight = 1920, quality = 0.85) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // 크기가 큰 경우 리사이징
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = width * ratio;
+            height = height * ratio;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const resizedFile = new File([blob], file.name, {
+                  type: file.type,
+                  lastModified: Date.now(),
+                });
+                resolve(resizedFile);
+              } else {
+                reject(new Error('이미지 리사이징 실패'));
+              }
+            },
+            file.type,
+            quality
+          );
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   // 이미지 업로드 함수
   const uploadImage = async (file, questionIndex) => {
-    const formData = new FormData();
-    formData.append("image", file);
-
     try {
       setActiveImageUploadIndex(questionIndex);
+      
+      // 파일이 10MB보다 크면 리사이징
+      let fileToUpload = file;
+      if (file.size > 10 * 1024 * 1024) {
+        try {
+          fileToUpload = await resizeImage(file);
+          console.log(`이미지 리사이징 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+        } catch (resizeError) {
+          console.error("이미지 리사이징 오류:", resizeError);
+          // 리사이징 실패해도 원본 파일 사용
+        }
+      }
+
+      const formData = new FormData();
+      formData.append("image", fileToUpload);
+
       const response = await fetch("/api/upload/image", {
         method: "POST",
         credentials: "include",
         body: formData,
       });
+
+      // 응답이 JSON인지 확인
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("서버 응답이 JSON이 아닙니다:", text);
+        throw new Error("서버 응답 오류: HTML이 반환되었습니다. 상태 코드: " + response.status);
+      }
 
       const data = await response.json();
       if (data.success) {
@@ -129,7 +201,57 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
       }
     } catch (error) {
       console.error("이미지 업로드 오류:", error);
-      alert("이미지 업로드에 실패했습니다.");
+      console.error("업로드 실패한 파일:", file);
+      console.error("업로드 실패한 questionIndex:", questionIndex);
+      alert(`이미지 업로드에 실패했습니다: ${error.message || error}`);
+    } finally {
+      setActiveImageUploadIndex(null);
+    }
+  };
+
+  // 정답 이미지 업로드 함수
+  const uploadCorrectAnswerImage = async (file, questionIndex) => {
+    try {
+      setActiveImageUploadIndex(questionIndex);
+      
+      // 파일이 10MB보다 크면 리사이징
+      let fileToUpload = file;
+      if (file.size > 10 * 1024 * 1024) {
+        try {
+          fileToUpload = await resizeImage(file);
+          console.log(`정답 이미지 리사이징 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+        } catch (resizeError) {
+          console.error("정답 이미지 리사이징 오류:", resizeError);
+          // 리사이징 실패해도 원본 파일 사용
+        }
+      }
+
+      const formData = new FormData();
+      formData.append("image", fileToUpload);
+
+      const response = await fetch("/api/upload/image", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      // 응답이 JSON인지 확인
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("서버 응답이 JSON이 아닙니다:", text);
+        throw new Error("서버 응답 오류: HTML이 반환되었습니다. 상태 코드: " + response.status);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        updateQuestion(questionIndex, "correctAnswerImageUrl", data.url);
+      } else {
+        alert(data.error || "정답 이미지 업로드에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("정답 이미지 업로드 오류:", error);
+      alert(`정답 이미지 업로드에 실패했습니다: ${error.message || error}`);
     } finally {
       setActiveImageUploadIndex(null);
     }
@@ -201,19 +323,19 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
         
         if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
           // Clipboard API 권한이 없는 경우 대체 방법 사용
-          useFallbackPasteMethod(questionIndex);
+          applyFallbackPasteMethod(questionIndex);
         } else {
           alert('클립보드에서 이미지를 읽을 수 없습니다. 이미지를 복사한 후 입력 영역에 Ctrl+V를 눌러주세요.');
         }
       }
     } else {
       // Clipboard API를 지원하지 않는 브라우저
-      useFallbackPasteMethod(questionIndex);
+      applyFallbackPasteMethod(questionIndex);
     }
   };
 
   // 대체 방법: 임시 요소를 만들고 paste 이벤트로 처리
-  const useFallbackPasteMethod = (questionIndex) => {
+  const applyFallbackPasteMethod = (questionIndex) => {
     // 활성화된 이미지 업로드 영역이 있으면 해당 영역에 포커스
     setActiveImageUploadIndex(questionIndex);
     
@@ -225,7 +347,8 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
     document.body.appendChild(tempTextarea);
     tempTextarea.focus();
     
-    alert('이미지를 복사한 후 Ctrl+V (또는 Cmd+V)를 눌러주세요.');
+    let isCleanedUp = false;
+    let timeoutId = null;
     
     const pasteHandler = (e) => {
       const items = e.clipboardData?.items;
@@ -245,21 +368,129 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
       }
     };
     
+    const blurHandler = () => {
+      cleanup();
+    };
+    
     const cleanup = () => {
+      if (isCleanedUp) return;
+      isCleanedUp = true;
+      
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      
       if (document.body.contains(tempTextarea)) {
         document.body.removeChild(tempTextarea);
       }
+      
       document.removeEventListener('paste', pasteHandler);
+      tempTextarea.removeEventListener('blur', blurHandler);
       setActiveImageUploadIndex(null);
     };
     
     document.addEventListener('paste', pasteHandler, { once: true });
     
     // 10초 후 자동 정리
-    setTimeout(cleanup, 10000);
+    timeoutId = setTimeout(cleanup, 10000);
     
     // 포커스가 벗어나면 정리
-    tempTextarea.addEventListener('blur', cleanup, { once: true });
+    tempTextarea.addEventListener('blur', blurHandler, { once: true });
+  };
+
+  // 정답 이미지용 클립보드 붙여넣기
+  const handleClipboardPasteForCorrectAnswer = async (questionIndex) => {
+    // Clipboard API 지원 확인 및 사용
+    if (navigator.clipboard && navigator.clipboard.read) {
+      try {
+        const items = await navigator.clipboard.read();
+        
+        for (const item of items) {
+          for (const type of item.types) {
+            if (type.startsWith('image/')) {
+              const blob = await item.getType(type);
+              const file = new File([blob], `clipboard-${Date.now()}.png`, { type: type });
+              uploadCorrectAnswerImage(file, questionIndex);
+              return;
+            }
+          }
+        }
+        
+        alert('클립보드에서 이미지를 찾을 수 없습니다. 이미지를 복사한 후 다시 시도해주세요.');
+      } catch (error) {
+        console.error('클립보드 읽기 오류:', error);
+        
+        if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
+          // Clipboard API 권한이 없는 경우 대체 방법 사용
+          applyFallbackPasteMethodForCorrectAnswer(questionIndex);
+        } else {
+          alert('클립보드에서 이미지를 읽을 수 없습니다. 이미지를 복사한 후 입력 영역에 Ctrl+V를 눌러주세요.');
+        }
+      }
+    } else {
+      // Clipboard API를 지원하지 않는 브라우저
+      applyFallbackPasteMethodForCorrectAnswer(questionIndex);
+    }
+  };
+
+  // 정답 이미지용 대체 붙여넣기 방법
+  const applyFallbackPasteMethodForCorrectAnswer = (questionIndex) => {
+    setActiveImageUploadIndex(questionIndex);
+    
+    const tempTextarea = document.createElement('textarea');
+    tempTextarea.style.position = 'fixed';
+    tempTextarea.style.left = '-9999px';
+    tempTextarea.setAttribute('tabindex', '-1');
+    document.body.appendChild(tempTextarea);
+    tempTextarea.focus();
+    
+    let isCleanedUp = false;
+    let timeoutId = null;
+    
+    const pasteHandler = (e) => {
+      const items = e.clipboardData?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.type.indexOf("image") !== -1) {
+            e.preventDefault();
+            const file = item.getAsFile();
+            if (file) {
+              uploadCorrectAnswerImage(file, questionIndex);
+            }
+            cleanup();
+            return;
+          }
+        }
+      }
+    };
+    
+    const blurHandler = () => {
+      cleanup();
+    };
+    
+    const cleanup = () => {
+      if (isCleanedUp) return;
+      isCleanedUp = true;
+      
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      
+      if (document.body.contains(tempTextarea)) {
+        document.body.removeChild(tempTextarea);
+      }
+      
+      document.removeEventListener('paste', pasteHandler);
+      tempTextarea.removeEventListener('blur', blurHandler);
+      setActiveImageUploadIndex(null);
+    };
+    
+    document.addEventListener('paste', pasteHandler, { once: true });
+    timeoutId = setTimeout(cleanup, 10000);
+    tempTextarea.addEventListener('blur', blurHandler, { once: true });
   };
 
   // 드래그 앤 드롭 처리
@@ -275,8 +506,12 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
     const files = e.dataTransfer.files;
     if (files.length > 0) {
       const file = files[0];
-      if (type === "image" && file.type.startsWith("image/")) {
-        uploadImage(file, questionIndex);
+      if (file.type.startsWith("image/")) {
+        if (type === "image") {
+          uploadImage(file, questionIndex);
+        } else if (type === "correctAnswerImage") {
+          uploadCorrectAnswerImage(file, questionIndex);
+        }
       }
     }
   };
@@ -510,6 +745,10 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
     <div 
       className="quiz-form-page"
       onPaste={(e) => {
+        // 모달이 열려있으면 페이지 레벨 붙여넣기 비활성화
+        if (editingQuestionIndex !== null) {
+          return;
+        }
         // 입력 필드가 아닌 곳에서 붙여넣기 시 이미지 업로드 영역에 붙여넣기
         const target = e.target;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
@@ -797,8 +1036,19 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
 
       {/* 편집 모달 - form 밖에 위치 */}
       {editingQuestionIndex !== null && (
-        <div className="question-edit-modal-overlay" onClick={() => setEditingQuestionIndex(null)}>
-          <div className="question-edit-modal" onClick={(e) => e.stopPropagation()}>
+        <div 
+          className="question-edit-modal-overlay" 
+          onClick={() => setEditingQuestionIndex(null)}
+        >
+          <div 
+            className="question-edit-modal" 
+            onClick={(e) => e.stopPropagation()}
+            onPaste={(e) => {
+              // 모달 내부에서 paste 이벤트 발생 시 처리
+              e.stopPropagation();
+              handlePaste(e, editingQuestionIndex);
+            }}
+          >
             <div className="modal-header">
               <h3>문제 편집</h3>
               <button className="close-button" onClick={() => setEditingQuestionIndex(null)}>✕</button>
@@ -859,7 +1109,6 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
                     <span className="label-text">이미지 (선택)</span>
                     <div 
                       className="file-upload-group"
-                      onPaste={(e) => handlePaste(e, editingQuestionIndex)}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, editingQuestionIndex, "image")}
                       onFocus={() => setActiveImageUploadIndex(editingQuestionIndex)}
@@ -939,6 +1188,76 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
                         required
                       />
                     )}
+                  </label>
+                </div>
+
+                <div className="form-section">
+                  <label>
+                    <span className="label-text">정답 이미지 (선택)</span>
+                    <div 
+                      className="file-upload-group"
+                      onPaste={(e) => {
+                        e.stopPropagation();
+                        const items = e.clipboardData?.items;
+                        if (!items) return;
+                        for (let i = 0; i < items.length; i++) {
+                          const item = items[i];
+                          if (item.type.indexOf("image") !== -1) {
+                            e.preventDefault();
+                            const file = item.getAsFile();
+                            if (file) {
+                              uploadCorrectAnswerImage(file, editingQuestionIndex);
+                            }
+                            break;
+                          }
+                        }
+                      }}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, editingQuestionIndex, "correctAnswerImage")}
+                      onFocus={() => setActiveImageUploadIndex(editingQuestionIndex)}
+                      onBlur={() => setTimeout(() => setActiveImageUploadIndex(null), 200)}
+                      tabIndex={0}
+                    >
+                      <div className="file-upload-area">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              uploadCorrectAnswerImage(file, editingQuestionIndex);
+                            }
+                          }}
+                          className="file-input"
+                          id={`correct-answer-image-input-edit-${editingQuestionIndex}`}
+                        />
+                        <div className="file-upload-buttons">
+                          <label htmlFor={`correct-answer-image-input-edit-${editingQuestionIndex}`} className="file-input-label">
+                            📁 파일 선택
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleClipboardPasteForCorrectAnswer(editingQuestionIndex)}
+                            className="clipboard-button"
+                          >
+                            📋 클립보드에서 가져오기
+                          </button>
+                        </div>
+                        <span className="file-upload-hint">또는 이미지를 여기에 붙여넣기 (Ctrl+V) 또는 드래그 앤 드롭</span>
+                      </div>
+                      {questions[editingQuestionIndex].correctAnswerImageUrl && (
+                        <div className="file-preview">
+                          <img src={questions[editingQuestionIndex].correctAnswerImageUrl} alt="정답 이미지 미리보기" className="preview-image" />
+                          <button
+                            type="button"
+                            onClick={() => updateQuestion(editingQuestionIndex, "correctAnswerImageUrl", "")}
+                            className="remove-file-button"
+                          >
+                            ✕ 삭제
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </label>
                 </div>
 

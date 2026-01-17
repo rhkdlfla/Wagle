@@ -262,6 +262,15 @@ function QuizBattle({ socket, room, onBackToLobby }) {
             // 결과 표시 중
             <div className="question-result">
               <h2>정답 공개!</h2>
+              {quiz && (quiz.questions[currentQuestionIndex]?.correctAnswerImageUrl || quiz.questions[currentQuestionIndex]?.imageUrl) && (
+                <div className="question-image-result">
+                  <img 
+                    src={quiz.questions[currentQuestionIndex].correctAnswerImageUrl || quiz.questions[currentQuestionIndex].imageUrl} 
+                    alt="정답 이미지" 
+                    className="result-question-image"
+                  />
+                </div>
+              )}
               <div className="correct-answer-display">
                 <p className="correct-answer-text">
                   정답: <strong>{questionResult.correctAnswerText}</strong>

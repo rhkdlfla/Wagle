@@ -35,6 +35,10 @@ const QuizSchema = new mongoose.Schema({
         type: String,
         default: null, // 이미지 퀴즈용
       },
+      correctAnswerImageUrl: {
+        type: String,
+        default: null, // 정답 이미지
+      },
       audioUrl: {
         type: String,
         default: null, // 노래 퀴즈용

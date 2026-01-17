@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const sharp = require("sharp");
 
 // 업로드 디렉토리 확인
 const uploadDir = path.join(__dirname, "../uploads");
@@ -72,7 +73,7 @@ const audioFilter = (req, file, cb) => {
 
 const uploadImage = multer({
   storage: imageStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
   fileFilter: imageFilter,
 });
 
@@ -83,10 +84,73 @@ const uploadAudio = multer({
 });
 
 // 이미지 업로드
-router.post("/image", uploadImage.single("image"), (req, res) => {
+router.post("/image", (req, res, next) => {
+  uploadImage.single("image")(req, res, (err) => {
+    if (err) {
+      console.error("이미지 업로드 multer 오류:", err);
+      return res.status(400).json({ error: err.message || "이미지 업로드에 실패했습니다." });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "이미지 파일이 없습니다." });
+    }
+
+    const originalPath = req.file.path;
+    const originalSize = req.file.size;
+    
+    // 이미지 최적화: 최대 너비 1920px, 품질 85%
+    try {
+      const metadata = await sharp(originalPath).metadata().catch(() => null);
+      
+      // sharp가 처리할 수 있는 형식인지 확인
+      if (!metadata || !['jpeg', 'jpg', 'png', 'webp'].includes(metadata.format)) {
+        console.log(`이미지 최적화 건너뜀: ${metadata?.format || 'unknown'} 형식`);
+        // 최적화할 수 없는 형식(GIF 등)은 원본 그대로 사용
+      } else {
+        const optimizedPath = originalPath.replace(path.extname(originalPath), '_optimized' + path.extname(originalPath));
+        const maxWidth = 1920;
+        const maxHeight = 1920;
+        
+        let sharpInstance = sharp(originalPath);
+        
+        // 크기가 큰 경우 리사이징
+        if (metadata.width > maxWidth || metadata.height > maxHeight) {
+          sharpInstance = sharpInstance.resize(maxWidth, maxHeight, {
+            fit: 'inside',
+            withoutEnlargement: true
+          });
+        }
+        
+        // JPEG/PNG/WebP 최적화
+        if (metadata.format === 'jpeg' || metadata.format === 'jpg') {
+          await sharpInstance
+            .jpeg({ quality: 85, mozjpeg: true })
+            .toFile(optimizedPath);
+        } else if (metadata.format === 'png') {
+          await sharpInstance
+            .png({ quality: 85, compressionLevel: 9 })
+            .toFile(optimizedPath);
+        } else if (metadata.format === 'webp') {
+          await sharpInstance
+            .webp({ quality: 85 })
+            .toFile(optimizedPath);
+        }
+        
+        // 최적화된 파일 크기 확인
+        const optimizedStats = await fs.promises.stat(optimizedPath);
+        
+        // 원본 파일 삭제하고 최적화된 파일을 원본 이름으로 변경
+        await fs.promises.unlink(originalPath);
+        await fs.promises.rename(optimizedPath, originalPath);
+        
+        console.log(`이미지 최적화 완료: ${(originalSize / 1024 / 1024).toFixed(2)}MB -> ${(optimizedStats.size / 1024 / 1024).toFixed(2)}MB`);
+      }
+    } catch (optimizeError) {
+      console.error("이미지 최적화 오류:", optimizeError);
+      // 최적화 실패해도 원본 파일 사용
     }
 
     const fileUrl = `/api/uploads/images/${req.file.filename}`;
