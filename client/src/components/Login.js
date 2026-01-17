@@ -10,6 +10,10 @@ function Login({ onLoginSuccess }) {
     if (error) {
       if (error === "kakao_config") {
         alert("카카오 로그인이 설정되지 않았습니다. 서버 관리자에게 문의하세요.");
+      } else if (error === "kakao_timeout") {
+        alert("카카오 로그인 시간이 초과되었습니다. 다시 시도해주세요.");
+      } else if (error === "kakao") {
+        alert("카카오 로그인에 실패했습니다. 다시 시도해주세요.");
       } else {
         alert("로그인에 실패했습니다. 다시 시도해주세요.");
       }

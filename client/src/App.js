@@ -15,6 +15,10 @@ const socket = io.connect("", {
   withCredentials: true,
 });
 
+async function updateGameResult() {
+  return Promise.resolve();
+}
+
 // 메인 게임 컴포넌트 (인증 필요)
 function GameApp({ socket, user, onLogout }) {
   const navigate = useNavigate();
@@ -96,6 +100,7 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
 
     let sessionRestoreTimeout = null;
 
+
     socket.on("joinedRoom", (roomData) => {
       setRoom(roomData);
       setIsLoading(false);
@@ -108,6 +113,18 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
     socket.on("joinRoomError", ({ message }) => {
       alert(message);
       navigate("/");
+    });
+
+    // 서버측 소켓 이벤트 예시
+    socket.on("game_finished", async (data) => {
+      const { winnerId, loserId } = data;
+
+      // 여기서 위에서 만든 함수를 호출
+      await updateGameResult(winnerId, true);  // 승리 처리
+      await updateGameResult(loserId, false);  // 패배 처리
+
+      // 변경된 점수를 모든 클라이언트에게 알림
+      io.emit("update_leaderboard");
     });
 
     socket.on("roomUpdated", (updatedRoom) => {
@@ -352,6 +369,7 @@ function App() {
       // 사용자 정보가 있으면 저장
       if (user) {
         sessionStorage.setItem("userData", JSON.stringify(user));
+        socket.emit("setUser", user);
       }
     });
     
@@ -366,6 +384,29 @@ function App() {
         }
       }
     });
+    
+    socket.on("duplicateLogin", async ({ message }) => {
+      if (message) {
+        alert(message);
+      } else {
+        alert("이미 로그인된 계정입니다.");
+      }
+      
+      try {
+        if (user && user.provider !== "guest") {
+          await fetch(`${SERVER_URL}/auth/logout`, {
+            credentials: "include",
+          });
+        }
+      } catch (error) {
+        console.error("중복 로그인 처리 중 오류:", error);
+      } finally {
+        sessionStorage.removeItem("socketId");
+        sessionStorage.removeItem("userData");
+        sessionStorage.removeItem("currentRoomId");
+        setUser(null);
+      }
+    });
 
     // 연결이 끊겼을 때 실행
     socket.on("disconnect", () => {
@@ -377,6 +418,7 @@ function App() {
       socket.off("connect");
       socket.off("disconnect");
       socket.off("sessionRestored");
+      socket.off("duplicateLogin");
     };
   }, [socket, user]);
 
