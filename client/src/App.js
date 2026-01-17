@@ -6,6 +6,7 @@ import Lobby from "./components/Lobby";
 import Login from "./components/Login";
 import ClickBattle from "./components/ClickBattle";
 import AppleBattle from "./components/AppleBattle";
+import QuizBattle from "./components/QuizBattle";
 import "./App.css";
 
 // 서버 주소 (nginx를 통해 /api 경로로 접근)
@@ -265,6 +266,16 @@ function RoomGame({ socket, user }) {
   if (room.selectedGame === "appleBattle") {
     return (
       <AppleBattle
+        socket={socket}
+        room={room}
+        onBackToLobby={handleBackToLobby}
+      />
+    );
+  }
+
+  if (room.selectedGame === "quizBattle") {
+    return (
+      <QuizBattle
         socket={socket}
         room={room}
         onBackToLobby={handleBackToLobby}

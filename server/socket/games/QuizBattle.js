@@ -1,0 +1,300 @@
+const Quiz = require("../../models/Quiz");
+
+class QuizBattle {
+  constructor(io, gameState, room) {
+    this.io = io;
+    this.gameState = gameState;
+    this.room = room;
+  }
+
+  // 게임 초기화
+  async initialize() {
+    // 퀴즈 데이터 로드
+    if (this.gameState.quizId) {
+      try {
+        const quiz = await Quiz.findById(this.gameState.quizId);
+        if (!quiz) {
+          throw new Error("퀴즈를 찾을 수 없습니다.");
+        }
+        this.gameState.quiz = {
+          id: quiz._id.toString(),
+          title: quiz.title,
+          category: quiz.category,
+          questions: quiz.questions,
+        };
+      } catch (error) {
+        console.error("퀴즈 로드 오류:", error);
+        throw error;
+      }
+    }
+
+    // 게임 상태 초기화
+    this.gameState.currentQuestionIndex = 0;
+    this.gameState.answers = {}; // { playerId: { answer, timeSpent, isCorrect } }
+    this.gameState.scores = {}; // { playerId: score }
+    this.gameState.questionStartTime = Date.now();
+    
+    // 플레이어 점수 초기화
+    this.room.players.forEach((player) => {
+      this.gameState.scores[player.id] = 0;
+    });
+
+    // 팀전 모드인 경우 팀 점수 초기화
+    if (this.room.teamMode && this.room.teams) {
+      this.gameState.teamScores = {};
+      this.room.teams.forEach((team) => {
+        this.gameState.teamScores[team.id] = 0;
+      });
+    }
+  }
+
+  // 주기적 업데이트 시작
+  startUpdateLoop(endGameCallback) {
+    // 첫 문제 전송
+    if (this.gameState.quiz && this.gameState.quiz.questions.length > 0) {
+      setTimeout(() => {
+        this.sendQuestion();
+      }, 2000); // 게임 시작 2초 후 첫 문제
+    }
+
+    const updateInterval = setInterval(() => {
+      const elapsed = Date.now() - this.gameState.startTime;
+      const remaining = Math.max(0, this.gameState.duration - elapsed);
+
+      if (remaining <= 0) {
+        clearInterval(updateInterval);
+        endGameCallback();
+        return;
+      }
+
+      // 현재 문제 시간 업데이트
+      if (this.gameState.currentQuestionIndex < this.gameState.quiz?.questions.length) {
+        const question = this.gameState.quiz.questions[this.gameState.currentQuestionIndex];
+        const questionElapsed = Date.now() - this.gameState.questionStartTime;
+        const questionRemaining = Math.max(0, question.timeLimit * 1000 - questionElapsed);
+
+        // 문제 시간이 끝나면 자동으로 다음 문제로
+        if (questionRemaining <= 0 && Object.keys(this.gameState.answers).length < this.room.players.length) {
+          // 아직 답하지 않은 플레이어는 0점 처리
+          this.room.players.forEach((player) => {
+            if (!this.gameState.answers[player.id]) {
+              this.gameState.answers[player.id] = {
+                answer: null,
+                timeSpent: question.timeLimit * 1000,
+                isCorrect: false,
+              };
+            }
+          });
+          this.nextQuestion();
+        }
+
+        // 문제 시간 업데이트 전송
+        this.io.to(this.room.id).emit("quizUpdate", {
+          questionTimeRemaining: questionRemaining,
+          timeRemaining: remaining,
+          scores: this.gameState.scores,
+          teamScores: this.room.teamMode ? this.gameState.teamScores : null,
+        });
+      }
+    }, 100);
+
+    return updateInterval;
+  }
+
+  // 정답 제출 처리
+  submitAnswer(socketId, answer, timeSpent) {
+    // 이미 답한 경우 무시
+    if (this.gameState.answers[socketId]) {
+      return false;
+    }
+
+    const question = this.gameState.quiz.questions[this.gameState.currentQuestionIndex];
+    const isCorrect = answer === question.correctAnswer;
+
+    // 점수 계산 (빠를수록 높은 점수)
+    let points = 0;
+    if (isCorrect) {
+      const timeBonus = Math.max(0, question.timeLimit * 1000 - timeSpent);
+      points = 100 + Math.floor(timeBonus / 100); // 기본 100점 + 시간 보너스 (밀리초당 1점)
+    }
+
+    this.gameState.scores[socketId] = (this.gameState.scores[socketId] || 0) + points;
+
+    // 팀전 모드인 경우 팀 점수에도 반영
+    if (this.room.teamMode) {
+      const player = this.room.players.find((p) => p.id === socketId);
+      if (player && player.teamId) {
+        this.gameState.teamScores[player.teamId] =
+          (this.gameState.teamScores[player.teamId] || 0) + points;
+      }
+    }
+
+    this.gameState.answers[socketId] = {
+      answer,
+      timeSpent,
+      isCorrect,
+    };
+
+    // 모든 플레이어가 답했는지 확인
+    if (Object.keys(this.gameState.answers).length === this.room.players.length) {
+      // 모두 답했으면 잠시 후 다음 문제로
+      setTimeout(() => {
+        this.nextQuestion();
+      }, 1000);
+    }
+
+    // 개별 답변 확인 전송
+    this.io.to(socketId).emit("answerSubmitted", {
+      isCorrect,
+      points,
+      currentScore: this.gameState.scores[socketId],
+    });
+
+    return true;
+  }
+
+  // 다음 문제로 이동
+  nextQuestion() {
+    // 정답 공개 및 결과 전송
+    const question = this.gameState.quiz.questions[this.gameState.currentQuestionIndex];
+    this.io.to(this.room.id).emit("questionResult", {
+      correctAnswer: question.correctAnswer,
+      correctAnswerText: question.options[question.correctAnswer],
+      answers: this.gameState.answers,
+      scores: this.gameState.scores,
+      teamScores: this.room.teamMode ? this.gameState.teamScores : null,
+    });
+
+    // 다음 문제로 이동
+    setTimeout(() => {
+      this.gameState.currentQuestionIndex++;
+      this.gameState.answers = {};
+      this.gameState.questionStartTime = Date.now();
+
+      if (
+        this.gameState.currentQuestionIndex >= this.gameState.quiz.questions.length
+      ) {
+        // 모든 문제 완료
+        this.endGame();
+      } else {
+        this.sendQuestion();
+      }
+    }, 4000); // 4초 후 다음 문제 (정답 공개 시간 포함)
+  }
+
+  // 문제 전송
+  sendQuestion() {
+    const question =
+      this.gameState.quiz.questions[this.gameState.currentQuestionIndex];
+    this.gameState.questionStartTime = Date.now();
+
+    this.io.to(this.room.id).emit("newQuestion", {
+      question: question.question,
+      imageUrl: question.imageUrl,
+      audioUrl: question.audioUrl,
+      options: question.options,
+      timeLimit: question.timeLimit,
+      questionNumber: this.gameState.currentQuestionIndex + 1,
+      totalQuestions: this.gameState.quiz.questions.length,
+    });
+  }
+
+  // 게임 종료
+  endGame() {
+    // 게임 종료는 gameHandler의 endGame에서 처리
+  }
+
+  // 게임 결과 계산
+  calculateResults() {
+    // 팀전 모드인 경우
+    if (this.room.teamMode && this.gameState.teamScores) {
+      let winningTeams = [];
+      let maxTeamScore = 0;
+
+      Object.entries(this.gameState.teamScores).forEach(([teamId, score]) => {
+        if (score > maxTeamScore) {
+          maxTeamScore = score;
+          winningTeams = [Number(teamId)];
+        } else if (score === maxTeamScore && maxTeamScore > 0) {
+          winningTeams.push(Number(teamId));
+        }
+      });
+
+      const results = this.room.players.map((player) => {
+        const score = this.gameState.scores[player.id] || 0;
+        const isWinner = player.teamId && winningTeams.includes(player.teamId);
+        return {
+          id: player.id,
+          name: player.name,
+          photo: player.photo,
+          score: score,
+          teamId: player.teamId || null,
+          teamScore: player.teamId ? this.gameState.teamScores[player.teamId] : null,
+          isWinner: isWinner,
+        };
+      });
+
+      results.sort((a, b) => {
+        if (a.teamScore !== null && b.teamScore !== null) {
+          if (b.teamScore !== a.teamScore) return b.teamScore - a.teamScore;
+        }
+        return b.score - a.score;
+      });
+
+      return { results, winners: winningTeams, teamScores: this.gameState.teamScores };
+    }
+
+    // 개인전 모드
+    let winners = [];
+    let maxScore = 0;
+
+    Object.entries(this.gameState.scores).forEach(([playerId, score]) => {
+      if (score > maxScore) {
+        maxScore = score;
+        winners.length = 0;
+        winners.push(playerId);
+      } else if (score === maxScore && maxScore > 0) {
+        winners.push(playerId);
+      }
+    });
+
+    const results = this.room.players.map((player) => ({
+      id: player.id,
+      name: player.name,
+      photo: player.photo,
+      score: this.gameState.scores[player.id] || 0,
+      isWinner: winners.includes(player.id),
+    }));
+
+    results.sort((a, b) => b.score - a.score);
+
+    return { results, winners };
+  }
+
+  // 게임 상태 반환 (재연결 시)
+  getGameStateData() {
+    const elapsed = Date.now() - this.gameState.startTime;
+    const remaining = Math.max(0, this.gameState.duration - elapsed);
+
+    const question = this.gameState.quiz?.questions[this.gameState.currentQuestionIndex];
+    let questionTimeRemaining = 0;
+    if (question) {
+      const questionElapsed = Date.now() - this.gameState.questionStartTime;
+      questionTimeRemaining = Math.max(0, question.timeLimit * 1000 - questionElapsed);
+    }
+
+    return {
+      duration: this.gameState.duration,
+      startTime: this.gameState.startTime,
+      gameType: this.gameState.gameType,
+      quiz: this.gameState.quiz,
+      currentQuestionIndex: this.gameState.currentQuestionIndex,
+      scores: this.gameState.scores,
+      teamScores: this.room.teamMode ? this.gameState.teamScores : null,
+      timeRemaining: remaining,
+      questionTimeRemaining: questionTimeRemaining,
+    };
+  }
+}
+
+module.exports = QuizBattle;

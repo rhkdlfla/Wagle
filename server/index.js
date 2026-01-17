@@ -11,6 +11,7 @@ const passport = require("passport");
 require("./config/database"); // MongoDB 연결
 require("./config/passport"); // Passport 인증 설정
 const authRoutes = require("./routes/auth");
+const quizRoutes = require("./routes/quiz");
 
 // 환경 변수
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
@@ -46,6 +47,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // 라우트 설정
 app.use("/auth", authRoutes);
+app.use("/api/quiz", quizRoutes);
 
 // HTTP 서버 및 Socket.IO 설정
 const server = http.createServer(app);

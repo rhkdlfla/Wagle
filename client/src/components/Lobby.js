@@ -18,6 +18,13 @@ const GAMES = [
     icon: "🍎",
     minPlayers: 1,
   },
+  {
+    id: "quizBattle",
+    name: "퀴즈 배틀",
+    description: "다양한 퀴즈를 풀어보세요!",
+    icon: "🧩",
+    minPlayers: 1,
+  },
 ];
 
 function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
@@ -27,6 +34,8 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     currentRoom?.selectedGame || GAMES[0].id
   );
   const [gameDuration, setGameDuration] = useState(30); // 클릭 배틀 기본 30초
+  const [selectedQuizId, setSelectedQuizId] = useState(null); // 선택된 퀴즈 ID
+  const [availableQuizzes, setAvailableQuizzes] = useState([]); // 사용 가능한 퀴즈 목록
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
@@ -118,16 +127,43 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         roomId: currentRoom.id,
         gameId: gameId,
       });
+      // 퀴즈 배틀 선택 시 퀴즈 목록 불러오기
+      if (gameId === "quizBattle") {
+        fetchAvailableQuizzes();
+      } else {
+        setSelectedQuizId(null);
+      }
+    }
+  };
+
+  // 퀴즈 목록 불러오기
+  const fetchAvailableQuizzes = async () => {
+    try {
+      const response = await fetch("/api/quiz/list?limit=20");
+      const data = await response.json();
+      if (data.quizzes) {
+        setAvailableQuizzes(data.quizzes);
+        if (data.quizzes.length > 0 && !selectedQuizId) {
+          setSelectedQuizId(data.quizzes[0]._id);
+        }
+      }
+    } catch (error) {
+      console.error("퀴즈 목록 불러오기 실패:", error);
     }
   };
 
   const handleStartGame = () => {
     if (isHost && currentRoom.players.length > 0) {
+      if (selectedGame === "quizBattle" && !selectedQuizId) {
+        alert("퀴즈를 선택해주세요.");
+        return;
+      }
       const duration = selectedGame === "clickBattle" ? gameDuration * 1000 : undefined;
       socket.emit("startGame", {
         roomId: currentRoom.id,
         gameType: selectedGame,
         duration: duration,
+        quizId: selectedGame === "quizBattle" ? selectedQuizId : undefined,
       });
     }
   };
@@ -613,6 +649,50 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
             ))}
           </div>
           
+          {/* 퀴즈 배틀 퀴즈 선택 UI */}
+          {selectedGame === "quizBattle" && isHost && (
+            <div className="quiz-selection-section">
+              <h3>🧩 퀴즈 선택</h3>
+              {availableQuizzes.length === 0 ? (
+                <div className="quiz-loading">
+                  <p>퀴즈 목록을 불러오는 중...</p>
+                  <button onClick={fetchAvailableQuizzes} className="refresh-quiz-button">
+                    새로고침
+                  </button>
+                </div>
+              ) : (
+                <div className="quiz-list">
+                  {availableQuizzes.map((quiz) => (
+                    <div
+                      key={quiz._id}
+                      className={`quiz-item ${
+                        selectedQuizId === quiz._id ? "selected" : ""
+                      }`}
+                      onClick={() => setSelectedQuizId(quiz._id)}
+                    >
+                      <div className="quiz-icon">🧩</div>
+                      <div className="quiz-info">
+                        <div className="quiz-name">{quiz.title}</div>
+                        <div className="quiz-meta">
+                          <span className="quiz-category">{quiz.category}</span>
+                          <span className="quiz-questions-count">
+                            {quiz.questions?.length || 0}문제
+                          </span>
+                        </div>
+                        {quiz.description && (
+                          <div className="quiz-description">{quiz.description}</div>
+                        )}
+                      </div>
+                      {selectedQuizId === quiz._id && (
+                        <div className="selected-badge">✓</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 클릭 배틀 시간 조절 UI */}
           {selectedGame === "clickBattle" && isHost && (
             <div className="game-duration-section">
