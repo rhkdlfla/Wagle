@@ -68,7 +68,7 @@ const rooms = new Map(); // roomId -> { id, name, players: [], maxPlayers: 4, st
 const gameStates = new Map(); // roomId -> { startTime, duration, clicks: { socketId: count }, isActive, gameType, grid, scores }
 
 // ✅ 유저(계정) 기준으로 현재 연결된 socket 추적
-const userToSocket = new Map();  // userKey -> socketId
+const userToSocket = new Map();  // userKey -> { socketId, clientId }
 app.locals.userToSocket = userToSocket;
 
 function getUserKey(userData) {
@@ -173,9 +173,13 @@ io.on("connection", (socket) => {
 
   
   // 클라이언트에서 사용자 정보 전송 받기
-  socket.on("setUser", (userData) => {
+  socket.on("setUser", (payload) => {
+    const userData = payload?.user || payload;
+    const clientId = payload?.clientId || null;
+
     user = userData;
     socket.data.user = userData;
+    socket.data.clientId = clientId;
 
     const userKey = getUserKey(userData);
     socket.data.userKey = userKey;
@@ -185,16 +189,34 @@ io.on("connection", (socket) => {
     if (!userKey) return;
   
     // ✅ 같은 계정이 이미 다른 socket으로 연결돼 있으면 신규 로그인 차단
-    const oldSocketId = userToSocket.get(userKey);
-    if (oldSocketId && oldSocketId !== socket.id) {
-      console.log(`[DUP LOGIN BLOCKED] ${userKey}: ${oldSocketId} -> ${socket.id}`);
-      socket.emit("duplicateLogin", { message: "이미 로그인된 계정입니다." });
-      socket.disconnect(true);
-      return;
+    const existing = userToSocket.get(userKey);
+    if (existing && existing.socketId !== socket.id) {
+      const isSameClient = existing.clientId && clientId && existing.clientId === clientId;
+      if (isSameClient) {
+        console.log(`[SESSION REPLACE] ${userKey}: ${existing.socketId} -> ${socket.id}`);
+        replacePlayerSocketIdEverywhere({
+          io,
+          rooms,
+          gameStates,
+          userKey,
+          oldSocketId: existing.socketId,
+          newSocket: socket
+        });
+
+        const oldSocket = io.sockets.sockets.get(existing.socketId);
+        if (oldSocket) {
+          oldSocket.disconnect(true);
+        }
+      } else {
+        console.log(`[DUP LOGIN BLOCKED] ${userKey}: ${existing.socketId} -> ${socket.id}`);
+        socket.emit("duplicateLogin", { message: "이미 로그인된 계정입니다." });
+        socket.disconnect(true);
+        return;
+      }
     }
 
     // ✅ 현재 소켓을 이 유저의 최신 소켓으로 기록
-    userToSocket.set(userKey, socket.id);
+    userToSocket.set(userKey, { socketId: socket.id, clientId });
   });
   
   
@@ -208,8 +230,11 @@ io.on("connection", (socket) => {
   // 연결 해제 처리 (단, 페이지 새로고침이 아닌 경우에만)
   socket.on("disconnect", () => {
     console.log("유저 접속 끊김", socket.id);
-    if (socket.data?.userKey && userToSocket.get(socket.data.userKey) === socket.id) {
-      userToSocket.delete(socket.data.userKey);
+    if (socket.data?.userKey) {
+      const existing = userToSocket.get(socket.data.userKey);
+      if (existing?.socketId === socket.id) {
+        userToSocket.delete(socket.data.userKey);
+      }
     }
     
     // 복원된 세션이 아니고 일정 시간 내에 재연결되지 않으면 플레이어 제거

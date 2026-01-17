@@ -72,7 +72,8 @@ router.get("/logout", (req, res) => {
     req.session.destroy(() => {
       if (userKey && req.app?.locals?.userToSocket) {
         const userToSocket = req.app.locals.userToSocket;
-        const socketId = userToSocket.get(userKey);
+        const existing = userToSocket.get(userKey);
+        const socketId = existing?.socketId;
         if (socketId && req.app?.locals?.io) {
           const socket = req.app.locals.io.sockets.sockets.get(socketId);
           if (socket) {

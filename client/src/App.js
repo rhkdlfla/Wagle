@@ -14,6 +14,14 @@ const socket = io.connect("", {
   path: "/socket.io/",
   withCredentials: true,
 });
+const CLIENT_ID_KEY = "clientId";
+const clientId = (() => {
+  const existing = sessionStorage.getItem(CLIENT_ID_KEY);
+  if (existing) return existing;
+  const newId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  sessionStorage.setItem(CLIENT_ID_KEY, newId);
+  return newId;
+})();
 
 async function updateGameResult() {
   return Promise.resolve();
@@ -369,7 +377,7 @@ function App() {
       // 사용자 정보가 있으면 저장
       if (user) {
         sessionStorage.setItem("userData", JSON.stringify(user));
-        socket.emit("setUser", user);
+        socket.emit("setUser", { user, clientId });
       }
     });
     
@@ -391,21 +399,11 @@ function App() {
       } else {
         alert("이미 로그인된 계정입니다.");
       }
-      
-      try {
-        if (user && user.provider !== "guest") {
-          await fetch(`${SERVER_URL}/auth/logout`, {
-            credentials: "include",
-          });
-        }
-      } catch (error) {
-        console.error("중복 로그인 처리 중 오류:", error);
-      } finally {
-        sessionStorage.removeItem("socketId");
-        sessionStorage.removeItem("userData");
-        sessionStorage.removeItem("currentRoomId");
-        setUser(null);
-      }
+
+      sessionStorage.removeItem("socketId");
+      sessionStorage.removeItem("userData");
+      sessionStorage.removeItem("currentRoomId");
+      setUser(null);
     });
 
     // 연결이 끊겼을 때 실행
@@ -425,7 +423,7 @@ function App() {
   // 사용자 정보가 변경되면 소켓에 전송 및 세션 스토리지 저장
   useEffect(() => {
     if (user && socket.connected) {
-      socket.emit("setUser", user);
+      socket.emit("setUser", { user, clientId });
       sessionStorage.setItem("userData", JSON.stringify(user));
     }
   }, [user, socket]);
