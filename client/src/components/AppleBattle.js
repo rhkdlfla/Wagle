@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
+import GameScoreboard from "./GameScoreboard";
+import GameResults from "./GameResults";
 import "./AppleBattle.css";
 
 const GRID_ROWS = 10;
@@ -21,6 +23,8 @@ function AppleBattle({ socket, room, onBackToLobby }) {
   const [isActive, setIsActive] = useState(false);
   const [results, setResults] = useState(null);
   const [myScore, setMyScore] = useState(0);
+  const [teamActivePlayers, setTeamActivePlayers] = useState(null); // 이어달리기 모드: 각 팀의 현재 활성 플레이어
+  const [relayMode, setRelayMode] = useState(false); // 이어달리기 모드 여부
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [dragEnd, setDragEnd] = useState(null);
@@ -98,7 +102,7 @@ function AppleBattle({ socket, room, onBackToLobby }) {
     socket.on("gameStarted", handleGameStarted);
 
     // 사과배틀 업데이트 수신
-    socket.on("appleBattleUpdate", ({ scores: scoreUpdates, teamScores: teamScoresData, timeRemaining: remaining, grid: updatedGrid }) => {
+    socket.on("appleBattleUpdate", ({ scores: scoreUpdates, teamScores: teamScoresData, timeRemaining: remaining, grid: updatedGrid, teamActivePlayers: activePlayers }) => {
       setScores(prev => {
         const newScores = {};
         scoreUpdates.forEach(({ id, score }) => {
@@ -108,6 +112,7 @@ function AppleBattle({ socket, room, onBackToLobby }) {
       });
       setTeamScores(teamScoresData || null);
       setTimeRemaining(remaining);
+      setTeamActivePlayers(activePlayers || null);
       if (updatedGrid) {
         // 그리드를 깊은 복사하여 React가 변경을 감지하도록 함
         setGrid(JSON.parse(JSON.stringify(updatedGrid)));
@@ -142,6 +147,11 @@ function AppleBattle({ socket, room, onBackToLobby }) {
       }
     };
   }, [socket, room]);
+  
+  // 이어달리기 모드 감지 (팀전 모드이고 teamActivePlayers가 있으면 이어달리기 모드)
+  useEffect(() => {
+    setRelayMode(room?.teamMode && teamActivePlayers !== null);
+  }, [room?.teamMode, teamActivePlayers]);
 
   // 그리드 좌표 계산
   const getGridPosition = (e) => {
@@ -185,6 +195,26 @@ function AppleBattle({ socket, room, onBackToLobby }) {
   const handleMouseDown = (e) => {
     if (!isActive) return;
     
+    // 우클릭: 이어달리기 모드에서 다음 팀원에게 순서 넘기기
+    if (e.button === 2 || (e.type === "contextmenu")) {
+      e.preventDefault();
+      if (relayMode && room.teamMode) {
+        const myTeamId = room.players.find((p) => p.id === socket.id)?.teamId;
+        if (myTeamId && teamActivePlayers?.[myTeamId] === socket.id) {
+          socket.emit("passTurn", { roomId: room.id });
+        }
+      }
+      return;
+    }
+    
+    // 이어달리기 모드에서 현재 차례가 아니면 드래그 불가
+    if (relayMode && room.teamMode) {
+      const myTeamId = room.players.find((p) => p.id === socket.id)?.teamId;
+      if (!myTeamId || teamActivePlayers?.[myTeamId] !== socket.id) {
+        return; // 현재 차례가 아님
+      }
+    }
+    
     const pos = getGridPosition(e);
     if (pos) {
       setIsDragging(true);
@@ -192,6 +222,36 @@ function AppleBattle({ socket, room, onBackToLobby }) {
       setDragEnd(pos);
       setSelectedSum(calculateSelectedSum(pos.row, pos.col, pos.row, pos.col));
     }
+  };
+  
+  // 현재 클릭 가능한지 확인 (이어달리기 모드일 때)
+  const canPlay = () => {
+    if (!relayMode || !room.teamMode) {
+      return true; // 이어달리기 모드가 아니면 항상 플레이 가능
+    }
+    
+    const myTeamId = room.players.find((p) => p.id === socket.id)?.teamId;
+    if (!myTeamId) {
+      return false; // 팀이 없으면 플레이 불가
+    }
+    
+    return teamActivePlayers?.[myTeamId] === socket.id;
+  };
+  
+  // 현재 활성 플레이어 이름 가져오기
+  const getActivePlayerName = () => {
+    if (!relayMode || !room.teamMode || !teamActivePlayers) {
+      return null;
+    }
+    
+    const myTeamId = room.players.find((p) => p.id === socket.id)?.teamId;
+    if (!myTeamId) {
+      return null;
+    }
+    
+    const activePlayerId = teamActivePlayers[myTeamId];
+    const activePlayer = room.players.find((p) => p.id === activePlayerId);
+    return activePlayer ? activePlayer.name : null;
   };
 
   // 마우스 이동
@@ -260,6 +320,19 @@ function AppleBattle({ socket, room, onBackToLobby }) {
   };
 
   const selectedArea = getSelectedArea();
+  const isHost = room?.players?.[0]?.id === socket.id;
+
+  const handleLeaveGame = () => {
+    if (window.confirm("게임을 나가시겠습니까?")) {
+      onBackToLobby();
+    }
+  };
+
+  const handleEndGame = () => {
+    if (window.confirm("게임을 종료하시겠습니까? 모든 플레이어가 로비로 돌아갑니다.")) {
+      socket.emit("endGame", { roomId: room.id });
+    }
+  };
 
   if (results) {
     return (
@@ -267,77 +340,13 @@ function AppleBattle({ socket, room, onBackToLobby }) {
         <div className="results-screen">
           <h1>🎮 게임 종료!</h1>
           
-          {/* 팀전 모드일 때 팀 점수 표시 */}
-          {room.teamMode && results[0]?.teamScore !== undefined && room.teams && (
-            <div className="results-team-scores">
-              <h3>팀 점수</h3>
-              <div className="results-team-list">
-                {room.teams
-                  .map((team) => {
-                    const teamResult = results.find((r) => r.teamId === team.id);
-                    const teamScore = teamResult?.teamScore || 0;
-                    const isWinner = results.some((r) => r.teamId === team.id && r.isWinner);
-                    return {
-                      ...team,
-                      score: teamScore,
-                      isWinner,
-                    };
-                  })
-                  .sort((a, b) => b.score - a.score)
-                  .map((team, index) => (
-                    <div
-                      key={team.id}
-                      className={`result-team-item ${team.isWinner ? "winner" : ""}`}
-                    >
-                      <div className="result-team-rank">
-                        {index === 0 && team.isWinner ? "👑" : `#${index + 1}`}
-                      </div>
-                      <div
-                        className="result-team-color"
-                        style={{ backgroundColor: team.color }}
-                      />
-                      <div className="result-team-info">
-                        <div className="result-team-name">
-                          {team.name}
-                          {team.isWinner && <span className="winner-badge">승리팀!</span>}
-                        </div>
-                        <div className="result-team-score">{team.score}칸</div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-          
-          {/* 개인 점수 표시 */}
-          <div className="results-list">
-            <h3>{room.teamMode ? "개인 점수" : "순위"}</h3>
-            {results.map((result, index) => {
-              const playerTeam = room.teamMode && result.teamId
-                ? room.teams?.find((t) => t.id === result.teamId)
-                : null;
-              return (
-                <div
-                  key={result.id}
-                  className={`result-item ${result.isWinner ? "winner" : ""}`}
-                  style={
-                    playerTeam
-                      ? {
-                          borderLeft: `4px solid ${playerTeam.color}`,
-                        }
-                      : {}
-                  }
-                >
-                  <div className="result-rank">#{index + 1}</div>
-                  <div className="result-info">
-                    <div className="result-name">{result.name}</div>
-                    <div className="result-score">{result.score}칸</div>
-                  </div>
-                  {result.isWinner && <div className="winner-badge">👑 승리!</div>}
-                </div>
-              );
-            })}
-          </div>
+          <GameResults
+            results={results}
+            teams={room.teamMode ? room.teams : []}
+            myPlayerId={socket.id}
+            teamMode={room.teamMode}
+            scoreUnit="칸"
+          />
           <button onClick={onBackToLobby} className="back-button">
             로비로 돌아가기
           </button>
@@ -359,16 +368,31 @@ function AppleBattle({ socket, room, onBackToLobby }) {
   return (
     <div className="apple-battle-container">
       <div className="apple-battle-header">
-        <h1>🍎 사과배틀</h1>
-        <div className="timer">⏱️ {formatTime(timeRemaining)}</div>
+        <div className="game-header-content">
+          <div>
+            <h1>🍎 사과배틀</h1>
+            <div className="timer">⏱️ {formatTime(timeRemaining)}</div>
+          </div>
+          <div className="game-header-actions">
+            {isHost && isActive && (
+              <button onClick={handleEndGame} className="end-game-button" title="게임 종료">
+                🛑 게임 종료
+              </button>
+            )}
+            <button onClick={handleLeaveGame} className="leave-game-button" title="게임 나가기">
+              🚪 나가기
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="apple-battle-content">
         <div className="game-grid-container">
           <div
             ref={gridRef}
-            className="game-grid"
+            className={`game-grid ${relayMode && !canPlay() ? "disabled" : ""}`}
             onMouseDown={handleMouseDown}
+            onContextMenu={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
@@ -446,62 +470,23 @@ function AppleBattle({ socket, room, onBackToLobby }) {
         </div>
 
         <div className="score-panel">
-          <h2>점수</h2>
-          
-          {/* 팀전 모드일 때는 팀 점수만 표시, 개인전 모드일 때는 개인 점수만 표시 */}
-          {room.teamMode && room.teams && room.teams.length > 0 ? (
-            <div className="team-scores-section">
-              <h3>팀 점수</h3>
-              <div className="team-scores-list">
-                {room.teams
-                  .map((team) => ({
-                    ...team,
-                    score: teamScores && teamScores[team.id] ? teamScores[team.id] : 0,
-                  }))
-                  .sort((a, b) => b.score - a.score)
-                  .map((team) => (
-                    <div key={team.id} className="team-score-item">
-                      <div
-                        className="team-score-color"
-                        style={{ backgroundColor: team.color }}
-                      />
-                      <div className="team-score-info">
-                        <div className="team-score-name">{team.name}</div>
-                        <div className="team-score-value">{team.score}칸</div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          ) : (
-            <div className="scores-list">
-              {room.players
-                .map((player) => {
-                  const score = scores[player.id] || 0;
-                  const color = playerColorMap.current[player.id];
-                  const isMe = player.id === socket.id;
-                  
-                  return { player, score, color, isMe };
-                })
-                .sort((a, b) => b.score - a.score)
-                .map(({ player, score, color, isMe }) => (
-                  <div
-                    key={player.id}
-                    className={`score-item ${isMe ? "my-score" : ""}`}
-                  >
-                    <div
-                      className="score-color"
-                      style={{ backgroundColor: color }}
-                    />
-                    <div className="score-info">
-                      <div className="score-name">
-                        {player.name}
-                        {isMe && " (나)"}
-                      </div>
-                      <div className="score-value">{score}칸</div>
-                    </div>
-                  </div>
-                ))}
+          <GameScoreboard
+            teams={room.teamMode ? room.teams : []}
+            teamScores={teamScores}
+            players={room.players}
+            scores={scores}
+            myPlayerId={socket.id}
+            teamMode={room.teamMode}
+            scoreUnit="칸"
+          />
+          {relayMode && room.teamMode && (
+            <div className="relay-mode-info">
+              <p className="active-player-text">
+                현재 차례: <strong>{getActivePlayerName() || "대기 중"}</strong>
+              </p>
+              <p className="relay-instruction">
+                💡 우클릭으로 다음 팀원에게 순서 넘기기
+              </p>
             </div>
           )}
           <div className="game-instructions">

@@ -9,8 +9,28 @@
 }
 
 .game-header {
-  text-align: center;
+  width: 100%;
+  max-width: 1200px;
   margin-bottom: 30px;
+}
+
+.game-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.game-header-content > div:first-child {
+  flex: 1;
+  text-align: center;
+}
+
+.game-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 .game-header h1 {
@@ -32,6 +52,40 @@
 .game-header p {
   font-size: 1.2rem;
   opacity: 0.9;
+}
+
+.end-game-button,
+.leave-game-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.end-game-button {
+  background: rgba(244, 67, 54, 0.9);
+  color: white;
+}
+
+.end-game-button:hover {
+  background: rgba(244, 67, 54, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+}
+
+.leave-game-button {
+  background: rgba(158, 158, 158, 0.8);
+  color: white;
+}
+
+.leave-game-button:hover {
+  background: rgba(158, 158, 158, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(158, 158, 158, 0.4);
 }
 
 .waiting-screen {
@@ -105,9 +159,47 @@
   border: 5px solid rgba(255, 255, 255, 0.3);
 }
 
-.click-button:active {
+.click-button:active:not(.disabled) {
   transform: scale(0.95);
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.click-button.disabled {
+  background: linear-gradient(135deg, #999 0%, #888 100%);
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.click-area {
+  position: relative;
+}
+
+.relay-mode-info {
+  margin-top: 20px;
+  text-align: center;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.active-player-text {
+  font-size: 1.1rem;
+  margin: 0 0 8px 0;
+  font-weight: 600;
+}
+
+.active-player-text strong {
+  color: #ffc107;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.relay-instruction {
+  font-size: 0.9rem;
+  margin: 0;
+  opacity: 0.8;
+  font-style: italic;
 }
 
 .click-icon {
@@ -339,6 +431,155 @@
   box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
 }
 
+/* 팀 점수 표시 (게임 중) */
+.team-scores-display {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 20px;
+  width: 100%;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.team-scores-display h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.5rem;
+  text-align: center;
+  color: #ffc107;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.team-scores-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.team-score-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px 15px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  transition: all 0.3s;
+  border-left: 4px solid transparent;
+}
+
+.team-score-item:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateX(5px);
+}
+
+.team-color-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.team-score-name {
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.team-score-value {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #ffc107;
+  min-width: 80px;
+  text-align: right;
+}
+
+/* 결과 화면 팀 점수 */
+.results-team-scores {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.results-team-scores h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.8rem;
+  text-align: center;
+  color: #ffc107;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.results-team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.result-team-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px 20px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  transition: all 0.3s;
+  border-left: 4px solid transparent;
+}
+
+.result-team-item.winner {
+  background: rgba(255, 193, 7, 0.2);
+  border-left-color: #ffc107;
+  box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+}
+
+.result-team-item:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateX(5px);
+}
+
+.result-team-rank {
+  font-size: 1.5rem;
+  font-weight: bold;
+  min-width: 40px;
+  text-align: center;
+  color: #ffc107;
+}
+
+.result-team-color {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.result-team-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.result-team-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.result-team-score {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
 @media (max-width: 768px) {
   .game-header h1 {
     font-size: 2rem;
@@ -358,5 +599,33 @@
 
   .click-count {
     font-size: 2rem;
+  }
+
+  .team-scores-display {
+    padding: 15px;
+  }
+
+  .team-scores-display h3 {
+    font-size: 1.2rem;
+  }
+
+  .team-score-item {
+    padding: 10px 12px;
+  }
+
+  .team-score-name {
+    font-size: 1rem;
+  }
+
+  .team-score-value {
+    font-size: 1.1rem;
+  }
+
+  .results-team-scores {
+    padding: 20px;
+  }
+
+  .results-team-scores h3 {
+    font-size: 1.5rem;
   }
 }

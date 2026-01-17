@@ -7,7 +7,7 @@ const GAMES = [
   {
     id: "clickBattle",
     name: "클릭 대결",
-    description: "30초 동안 최대한 많이 클릭하세요!",
+    description: "일정 시간 동안 최대한 많이 클릭하세요!",
     icon: "👆",
     minPlayers: 1,
   },
@@ -30,9 +30,13 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
+  const [chatMode, setChatMode] = useState("room"); // "room" or "team"
   const messagesEndRef = useRef(null);
   const location = useLocation();
   const isHost = currentRoom?.players[0]?.id === socket.id;
+  
+  // 현재 플레이어의 팀 ID 가져오기
+  const myTeamId = currentRoom?.players?.find((p) => p.id === socket.id)?.teamId || null;
 
   useEffect(() => {
     // 방 업데이트 수신
@@ -41,6 +45,11 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       if (updatedRoom.selectedGame) {
         setSelectedGame(updatedRoom.selectedGame);
       }
+    });
+    
+    // 이어달리기 모드 에러 수신
+    socket.on("relayModeError", ({ message }) => {
+      alert(message);
     });
 
     // 게임 시작 수신
@@ -82,6 +91,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       socket.off("messageError");
       socket.off("setTeamsError");
       socket.off("assignTeamError");
+      socket.off("relayModeError");
     };
   }, [socket, onLeaveRoom, onStartGame]);
 
@@ -121,12 +131,39 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       });
     }
   };
-
-  const handleSetTeams = (teamCount) => {
+  
+  const handleRelayModeChange = (enabled) => {
     if (isHost) {
+      socket.emit("setRelayMode", {
+        roomId: currentRoom.id,
+        relayMode: enabled,
+      });
+    }
+  };
+
+  const handleEnableTeamMode = () => {
+    if (isHost) {
+      // 기본 2팀으로 시작
       socket.emit("setTeams", {
         roomId: currentRoom.id,
-        teamCount: teamCount,
+        teamCount: 2,
+      });
+    }
+  };
+
+  const handleAddTeam = () => {
+    if (isHost) {
+      socket.emit("addTeam", {
+        roomId: currentRoom.id,
+      });
+    }
+  };
+
+  const handleRemoveTeam = (teamId) => {
+    if (isHost) {
+      socket.emit("removeTeam", {
+        roomId: currentRoom.id,
+        teamId: teamId,
       });
     }
   };
@@ -219,11 +256,32 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
 
   const handleSendMessage = () => {
     if (messageInput.trim() && currentRoom) {
-      socket.emit("sendMessage", {
-        roomId: currentRoom.id,
-        message: messageInput.trim(),
-      });
+      if (chatMode === "team" && currentRoom.teamMode && myTeamId) {
+        // 팀 채팅 전송
+        socket.emit("sendTeamMessage", {
+          roomId: currentRoom.id,
+          message: messageInput.trim(),
+          teamId: myTeamId,
+        });
+      } else {
+        // 전체 채팅 전송
+        socket.emit("sendMessage", {
+          roomId: currentRoom.id,
+          message: messageInput.trim(),
+        });
+      }
       setMessageInput("");
+    }
+  };
+  
+  // 표시할 메시지 필터링 (현재 채팅 모드에 따라)
+  const getDisplayedMessages = () => {
+    if (!currentRoom?.teamMode || chatMode === "room") {
+      // 전체 채팅 모드: 모든 메시지 표시
+      return messages;
+    } else {
+      // 팀 채팅 모드: 팀 채팅만 표시
+      return messages.filter((msg) => msg.type === "team" && msg.teamId === myTeamId);
     }
   };
 
@@ -257,17 +315,38 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
 
       <div className="lobby-content">
         <div className="chat-section">
-          <h2>💬 채팅</h2>
+          <div className="chat-header">
+            <h2>💬 채팅</h2>
+            {currentRoom?.teamMode && myTeamId && (
+              <div className="chat-mode-toggle">
+                <button
+                  className={`chat-mode-button ${chatMode === "room" ? "active" : ""}`}
+                  onClick={() => setChatMode("room")}
+                >
+                  전체
+                </button>
+                <button
+                  className={`chat-mode-button ${chatMode === "team" ? "active" : ""}`}
+                  onClick={() => setChatMode("team")}
+                >
+                  {currentRoom.teams?.find((t) => t.id === myTeamId)?.name || "팀"}
+                </button>
+              </div>
+            )}
+          </div>
           <div className="chat-messages">
-            {messages.length === 0 ? (
+            {getDisplayedMessages().length === 0 ? (
               <div className="chat-empty">아직 메시지가 없습니다.</div>
             ) : (
-              messages.map((msg) => {
+              getDisplayedMessages().map((msg) => {
                 const isMyMessage = msg.playerId === socket.id;
+                const isTeamMessage = msg.type === "team";
                 return (
                   <div
                     key={msg.id}
-                    className={`chat-message ${isMyMessage ? "my-message" : ""}`}
+                    className={`chat-message ${isMyMessage ? "my-message" : ""} ${
+                      isTeamMessage ? "team-message" : ""
+                    }`}
                   >
                     {!isMyMessage && (
                       <div className="message-sender">
@@ -282,7 +361,14 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                             {msg.playerName.charAt(0)}
                           </div>
                         )}
-                        <span className="message-player-name">{msg.playerName}</span>
+                        <span className="message-player-name">
+                          {msg.playerName}
+                          {isTeamMessage && msg.teamName && (
+                            <span className="team-badge" style={{ color: msg.teamColor }}>
+                              [{msg.teamName}]
+                            </span>
+                          )}
+                        </span>
                       </div>
                     )}
                     <div className="message-content">
@@ -324,28 +410,46 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
               {!currentRoom.teamMode ? (
                 <div className="team-mode-toggle">
                   <h3>팀전 모드</h3>
-                  <div className="team-count-buttons">
-                    {[2, 3, 4, 5, 6].map((count) => (
-                      <button
-                        key={count}
-                        onClick={() => handleSetTeams(count)}
-                        className="team-count-button"
-                      >
-                        {count}팀
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    onClick={handleEnableTeamMode}
+                    className="enable-team-mode-button"
+                  >
+                    팀전 모드 활성화
+                  </button>
                 </div>
               ) : (
                 <div className="team-mode-active">
                   <div className="team-mode-header">
                     <h3>팀전 모드 활성화됨 ({currentRoom.teams?.length || 0}팀)</h3>
-                    <button
-                      onClick={handleDisableTeamMode}
-                      className="disable-team-mode-button"
-                    >
-                      팀전 모드 해제
-                    </button>
+                    <div className="team-control-buttons">
+                      <button
+                        onClick={handleAddTeam}
+                        className="add-team-button"
+                        disabled={currentRoom.teams && currentRoom.teams.length >= 8}
+                        title="팀 추가 (최대 8개)"
+                      >
+                        + 팀 추가
+                      </button>
+                      {currentRoom.teams && currentRoom.teams.length > 2 && (
+                        <button
+                          onClick={() => {
+                            // 마지막 팀 삭제
+                            const lastTeam = currentRoom.teams[currentRoom.teams.length - 1];
+                            handleRemoveTeam(lastTeam.id);
+                          }}
+                          className="remove-team-button"
+                          title="팀 삭제 (최소 2개 유지)"
+                        >
+                          - 팀 삭제
+                        </button>
+                      )}
+                      <button
+                        onClick={handleDisableTeamMode}
+                        className="disable-team-mode-button"
+                      >
+                        팀전 모드 해제
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -560,6 +664,44 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+          
+          {/* 게임 설정 정보 표시 (모든 플레이어가 볼 수 있음) */}
+          {(selectedGame === "clickBattle" || selectedGame === "appleBattle") && currentRoom.teamMode && (
+            <div className="game-setting-info">
+              <h3>⚙️ 게임 모드 설정</h3>
+              {isHost ? (
+                <div className="game-setting-item">
+                  <label className="game-setting-label">
+                    <input
+                      type="checkbox"
+                      checked={currentRoom.relayMode || false}
+                      onChange={(e) => handleRelayModeChange(e.target.checked)}
+                      style={{ marginRight: "8px" }}
+                    />
+                    <span className={currentRoom.relayMode ? "mode-active" : ""}>
+                      이어달리기 모드 {currentRoom.relayMode && "✓"}
+                    </span>
+                    <span className="setting-description">
+                      (각 팀당 한 명씩만 클릭 가능, 우클릭으로 다음 팀원에게 순서 넘기기)
+                    </span>
+                  </label>
+                </div>
+              ) : (
+                <div className="game-setting-display">
+                  <div className="setting-status">
+                    <span className={`mode-badge ${currentRoom.relayMode ? "mode-active" : "mode-inactive"}`}>
+                      {currentRoom.relayMode ? "🔄 이어달리기 모드 활성화" : "⚡ 일반 모드"}
+                    </span>
+                  </div>
+                  {currentRoom.relayMode && (
+                    <div className="setting-description">
+                      각 팀당 한 명씩만 클릭 가능하며, 우클릭으로 다음 팀원에게 순서를 넘길 수 있습니다.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
