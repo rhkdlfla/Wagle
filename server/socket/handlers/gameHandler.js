@@ -278,6 +278,15 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
               currentQuestionIndex: gameStateData.currentQuestionIndex,
             },
           });
+        } else if (gameState.gameType === "numberRush") {
+          socket.emit("gameStarted", {
+            room: room,
+            gameState: {
+              duration: gameStateData.duration,
+              startTime: gameStateData.startTime,
+              gameType: gameState.gameType,
+            },
+          });
         }
       }
     } else {
