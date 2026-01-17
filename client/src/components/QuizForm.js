@@ -15,12 +15,14 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
   const [activeImageUploadIndex, setActiveImageUploadIndex] = useState(null); // 현재 이미지 업로드 중인 문제 인덱스
   const [description, setDescription] = useState(quizToEdit?.description || "");
   const [isPublic, setIsPublic] = useState(quizToEdit?.isPublic !== false);
+  const [thumbnailUrl, setThumbnailUrl] = useState(quizToEdit?.thumbnailUrl || "");
+  const [defaultQuestionType, setDefaultQuestionType] = useState(quizToEdit?.defaultQuestionType || "객관식");
+  const [showSettings, setShowSettings] = useState(!quizToEdit); // 새 퀴즈 생성 시 설정 화면 먼저 표시
   const [questions, setQuestions] = useState(
     quizToEdit?.questions?.length > 0
       ? quizToEdit.questions.map((q) => ({
           questionType: q.questionType || "객관식",
           imageUrl: q.imageUrl || "",
-          audioUrl: q.audioUrl || "",
           options: q.options || ["", ""],
           correctAnswer: q.correctAnswer || (q.questionType === "주관식" ? "" : 0),
         }))
@@ -28,7 +30,6 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
           {
             questionType: "객관식",
             imageUrl: "",
-            audioUrl: "",
             options: ["", ""],
             correctAnswer: 0,
           },
@@ -36,16 +37,16 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [editingQuestionIndex, setEditingQuestionIndex] = useState(null); // 현재 편집 중인 문제 인덱스
 
   const addQuestion = () => {
     setQuestions([
       ...questions,
       {
-        questionType: "객관식",
+        questionType: defaultQuestionType,
         imageUrl: "",
-        audioUrl: "",
-        options: ["", ""],
-        correctAnswer: 0,
+        options: defaultQuestionType === "객관식" ? ["", ""] : [],
+        correctAnswer: defaultQuestionType === "객관식" ? 0 : "",
       },
     ]);
   };
@@ -134,6 +135,30 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
     }
   };
 
+  // 썸네일 업로드 함수
+  const uploadThumbnail = async (file) => {
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      const response = await fetch("/api/upload/image", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setThumbnailUrl(data.url);
+      } else {
+        alert(data.error || "썸네일 업로드에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("썸네일 업로드 오류:", error);
+      alert("썸네일 업로드에 실패했습니다.");
+    }
+  };
+
   // 클립보드에서 이미지 붙여넣기 처리
   const handlePaste = (e, questionIndex) => {
     const items = e.clipboardData?.items;
@@ -152,6 +177,91 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
     }
   };
 
+  // 클립보드에서 이미지 읽어오기
+  const handleClipboardPaste = async (questionIndex) => {
+    // Clipboard API 지원 확인 및 사용
+    if (navigator.clipboard && navigator.clipboard.read) {
+      try {
+        const items = await navigator.clipboard.read();
+        
+        for (const item of items) {
+          for (const type of item.types) {
+            if (type.startsWith('image/')) {
+              const blob = await item.getType(type);
+              const file = new File([blob], `clipboard-${Date.now()}.png`, { type: type });
+              uploadImage(file, questionIndex);
+              return;
+            }
+          }
+        }
+        
+        alert('클립보드에서 이미지를 찾을 수 없습니다. 이미지를 복사한 후 다시 시도해주세요.');
+      } catch (error) {
+        console.error('클립보드 읽기 오류:', error);
+        
+        if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
+          // Clipboard API 권한이 없는 경우 대체 방법 사용
+          useFallbackPasteMethod(questionIndex);
+        } else {
+          alert('클립보드에서 이미지를 읽을 수 없습니다. 이미지를 복사한 후 입력 영역에 Ctrl+V를 눌러주세요.');
+        }
+      }
+    } else {
+      // Clipboard API를 지원하지 않는 브라우저
+      useFallbackPasteMethod(questionIndex);
+    }
+  };
+
+  // 대체 방법: 임시 요소를 만들고 paste 이벤트로 처리
+  const useFallbackPasteMethod = (questionIndex) => {
+    // 활성화된 이미지 업로드 영역이 있으면 해당 영역에 포커스
+    setActiveImageUploadIndex(questionIndex);
+    
+    // 사용자에게 안내
+    const tempTextarea = document.createElement('textarea');
+    tempTextarea.style.position = 'fixed';
+    tempTextarea.style.left = '-9999px';
+    tempTextarea.setAttribute('tabindex', '-1');
+    document.body.appendChild(tempTextarea);
+    tempTextarea.focus();
+    
+    alert('이미지를 복사한 후 Ctrl+V (또는 Cmd+V)를 눌러주세요.');
+    
+    const pasteHandler = (e) => {
+      const items = e.clipboardData?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item.type.indexOf("image") !== -1) {
+            e.preventDefault();
+            const file = item.getAsFile();
+            if (file) {
+              uploadImage(file, questionIndex);
+            }
+            cleanup();
+            return;
+          }
+        }
+      }
+    };
+    
+    const cleanup = () => {
+      if (document.body.contains(tempTextarea)) {
+        document.body.removeChild(tempTextarea);
+      }
+      document.removeEventListener('paste', pasteHandler);
+      setActiveImageUploadIndex(null);
+    };
+    
+    document.addEventListener('paste', pasteHandler, { once: true });
+    
+    // 10초 후 자동 정리
+    setTimeout(cleanup, 10000);
+    
+    // 포커스가 벗어나면 정리
+    tempTextarea.addEventListener('blur', cleanup, { once: true });
+  };
+
   // 드래그 앤 드롭 처리
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -167,29 +277,88 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
       const file = files[0];
       if (type === "image" && file.type.startsWith("image/")) {
         uploadImage(file, questionIndex);
-      } else if (type === "audio" && file.type.startsWith("audio/")) {
-        // 오디오 업로드
-        const formData = new FormData();
-        formData.append("audio", file);
-
-        fetch("/api/upload/audio", {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.success) {
-              updateQuestion(questionIndex, "audioUrl", data.url);
-            } else {
-              alert(data.error || "오디오 업로드에 실패했습니다.");
-            }
-          })
-          .catch((error) => {
-            console.error("오디오 업로드 오류:", error);
-            alert("오디오 업로드에 실패했습니다.");
-          });
       }
+    }
+  };
+
+  // 설정 저장 (빈 퀴즈 저장)
+  const saveSettings = async () => {
+    setError("");
+
+    // 유효성 검사
+    if (!title.trim()) {
+      alert("퀴즈 제목을 입력해주세요.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+      };
+
+      // 게스트 사용자인 경우 헤더에 정보 추가 (Base64 인코딩)
+      if (!user || !user.id) {
+        const guestInfo = JSON.stringify({
+          name: user?.name || "게스트",
+        });
+        headers["guest-user"] = btoa(unescape(encodeURIComponent(guestInfo)));
+      }
+
+      const apiUrl = quizToEdit ? `/api/quiz/${quizToEdit._id}` : "/api/quiz/create";
+      const method = quizToEdit ? "PUT" : "POST";
+      const requestBody = {
+        title: title.trim(),
+        description: description.trim(),
+        thumbnailUrl: thumbnailUrl.trim() || null,
+        defaultQuestionType: defaultQuestionType,
+        questions: [], // 빈 문제 배열
+        isPublic,
+      };
+
+      const response = await fetch(apiUrl, {
+        method: method,
+        headers,
+        credentials: "include",
+        body: JSON.stringify(requestBody),
+      });
+
+      if (response.status === 404) {
+        const text = await response.text().catch(() => "");
+        throw new Error(`경로를 찾을 수 없습니다. (HTTP 404)`);
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        throw new Error(`서버 오류가 발생했습니다. (HTTP ${response.status})`);
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errorMsg = data.error || (quizToEdit ? "퀴즈 수정에 실패했습니다." : "퀴즈 생성에 실패했습니다.");
+        throw new Error(errorMsg);
+      }
+
+      // 새 퀴즈 생성 시 quizToEdit 업데이트 및 설정 화면 닫기
+      if (!quizToEdit && data.quiz) {
+        // quizToEdit를 업데이트하기 위해 App.js의 QuizFormPage에서 처리해야 함
+        // 여기서는 설정 화면만 닫고 onSuccess 호출
+        if (onSuccess) {
+          onSuccess(data.quiz);
+        }
+        setShowSettings(false);
+      } else if (quizToEdit) {
+        // 편집 모드에서는 설정 화면만 닫기
+        setShowSettings(false);
+      }
+    } catch (err) {
+      console.error("퀴즈 설정 저장 에러:", err);
+      setError(err.message || "퀴즈 저장에 실패했습니다.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -247,12 +416,13 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
       const requestBody = {
         title: title.trim(),
         description: description.trim(),
+        thumbnailUrl: thumbnailUrl.trim() || null,
+        defaultQuestionType: defaultQuestionType,
         questions: questions.map((q) => {
           const questionType = q.questionType || "객관식";
           const baseQuestion = {
             questionType,
             imageUrl: q.imageUrl.trim() || null,
-            audioUrl: q.audioUrl.trim() || null,
           };
           
           if (questionType === "주관식") {
@@ -337,335 +507,271 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
   };
 
   return (
-    <div className="quiz-form-overlay" onClick={onClose}>
-      <div 
-        className="quiz-form-container" 
-        onClick={(e) => e.stopPropagation()}
-        onPaste={(e) => {
-          // 입력 필드가 아닌 곳에서 붙여넣기 시 이미지 업로드 영역에 붙여넣기
-          const target = e.target;
-          if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-            // 활성화된 이미지 업로드 영역이 있으면 해당 문제에 붙여넣기
-            if (activeImageUploadIndex !== null) {
-              handlePaste(e, activeImageUploadIndex);
-            } else {
-              // 활성화된 영역이 없으면 첫 번째 문제에 붙여넣기
-              handlePaste(e, 0);
-            }
+    <div 
+      className="quiz-form-page"
+      onPaste={(e) => {
+        // 입력 필드가 아닌 곳에서 붙여넣기 시 이미지 업로드 영역에 붙여넣기
+        const target = e.target;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          // 활성화된 이미지 업로드 영역이 있으면 해당 문제에 붙여넣기
+          if (activeImageUploadIndex !== null) {
+            handlePaste(e, activeImageUploadIndex);
+          } else {
+            // 활성화된 영역이 없으면 첫 번째 문제에 붙여넣기
+            handlePaste(e, 0);
           }
-        }}
-      >
+        }
+      }}
+    >
+      <div className="quiz-form-container">
         <div className="quiz-form-header">
-          <h2>🧩 {quizToEdit ? "퀴즈 편집" : "새 퀴즈 만들기"}</h2>
-          <button className="close-button" onClick={onClose}>
-            ✕
-          </button>
+          <h2>🧩 {showSettings ? "퀴즈 설정" : (quizToEdit ? "퀴즈 편집" : "새 퀴즈 만들기")}</h2>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            {!showSettings && quizToEdit && (
+              <button 
+                type="button"
+                className="settings-button"
+                onClick={() => setShowSettings(true)}
+              >
+                ⚙️ 설정
+              </button>
+            )}
+            <button className="close-button" onClick={onClose}>
+              ✕
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="quiz-form">
-          {error && <div className="error-message">{error}</div>}
+        {showSettings ? (
+          // 설정 화면
+          <div className="quiz-settings-form">
+            {error && <div className="error-message">{error}</div>}
 
-          <div className="form-section">
-            <label>
-              <span className="label-text">퀴즈 제목 *</span>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="예: K-pop 아티스트 맞추기"
-                maxLength={100}
-                required
-              />
-            </label>
-          </div>
+            <div className="form-section">
+              <label>
+                <span className="label-text">퀴즈 제목 *</span>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="예: K-pop 아티스트 맞추기"
+                  maxLength={100}
+                  required
+                />
+              </label>
+            </div>
 
-          <div className="form-section">
-            <label>
-              <span className="label-text">설명</span>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="퀴즈에 대한 간단한 설명을 입력하세요 (선택사항)"
-                rows={3}
-                maxLength={500}
-              />
-            </label>
-          </div>
+            <div className="form-section">
+              <label>
+                <span className="label-text">설명</span>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="퀴즈에 대한 간단한 설명을 입력하세요 (선택사항)"
+                  rows={3}
+                  maxLength={500}
+                />
+              </label>
+            </div>
 
-          <div className="form-section">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={isPublic}
-                onChange={(e) => setIsPublic(e.target.checked)}
-              />
-              <span>공개 퀴즈</span>
-            </label>
+            <div className="form-section">
+              <label>
+                <span className="label-text">썸네일 (선택)</span>
+                <div 
+                  className="file-upload-group"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0 && files[0].type.startsWith("image/")) {
+                      uploadThumbnail(files[0]);
+                    }
+                  }}
+                >
+                  <div className="file-upload-area">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          uploadThumbnail(file);
+                        }
+                      }}
+                      className="file-input"
+                      id="thumbnail-input"
+                    />
+                    <div className="file-upload-buttons">
+                      <label htmlFor="thumbnail-input" className="file-input-label">
+                        📁 파일 선택
+                      </label>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            if (navigator.clipboard && navigator.clipboard.read) {
+                              const items = await navigator.clipboard.read();
+                              for (const item of items) {
+                                for (const type of item.types) {
+                                  if (type.startsWith('image/')) {
+                                    const blob = await item.getType(type);
+                                    const file = new File([blob], `thumbnail-${Date.now()}.png`, { type: type });
+                                    uploadThumbnail(file);
+                                    return;
+                                  }
+                                }
+                              }
+                              alert('클립보드에서 이미지를 찾을 수 없습니다.');
+                            } else {
+                              alert('클립보드 접근이 지원되지 않습니다.');
+                            }
+                          } catch (error) {
+                            console.error('클립보드 읽기 오류:', error);
+                            alert('클립보드에서 이미지를 읽을 수 없습니다.');
+                          }
+                        }}
+                        className="clipboard-button"
+                      >
+                        📋 클립보드에서 가져오기
+                      </button>
+                    </div>
+                    <span className="file-upload-hint">또는 이미지를 여기에 드래그 앤 드롭</span>
+                  </div>
+                  {thumbnailUrl && (
+                    <div className="file-preview">
+                      <img src={thumbnailUrl} alt="썸네일 미리보기" className="preview-image" />
+                      <button
+                        type="button"
+                        onClick={() => setThumbnailUrl("")}
+                        className="remove-file-button"
+                      >
+                        ✕ 삭제
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </label>
+            </div>
+
+            <div className="form-section">
+              <label>
+                <span className="label-text">기본 답변 형식 *</span>
+                <div className="question-type-buttons">
+                  <button
+                    type="button"
+                    className={`type-button ${defaultQuestionType === "객관식" ? "active" : ""}`}
+                    onClick={() => setDefaultQuestionType("객관식")}
+                  >
+                    객관식
+                  </button>
+                  <button
+                    type="button"
+                    className={`type-button ${defaultQuestionType === "주관식" ? "active" : ""}`}
+                    onClick={() => setDefaultQuestionType("주관식")}
+                  >
+                    주관식
+                  </button>
+                </div>
+                <span className="hint-text">새 문제 추가 시 기본으로 사용되는 답변 형식입니다.</span>
+              </label>
+            </div>
+
+            <div className="form-section">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                />
+                <span>공개 퀴즈</span>
+              </label>
+            </div>
+
+            <div className="form-actions">
+              <button
+                type="button"
+                onClick={async () => {
+                  if (quizToEdit) {
+                    // 편집 모드: 설정 저장 후 설정 화면 닫기
+                    await saveSettings();
+                  } else {
+                    // 새 퀴즈: 설정 저장 후 문제 편집 화면으로 이동
+                    await saveSettings();
+                  }
+                }}
+                className="submit-button"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "저장 중..." : (quizToEdit ? "저장" : "저장 후 문제 작성")}
+              </button>
+            </div>
           </div>
+        ) : (
+          // 문제 편집 화면
+          <form onSubmit={handleSubmit} className="quiz-form">
+            {error && <div className="error-message">{error}</div>}
 
           <div className="questions-section">
             <div className="questions-header">
               <h3>문제 ({questions.length}개)</h3>
-              <button
-                type="button"
-                onClick={addQuestion}
-                className="add-question-button"
-              >
-                + 문제 추가
-              </button>
             </div>
 
+            <div className="questions-grid">
             {questions.map((question, qIndex) => (
               <div key={qIndex} className="question-card">
-                <div className="question-header">
-                  <h4>문제 {qIndex + 1}</h4>
-                  {questions.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeQuestion(qIndex)}
-                      className="remove-question-button"
-                    >
-                      삭제
-                    </button>
-                  )}
-                </div>
-
-                <div className="form-section">
-                  <label>
-                    <span className="label-text">문제 유형 *</span>
-                    <div className="question-type-buttons">
-                      <button
-                        type="button"
-                        className={`type-button ${question.questionType === "객관식" ? "active" : ""}`}
-                        onClick={() => {
-                          const currentType = question.questionType;
-                          // 주관식에서 객관식으로 변경 시 초기화
-                          if (currentType === "주관식") {
-                            const updates = {
-                              questionType: "객관식",
-                              correctAnswer: 0,
-                            };
-                            // 객관식 기본 선택지 복원
-                            if (!question.options || question.options.length === 0) {
-                              updates.options = ["", ""];
-                            }
-                            updateQuestionMultiple(qIndex, updates);
-                          } else {
-                            updateQuestion(qIndex, "questionType", "객관식");
-                          }
-                        }}
-                      >
-                        객관식
-                      </button>
-                      <button
-                        type="button"
-                        className={`type-button ${question.questionType === "주관식" ? "active" : ""}`}
-                        onClick={() => {
-                          const currentType = question.questionType;
-                          // 객관식에서 주관식으로 변경 시 초기화
-                          if (currentType === "객관식") {
-                            updateQuestionMultiple(qIndex, {
-                              questionType: "주관식",
-                              correctAnswer: "",
-                              options: [],
-                            });
-                          } else {
-                            updateQuestion(qIndex, "questionType", "주관식");
-                          }
-                        }}
-                      >
-                        주관식
-                      </button>
+                  <div className="question-preview-wrapper">
+                    <div className="question-preview" onClick={() => setEditingQuestionIndex(qIndex)}>
+                      {question.imageUrl ? (
+                        <img src={question.imageUrl} alt={`문제 ${qIndex + 1}`} className="question-preview-image" />
+                      ) : (
+                        <div className="question-placeholder">
+                          <span>이미지를 추가하려면 클릭하세요</span>
+                        </div>
+                      )}
                     </div>
-                  </label>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-section">
-                    <label>
-                      <span className="label-text">이미지 (선택)</span>
-                      <div 
-                        className="file-upload-group"
-                        onPaste={(e) => handlePaste(e, qIndex)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, qIndex, "image")}
-                        onFocus={() => setActiveImageUploadIndex(qIndex)}
-                        onBlur={() => setTimeout(() => setActiveImageUploadIndex(null), 200)}
-                        tabIndex={0}
-                      >
-                        <div className="file-upload-area">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files[0];
-                              if (file) {
-                                uploadImage(file, qIndex);
-                              }
-                            }}
-                            className="file-input"
-                            id={`image-input-${qIndex}`}
-                          />
-                          <label htmlFor={`image-input-${qIndex}`} className="file-input-label">
-                            📁 파일 선택
-                          </label>
-                          <span className="file-upload-hint">또는 이미지를 여기에 붙여넣기 (Ctrl+V) 또는 드래그 앤 드롭</span>
-                        </div>
-                        {question.imageUrl && (
-                          <div className="file-preview">
-                            <img src={question.imageUrl} alt="미리보기" className="preview-image" />
-                            <button
-                              type="button"
-                              onClick={() => updateQuestion(qIndex, "imageUrl", "")}
-                              className="remove-file-button"
-                            >
-                              ✕ 삭제
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </label>
-                  </div>
-
-                  <div className="form-section">
-                    <label>
-                      <span className="label-text">오디오 (선택)</span>
-                      <div 
-                        className="file-upload-group"
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, qIndex, "audio")}
-                      >
-                        <div className="file-upload-area">
-                          <input
-                            type="file"
-                            accept="audio/*"
-                            onChange={async (e) => {
-                              const file = e.target.files[0];
-                              if (!file) return;
-
-                              const formData = new FormData();
-                              formData.append("audio", file);
-
-                              try {
-                                const response = await fetch("/api/upload/audio", {
-                                  method: "POST",
-                                  credentials: "include",
-                                  body: formData,
-                                });
-
-                                const data = await response.json();
-                                if (data.success) {
-                                  updateQuestion(qIndex, "audioUrl", data.url);
-                                } else {
-                                  alert(data.error || "오디오 업로드에 실패했습니다.");
-                                }
-                              } catch (error) {
-                                console.error("오디오 업로드 오류:", error);
-                                alert("오디오 업로드에 실패했습니다.");
-                              }
-                            }}
-                            className="file-input"
-                            id={`audio-input-${qIndex}`}
-                          />
-                          <label htmlFor={`audio-input-${qIndex}`} className="file-input-label">
-                            📁 파일 선택
-                          </label>
-                          <span className="file-upload-hint">또는 파일을 여기에 드래그 앤 드롭</span>
-                        </div>
-                        {question.audioUrl && (
-                          <div className="file-preview">
-                            <audio src={question.audioUrl} controls className="preview-audio" />
-                            <button
-                              type="button"
-                              onClick={() => updateQuestion(qIndex, "audioUrl", "")}
-                              className="remove-file-button"
-                            >
-                              ✕ 삭제
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="form-section">
-                  <label>
-                    <span className="label-text">정답 *</span>
-                    {question.questionType === "객관식" ? (
-                      <input
-                        type="text"
-                        value={question.options && question.options[0] ? question.options[0] : ""}
-                        onChange={(e) => {
-                          // 정답은 options[0]에 저장
-                          const updatedOptions = [...(question.options || [""])];
-                          updatedOptions[0] = e.target.value;
-                          updateQuestion(qIndex, "options", updatedOptions);
-                          // correctAnswer는 항상 0 (정답이 첫 번째)
-                          updateQuestion(qIndex, "correctAnswer", 0);
+                    <div className="question-actions-overlay">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingQuestionIndex(qIndex);
                         }}
-                        placeholder="정답을 입력하세요"
-                        className="correct-answer-input"
-                        required
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        value={typeof question.correctAnswer === 'string' ? question.correctAnswer : ""}
-                        onChange={(e) =>
-                          updateQuestion(qIndex, "correctAnswer", e.target.value)
-                        }
-                        placeholder="정답을 입력하세요"
-                        className="correct-answer-input"
-                        required
-                      />
-                    )}
-                  </label>
-                </div>
-
-                {question.questionType === "객관식" && (
-                  <div className="options-section">
-                    <div className="options-header">
-                      <span className="label-text">오답 선택지 (선택사항)</span>
-                      {question.options && question.options.length < 6 && (
+                        className="question-action-button edit-action"
+                        title="편집"
+                      >
+                        ✏️
+                      </button>
+                      {questions.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => addOption(qIndex)}
-                          className="add-option-button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeQuestion(qIndex);
+                          }}
+                          className="question-action-button delete-action"
+                          title="삭제"
                         >
-                          + 오답 선택지 추가
+                          🗑️
                         </button>
                       )}
                     </div>
-
-                    {question.options && question.options.slice(1).map((option, oIndex) => (
-                      <div key={oIndex + 1} className="option-row">
-                        <input
-                          type="text"
-                          value={option}
-                          onChange={(e) => {
-                            const updatedOptions = [...question.options];
-                            updatedOptions[oIndex + 1] = e.target.value;
-                            updateQuestion(qIndex, "options", updatedOptions);
-                          }}
-                          placeholder={`오답 선택지 ${oIndex + 1}`}
-                          className="option-input"
-                        />
-                        {question.options.length > 2 && (
-                          <button
-                            type="button"
-                            onClick={() => removeOption(qIndex, oIndex + 1)}
-                            className="remove-option-button"
-                          >
-                            ✕
-                          </button>
-                        )}
-                      </div>
-                    ))}
                   </div>
-                )}
               </div>
             ))}
+            {/* 문제 추가 카드 */}
+            <div 
+              className="question-card add-question-card" 
+              onClick={addQuestion}
+            >
+              <div className="question-preview-wrapper">
+                <div className="question-placeholder add-question-placeholder">
+                  <div className="add-icon">+</div>
+                  <span>문제를 추가해보세요.</span>
+                </div>
+              </div>
+            </div>
+            </div>
           </div>
 
           <div className="form-actions">
@@ -686,7 +792,213 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
             </button>
           </div>
         </form>
+        )}
       </div>
+
+      {/* 편집 모달 - form 밖에 위치 */}
+      {editingQuestionIndex !== null && (
+        <div className="question-edit-modal-overlay" onClick={() => setEditingQuestionIndex(null)}>
+          <div className="question-edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>문제 편집</h3>
+              <button className="close-button" onClick={() => setEditingQuestionIndex(null)}>✕</button>
+            </div>
+            {questions[editingQuestionIndex] && (
+              <div>
+                <div className="form-section">
+                  <label>
+                    <span className="label-text">문제 유형 *</span>
+                    <div className="question-type-buttons">
+                      <button
+                        type="button"
+                        className={`type-button ${questions[editingQuestionIndex].questionType === "객관식" ? "active" : ""}`}
+                        onClick={() => {
+                          const qIndex = editingQuestionIndex;
+                          const currentType = questions[qIndex].questionType;
+                          if (currentType === "주관식") {
+                            const updates = {
+                              questionType: "객관식",
+                              correctAnswer: 0,
+                            };
+                            if (!questions[qIndex].options || questions[qIndex].options.length === 0) {
+                              updates.options = ["", ""];
+                            }
+                            updateQuestionMultiple(qIndex, updates);
+                          } else {
+                            updateQuestion(qIndex, "questionType", "객관식");
+                          }
+                        }}
+                      >
+                        객관식
+                      </button>
+                      <button
+                        type="button"
+                        className={`type-button ${questions[editingQuestionIndex].questionType === "주관식" ? "active" : ""}`}
+                        onClick={() => {
+                          const qIndex = editingQuestionIndex;
+                          const currentType = questions[qIndex].questionType;
+                          if (currentType === "객관식") {
+                            updateQuestionMultiple(qIndex, {
+                              questionType: "주관식",
+                              correctAnswer: "",
+                              options: [],
+                            });
+                          } else {
+                            updateQuestion(qIndex, "questionType", "주관식");
+                          }
+                        }}
+                      >
+                        주관식
+                      </button>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="form-section">
+                  <label>
+                    <span className="label-text">이미지 (선택)</span>
+                    <div 
+                      className="file-upload-group"
+                      onPaste={(e) => handlePaste(e, editingQuestionIndex)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, editingQuestionIndex, "image")}
+                      onFocus={() => setActiveImageUploadIndex(editingQuestionIndex)}
+                      onBlur={() => setTimeout(() => setActiveImageUploadIndex(null), 200)}
+                      tabIndex={0}
+                    >
+                      <div className="file-upload-area">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              uploadImage(file, editingQuestionIndex);
+                            }
+                          }}
+                          className="file-input"
+                          id={`image-input-edit-${editingQuestionIndex}`}
+                        />
+                        <div className="file-upload-buttons">
+                          <label htmlFor={`image-input-edit-${editingQuestionIndex}`} className="file-input-label">
+                            📁 파일 선택
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleClipboardPaste(editingQuestionIndex)}
+                            className="clipboard-button"
+                          >
+                            📋 클립보드에서 가져오기
+                          </button>
+                        </div>
+                        <span className="file-upload-hint">또는 이미지를 여기에 붙여넣기 (Ctrl+V) 또는 드래그 앤 드롭</span>
+                      </div>
+                      {questions[editingQuestionIndex].imageUrl && (
+                        <div className="file-preview">
+                          <img src={questions[editingQuestionIndex].imageUrl} alt="미리보기" className="preview-image" />
+                          <button
+                            type="button"
+                            onClick={() => updateQuestion(editingQuestionIndex, "imageUrl", "")}
+                            className="remove-file-button"
+                          >
+                            ✕ 삭제
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                </div>
+
+                <div className="form-section">
+                  <label>
+                    <span className="label-text">정답 *</span>
+                    {questions[editingQuestionIndex].questionType === "객관식" ? (
+                      <input
+                        type="text"
+                        value={questions[editingQuestionIndex].options && questions[editingQuestionIndex].options[0] ? questions[editingQuestionIndex].options[0] : ""}
+                        onChange={(e) => {
+                          const qIndex = editingQuestionIndex;
+                          const updatedOptions = [...(questions[qIndex].options || [""])];
+                          updatedOptions[0] = e.target.value;
+                          updateQuestion(qIndex, "options", updatedOptions);
+                          updateQuestion(qIndex, "correctAnswer", 0);
+                        }}
+                        placeholder="정답을 입력하세요"
+                        className="correct-answer-input"
+                        required
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        value={typeof questions[editingQuestionIndex].correctAnswer === 'string' ? questions[editingQuestionIndex].correctAnswer : ""}
+                        onChange={(e) =>
+                          updateQuestion(editingQuestionIndex, "correctAnswer", e.target.value)
+                        }
+                        placeholder="정답을 입력하세요"
+                        className="correct-answer-input"
+                        required
+                      />
+                    )}
+                  </label>
+                </div>
+
+                {questions[editingQuestionIndex].questionType === "객관식" && (
+                  <div className="options-section">
+                    <div className="options-header">
+                      <span className="label-text">오답 선택지 (선택사항)</span>
+                      {questions[editingQuestionIndex].options && questions[editingQuestionIndex].options.length < 6 && (
+                        <button
+                          type="button"
+                          onClick={() => addOption(editingQuestionIndex)}
+                          className="add-option-button"
+                        >
+                          + 오답 선택지 추가
+                        </button>
+                      )}
+                    </div>
+
+                    {questions[editingQuestionIndex].options && questions[editingQuestionIndex].options.slice(1).map((option, oIndex) => (
+                      <div key={oIndex + 1} className="option-row">
+                        <input
+                          type="text"
+                          value={option}
+                          onChange={(e) => {
+                            const qIndex = editingQuestionIndex;
+                            const updatedOptions = [...questions[qIndex].options];
+                            updatedOptions[oIndex + 1] = e.target.value;
+                            updateQuestion(qIndex, "options", updatedOptions);
+                          }}
+                          placeholder={`오답 선택지 ${oIndex + 1}`}
+                          className="option-input"
+                        />
+                        {questions[editingQuestionIndex].options.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => removeOption(editingQuestionIndex, oIndex + 1)}
+                            className="remove-option-button"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="form-actions" style={{ marginTop: "15px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditingQuestionIndex(null)}
+                    className="submit-button"
+                  >
+                    완료
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

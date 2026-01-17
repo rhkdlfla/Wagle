@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useLocation } from "react-router-dom";
-import QuizForm from "./QuizForm";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./Lobby.css";
 
 // 게임 목록
@@ -37,14 +36,13 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [gameDuration, setGameDuration] = useState(30); // 클릭 배틀 기본 30초
   const [selectedQuizId, setSelectedQuizId] = useState(null); // 선택된 퀴즈 ID
   const [availableQuizzes, setAvailableQuizzes] = useState([]); // 사용 가능한 퀴즈 목록
-  const [showQuizForm, setShowQuizForm] = useState(false); // 퀴즈 추가 폼 표시 여부
-  const [quizToEdit, setQuizToEdit] = useState(null); // 편집할 퀴즈
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
   const [chatMode, setChatMode] = useState("room"); // "room" or "team"
   const messagesEndRef = useRef(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const isHost = currentRoom?.players[0]?.id === socket.id;
   
   // 현재 플레이어의 팀 ID 가져오기
@@ -155,38 +153,17 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     }
   };
 
-  // 퀴즈 추가/수정 성공 처리
-  const handleQuizCreated = (quiz) => {
-    if (quizToEdit) {
-      // 편집인 경우 목록 업데이트
-      setAvailableQuizzes(availableQuizzes.map(q => q._id === quiz._id ? quiz : q));
-      setQuizToEdit(null);
-    } else {
-      // 새 퀴즈인 경우 목록에 추가
-      setAvailableQuizzes([quiz, ...availableQuizzes]);
-      // 새로 생성된 퀴즈를 자동 선택
-      setSelectedQuizId(quiz._id);
+  // 퀴즈 페이지에서 돌아왔을 때 목록 새로고침
+  useEffect(() => {
+    if (selectedGame === "quizBattle" && location.pathname.includes("/room/")) {
+      fetchAvailableQuizzes();
     }
-    setShowQuizForm(false);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, selectedGame]);
 
-  // 퀴즈 편집 시작
-  const handleEditQuiz = async (quizId) => {
-    try {
-      const response = await fetch(`/api/quiz/${quizId}`);
-      const quiz = await response.json();
-      setQuizToEdit(quiz);
-      setShowQuizForm(true);
-    } catch (error) {
-      console.error("퀴즈 로드 실패:", error);
-      alert("퀴즈를 불러올 수 없습니다.");
-    }
-  };
-
-  // 퀴즈 폼 닫기
-  const handleCloseQuizForm = () => {
-    setShowQuizForm(false);
-    setQuizToEdit(null);
+  // 퀴즈 편집 시작 - 페이지로 이동
+  const handleEditQuiz = (quizId) => {
+    navigate(`/quiz/edit/${quizId}`);
   };
 
   // 내가 만든 퀴즈인지 확인 (로그인된 사용자만, 게스트 제외)
@@ -720,8 +697,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                       alert("퀴즈 생성을 위해서는 로그인이 필요합니다.");
                       return;
                     }
-                    setQuizToEdit(null);
-                    setShowQuizForm(true);
+                    navigate("/quiz/create");
                   }}
                   className="create-quiz-button"
                 >
@@ -902,16 +878,6 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
           </button>
         </div>
       </div>
-
-      {/* 퀴즈 추가/편집 모달 (로그인된 사용자만) */}
-      {showQuizForm && user && user.provider !== "guest" && (
-        <QuizForm
-          onClose={handleCloseQuizForm}
-          onSuccess={handleQuizCreated}
-          user={user}
-          quizToEdit={quizToEdit}
-        />
-      )}
     </div>
   );
 }

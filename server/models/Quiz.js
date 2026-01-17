@@ -10,6 +10,15 @@ const QuizSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+  thumbnailUrl: {
+    type: String,
+    default: null,
+  },
+  defaultQuestionType: {
+    type: String,
+    enum: ["객관식", "주관식"],
+    default: "객관식",
+  },
   creator: {
     userId: String,
     name: String,
