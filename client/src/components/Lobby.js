@@ -30,9 +30,13 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
+  const [chatMode, setChatMode] = useState("room"); // "room" or "team"
   const messagesEndRef = useRef(null);
   const location = useLocation();
   const isHost = currentRoom?.players[0]?.id === socket.id;
+  
+  // 현재 플레이어의 팀 ID 가져오기
+  const myTeamId = currentRoom?.players?.find((p) => p.id === socket.id)?.teamId || null;
 
   useEffect(() => {
     // 방 업데이트 수신
@@ -237,11 +241,32 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
 
   const handleSendMessage = () => {
     if (messageInput.trim() && currentRoom) {
-      socket.emit("sendMessage", {
-        roomId: currentRoom.id,
-        message: messageInput.trim(),
-      });
+      if (chatMode === "team" && currentRoom.teamMode && myTeamId) {
+        // 팀 채팅 전송
+        socket.emit("sendTeamMessage", {
+          roomId: currentRoom.id,
+          message: messageInput.trim(),
+          teamId: myTeamId,
+        });
+      } else {
+        // 전체 채팅 전송
+        socket.emit("sendMessage", {
+          roomId: currentRoom.id,
+          message: messageInput.trim(),
+        });
+      }
       setMessageInput("");
+    }
+  };
+  
+  // 표시할 메시지 필터링 (현재 채팅 모드에 따라)
+  const getDisplayedMessages = () => {
+    if (!currentRoom?.teamMode || chatMode === "room") {
+      // 전체 채팅 모드: 모든 메시지 표시
+      return messages;
+    } else {
+      // 팀 채팅 모드: 팀 채팅만 표시
+      return messages.filter((msg) => msg.type === "team" && msg.teamId === myTeamId);
     }
   };
 
@@ -275,17 +300,38 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
 
       <div className="lobby-content">
         <div className="chat-section">
-          <h2>💬 채팅</h2>
+          <div className="chat-header">
+            <h2>💬 채팅</h2>
+            {currentRoom?.teamMode && myTeamId && (
+              <div className="chat-mode-toggle">
+                <button
+                  className={`chat-mode-button ${chatMode === "room" ? "active" : ""}`}
+                  onClick={() => setChatMode("room")}
+                >
+                  전체
+                </button>
+                <button
+                  className={`chat-mode-button ${chatMode === "team" ? "active" : ""}`}
+                  onClick={() => setChatMode("team")}
+                >
+                  {currentRoom.teams?.find((t) => t.id === myTeamId)?.name || "팀"}
+                </button>
+              </div>
+            )}
+          </div>
           <div className="chat-messages">
-            {messages.length === 0 ? (
+            {getDisplayedMessages().length === 0 ? (
               <div className="chat-empty">아직 메시지가 없습니다.</div>
             ) : (
-              messages.map((msg) => {
+              getDisplayedMessages().map((msg) => {
                 const isMyMessage = msg.playerId === socket.id;
+                const isTeamMessage = msg.type === "team";
                 return (
                   <div
                     key={msg.id}
-                    className={`chat-message ${isMyMessage ? "my-message" : ""}`}
+                    className={`chat-message ${isMyMessage ? "my-message" : ""} ${
+                      isTeamMessage ? "team-message" : ""
+                    }`}
                   >
                     {!isMyMessage && (
                       <div className="message-sender">
@@ -300,7 +346,14 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                             {msg.playerName.charAt(0)}
                           </div>
                         )}
-                        <span className="message-player-name">{msg.playerName}</span>
+                        <span className="message-player-name">
+                          {msg.playerName}
+                          {isTeamMessage && msg.teamName && (
+                            <span className="team-badge" style={{ color: msg.teamColor }}>
+                              [{msg.teamName}]
+                            </span>
+                          )}
+                        </span>
                       </div>
                     )}
                     <div className="message-content">

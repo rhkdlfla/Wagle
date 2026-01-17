@@ -91,10 +91,45 @@
   height: 600px;
 }
 
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
 .chat-section h2 {
   margin-top: 0;
-  margin-bottom: 20px;
+  margin-bottom: 0;
   font-size: 1.5rem;
+}
+
+.chat-mode-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-mode-button {
+  padding: 6px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.chat-mode-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.chat-mode-button.active {
+  background: rgba(33, 150, 243, 0.8);
+  border-color: rgba(33, 150, 243, 1);
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.4);
 }
 
 .chat-messages {
@@ -193,6 +228,25 @@
   font-size: 0.85rem;
   opacity: 0.8;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.team-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.chat-message.team-message .message-content {
+  border-left: 3px solid;
+  border-color: inherit;
+}
+
+.chat-message.team-message.my-message .message-content {
+  border-left: 3px solid;
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 .message-content {
