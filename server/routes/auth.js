@@ -31,25 +31,29 @@ router.get(
       console.error("❌ KAKAO_CLIENT_ID 미설정");
       return res.redirect(`${CLIENT_URL}/login?error=kakao_config`);
     }
+    if (req.query?.error) {
+      console.error("❌ 카카오 콜백 에러:", req.query);
+    }
     passport.authenticate(
       "kakao",
       {
         failureRedirect: `${CLIENT_URL}/login?error=kakao`,
         failureFlash: false,
+        failWithError: true,
       },
       (err, user, info) => {
         if (err) {
-          console.error("❌ 카카오 인증 에러:", err);
-          return res.redirect(`${CLIENT_URL}/login?error=kakao`);
+          console.error("❌ 카카오 인증 에러:", err, info || "");
+          return res.redirect(`${CLIENT_URL}/login?error=kakao&reason=auth_error`);
         }
         if (!user) {
-          console.error("❌ 카카오 인증 실패: 사용자 정보 없음");
-          return res.redirect(`${CLIENT_URL}/login?error=kakao`);
+          console.error("❌ 카카오 인증 실패: 사용자 정보 없음", info || "");
+          return res.redirect(`${CLIENT_URL}/login?error=kakao&reason=no_user`);
         }
         req.logIn(user, (loginErr) => {
           if (loginErr) {
             console.error("❌ 카카오 로그인 세션 생성 에러:", loginErr);
-            return res.redirect(`${CLIENT_URL}/login?error=kakao`);
+            return res.redirect(`${CLIENT_URL}/login?error=kakao&reason=session_error`);
           }
           res.redirect(`${CLIENT_URL}/auth/success`);
         });
