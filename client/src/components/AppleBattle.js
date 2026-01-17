@@ -103,25 +103,30 @@ function AppleBattle({ socket, room, onBackToLobby }) {
 
     // 사과배틀 업데이트 수신
     socket.on("appleBattleUpdate", ({ scores: scoreUpdates, teamScores: teamScoresData, timeRemaining: remaining, grid: updatedGrid, teamActivePlayers: activePlayers }) => {
-      setScores(prev => {
-        const newScores = {};
-        scoreUpdates.forEach(({ id, score }) => {
-          newScores[id] = score;
+      if (scoreUpdates && Array.isArray(scoreUpdates)) {
+        setScores(prev => {
+          const newScores = {};
+          scoreUpdates.forEach(({ id, score }) => {
+            newScores[id] = score;
+          });
+          return newScores;
         });
-        return newScores;
-      });
-      setTeamScores(teamScoresData || null);
-      setTimeRemaining(remaining);
-      setTeamActivePlayers(activePlayers || null);
-      if (updatedGrid) {
-        // 그리드를 깊은 복사하여 React가 변경을 감지하도록 함
-        setGrid(JSON.parse(JSON.stringify(updatedGrid)));
+        
+        // 내 점수 업데이트
+        const myScoreUpdate = scoreUpdates.find(({ id }) => id === socket.id);
+        if (myScoreUpdate) {
+          setMyScore(myScoreUpdate.score);
+        }
       }
       
-      // 내 점수 업데이트
-      const myScoreUpdate = scoreUpdates.find(({ id }) => id === socket.id);
-      if (myScoreUpdate) {
-        setMyScore(myScoreUpdate.score);
+      setTeamScores(teamScoresData || null);
+      if (remaining !== undefined) {
+        setTimeRemaining(remaining);
+      }
+      setTeamActivePlayers(activePlayers || null);
+      if (updatedGrid && Array.isArray(updatedGrid)) {
+        // 그리드를 깊은 복사하여 React가 변경을 감지하도록 함
+        setGrid(JSON.parse(JSON.stringify(updatedGrid)));
       }
     });
 
@@ -401,8 +406,8 @@ function AppleBattle({ socket, room, onBackToLobby }) {
               height: GRID_ROWS * CELL_SIZE,
             }}
           >
-            {grid.map((row, rowIndex) =>
-              row.map((cell, colIndex) => {
+            {grid && Array.isArray(grid) && grid.length > 0 ? grid.map((row, rowIndex) =>
+              row && Array.isArray(row) ? row.map((cell, colIndex) => {
                 // 값이 0이거나 없으면 숫자 표시 안 함 (엄격한 체크)
                 const hasValue = cell && typeof cell.value === 'number' && cell.value > 0;
                 
@@ -447,8 +452,8 @@ function AppleBattle({ socket, room, onBackToLobby }) {
                     )}
                   </div>
                 );
-              })
-            )}
+              }) : null
+            ) : null}
             
             {/* 선택 박스 */}
             {selectedArea && (

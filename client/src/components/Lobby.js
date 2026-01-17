@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import "./Lobby.css";
 
-// 게임 목록
+// 게임 목록 및 설정 (중앙 관리)
 const GAMES = [
   {
     id: "clickBattle",
@@ -10,6 +10,11 @@ const GAMES = [
     description: "일정 시간 동안 최대한 많이 클릭하세요!",
     icon: "👆",
     minPlayers: 1,
+    defaultDuration: 30, // 초 단위
+    minDuration: 5,
+    maxDuration: 300,
+    durationPresets: [10, 30, 60, 120, 300], // 초 단위
+    supportsDuration: true,
   },
   {
     id: "appleBattle",
@@ -17,8 +22,18 @@ const GAMES = [
     description: "합이 10이 되는 사과를 선택해 땅따먹기!",
     icon: "🍎",
     minPlayers: 1,
+    defaultDuration: 120, // 초 단위
+    minDuration: 30,
+    maxDuration: 300,
+    durationPresets: [30, 60, 120, 180, 300], // 초 단위
+    supportsDuration: true,
   },
 ];
+
+// 게임 설정 가져오기
+function getGameConfig(gameId) {
+  return GAMES.find((game) => game.id === gameId) || GAMES[0];
+}
 
 function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [playerName, setPlayerName] = useState("");
@@ -26,7 +41,16 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [selectedGame, setSelectedGame] = useState(
     currentRoom?.selectedGame || GAMES[0].id
   );
-  const [gameDuration, setGameDuration] = useState(30); // 클릭 배틀 기본 30초
+  // 게임별 duration 관리 (게임 ID -> duration 초 단위)
+  const [gameDurations, setGameDurations] = useState(() => {
+    const durations = {};
+    GAMES.forEach((game) => {
+      if (game.supportsDuration) {
+        durations[game.id] = game.defaultDuration;
+      }
+    });
+    return durations;
+  });
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
@@ -118,12 +142,25 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         roomId: currentRoom.id,
         gameId: gameId,
       });
+      
+      // 게임 변경 시 해당 게임의 기본 duration 설정 (없으면)
+      const gameConfig = getGameConfig(gameId);
+      if (gameConfig.supportsDuration && !gameDurations[gameId]) {
+        setGameDurations((prev) => ({
+          ...prev,
+          [gameId]: gameConfig.defaultDuration,
+        }));
+      }
     }
   };
 
   const handleStartGame = () => {
     if (isHost && currentRoom.players.length > 0) {
-      const duration = selectedGame === "clickBattle" ? gameDuration * 1000 : undefined;
+      const gameConfig = getGameConfig(selectedGame);
+      const duration = gameConfig.supportsDuration
+        ? (gameDurations[selectedGame] || gameConfig.defaultDuration) * 1000
+        : undefined;
+      
       socket.emit("startGame", {
         roomId: currentRoom.id,
         gameType: selectedGame,
@@ -613,59 +650,56 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
             ))}
           </div>
           
-          {/* 클릭 배틀 시간 조절 UI */}
-          {selectedGame === "clickBattle" && isHost && (
-            <div className="game-duration-section">
-              <h3>⏱️ 게임 시간 설정</h3>
-              <div className="duration-controls">
-                <label htmlFor="duration-slider">
-                  시간: <strong>{formatDuration(gameDuration)}</strong>
-                </label>
-                <input
-                  id="duration-slider"
-                  type="range"
-                  min="5"
-                  max="300"
-                  step="5"
-                  value={gameDuration}
-                  onChange={(e) => setGameDuration(parseInt(e.target.value))}
-                  className="duration-slider"
-                />
-                <div className="duration-presets">
-                  <button
-                    onClick={() => setGameDuration(10)}
-                    className={gameDuration === 10 ? "active" : ""}
-                  >
-                    10초
-                  </button>
-                  <button
-                    onClick={() => setGameDuration(30)}
-                    className={gameDuration === 30 ? "active" : ""}
-                  >
-                    30초
-                  </button>
-                  <button
-                    onClick={() => setGameDuration(60)}
-                    className={gameDuration === 60 ? "active" : ""}
-                  >
-                    1분
-                  </button>
-                  <button
-                    onClick={() => setGameDuration(120)}
-                    className={gameDuration === 120 ? "active" : ""}
-                  >
-                    2분
-                  </button>
-                  <button
-                    onClick={() => setGameDuration(300)}
-                    className={gameDuration === 300 ? "active" : ""}
-                  >
-                    5분
-                  </button>
+          {/* 게임 시간 설정 UI (범용) */}
+          {(() => {
+            const gameConfig = getGameConfig(selectedGame);
+            if (!gameConfig.supportsDuration || !isHost) return null;
+            
+            const currentDuration = gameDurations[selectedGame] || gameConfig.defaultDuration;
+            const step = gameConfig.minDuration < 30 ? 5 : 10;
+            
+            return (
+              <div className="game-duration-section">
+                <h3>⏱️ 게임 시간 설정</h3>
+                <div className="duration-controls">
+                  <label htmlFor={`duration-slider-${selectedGame}`}>
+                    시간: <strong>{formatDuration(currentDuration)}</strong>
+                  </label>
+                  <input
+                    id={`duration-slider-${selectedGame}`}
+                    type="range"
+                    min={gameConfig.minDuration}
+                    max={gameConfig.maxDuration}
+                    step={step}
+                    value={currentDuration}
+                    onChange={(e) =>
+                      setGameDurations((prev) => ({
+                        ...prev,
+                        [selectedGame]: parseInt(e.target.value),
+                      }))
+                    }
+                    className="duration-slider"
+                  />
+                  <div className="duration-presets">
+                    {gameConfig.durationPresets.map((preset) => (
+                      <button
+                        key={preset}
+                        onClick={() =>
+                          setGameDurations((prev) => ({
+                            ...prev,
+                            [selectedGame]: preset,
+                          }))
+                        }
+                        className={currentDuration === preset ? "active" : ""}
+                      >
+                        {formatDuration(preset)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
           
           {/* 게임 설정 정보 표시 (모든 플레이어가 볼 수 있음) */}
           {(selectedGame === "clickBattle" || selectedGame === "appleBattle") && currentRoom.teamMode && (
