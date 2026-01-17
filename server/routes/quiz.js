@@ -11,10 +11,17 @@ function requireAuth(req, res, next) {
   next();
 }
 
-// 퀴즈 생성
+// 퀴즈 생성 (인증된 사용자만 가능)
 router.post("/create", requireAuth, async (req, res) => {
+  console.log("퀴즈 생성 요청 수신:", req.method, req.path, req.body?.title);
+  
+  // 게스트 사용자는 퀴즈 생성 불가
+  if (!req.user || !req.user.id) {
+    return res.status(403).json({ error: "퀴즈 생성을 위해서는 로그인이 필요합니다." });
+  }
+  
   try {
-    const { title, description, category, questions, isPublic } = req.body;
+    const { title, description, questions, isPublic } = req.body;
 
     // 유효성 검사
     if (!title || !title.trim()) {
@@ -28,7 +35,7 @@ router.post("/create", requireAuth, async (req, res) => {
     // 각 문제 유효성 검사
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      if (!q.question || !q.options || q.options.length < 2) {
+      if (!q.options || q.options.length < 2) {
         return res.status(400).json({ error: `문제 ${i + 1}의 형식이 올바르지 않습니다.` });
       }
       if (
@@ -40,30 +47,21 @@ router.post("/create", requireAuth, async (req, res) => {
       }
     }
 
-    // 사용자 정보 가져오기
-    const creator = req.user
-      ? {
-          userId: req.user.id,
-          name: req.user.name,
-          photo: req.user.photo,
-        }
-      : {
-          userId: null,
-          name: req.headers["guest-user"] ? JSON.parse(req.headers["guest-user"]).name : "게스트",
-          photo: null,
-        };
+    // 사용자 정보 가져오기 (인증된 사용자만 가능)
+    const creator = {
+      userId: req.user.id,
+      name: req.user.name,
+      photo: req.user.photo,
+    };
 
     const quiz = new Quiz({
       title: title.trim(),
       description: description || "",
-      category: category || "기타",
       questions: questions.map((q) => ({
-        question: q.question.trim(),
         imageUrl: q.imageUrl || null,
         audioUrl: q.audioUrl || null,
         options: q.options.map((opt) => opt.trim()),
         correctAnswer: q.correctAnswer,
-        timeLimit: q.timeLimit || 30,
       })),
       creator,
       isPublic: isPublic !== false,
@@ -74,19 +72,20 @@ router.post("/create", requireAuth, async (req, res) => {
     res.json({ success: true, quiz });
   } catch (error) {
     console.error("퀴즈 생성 오류:", error);
-    res.status(500).json({ error: "퀴즈 생성에 실패했습니다." });
+    console.error("에러 상세:", error.message, error.stack);
+    // 개발 환경에서는 상세 에러 메시지 반환
+    const errorMessage = process.env.NODE_ENV === 'production' 
+      ? "퀴즈 생성에 실패했습니다." 
+      : error.message || "퀴즈 생성에 실패했습니다.";
+    res.status(500).json({ error: errorMessage, details: error.message });
   }
 });
 
 // 퀴즈 목록 조회
 router.get("/list", async (req, res) => {
   try {
-    const { category, search, limit = 50, skip = 0 } = req.query;
+    const { search, limit = 50, skip = 0 } = req.query;
     const query = { isPublic: true };
-
-    if (category && category !== "전체") {
-      query.category = category;
-    }
 
     if (search && search.trim()) {
       query.$or = [
@@ -96,7 +95,7 @@ router.get("/list", async (req, res) => {
     }
 
     const quizzes = await Quiz.find(query)
-      .select("title description category creator createdAt questions")
+      .select("title description creator createdAt questions")
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(parseInt(skip))
@@ -141,13 +140,81 @@ router.get("/my/list", requireAuth, async (req, res) => {
     const query = { "creator.userId": userId };
 
     const quizzes = await Quiz.find(query)
-      .select("title description category isPublic createdAt")
+      .select("title description isPublic createdAt")
       .sort({ createdAt: -1 });
 
     res.json({ quizzes });
   } catch (error) {
     console.error("내 퀴즈 목록 조회 오류:", error);
     res.status(500).json({ error: "퀴즈 목록 조회에 실패했습니다." });
+  }
+});
+
+// 퀴즈 수정 (인증된 사용자만 가능)
+router.put("/:quizId", requireAuth, async (req, res) => {
+  try {
+    // 게스트 사용자는 퀴즈 수정 불가
+    if (!req.user || !req.user.id) {
+      return res.status(403).json({ error: "퀴즈 수정을 위해서는 로그인이 필요합니다." });
+    }
+
+    const { quizId } = req.params;
+    const { title, description, questions, isPublic } = req.body;
+
+    const quiz = await Quiz.findById(quizId);
+    if (!quiz) {
+      return res.status(404).json({ error: "퀴즈를 찾을 수 없습니다." });
+    }
+
+    // 권한 확인 - 본인이 만든 퀴즈만 수정 가능
+    if (!quiz.creator.userId || quiz.creator.userId !== req.user.id) {
+      return res.status(403).json({ error: "퀴즈를 수정할 권한이 없습니다." });
+    }
+
+    // 유효성 검사
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: "퀴즈 제목이 필요합니다." });
+    }
+
+    if (!questions || !Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ error: "최소 1개 이상의 문제가 필요합니다." });
+    }
+
+    // 각 문제 유효성 검사
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.options || q.options.length < 2) {
+        return res.status(400).json({ error: `문제 ${i + 1}의 형식이 올바르지 않습니다.` });
+      }
+      if (
+        typeof q.correctAnswer !== "number" ||
+        q.correctAnswer < 0 ||
+        q.correctAnswer >= q.options.length
+      ) {
+        return res.status(400).json({ error: `문제 ${i + 1}의 정답 인덱스가 올바르지 않습니다.` });
+      }
+    }
+
+    // 퀴즈 업데이트
+    quiz.title = title.trim();
+    quiz.description = description || "";
+    quiz.questions = questions.map((q) => ({
+      imageUrl: q.imageUrl || null,
+      audioUrl: q.audioUrl || null,
+      options: q.options.map((opt) => opt.trim()),
+      correctAnswer: q.correctAnswer,
+    }));
+    quiz.isPublic = isPublic !== false;
+
+    await quiz.save();
+    res.json({ success: true, quiz });
+  } catch (error) {
+    console.error("퀴즈 수정 오류:", error);
+    console.error("에러 상세:", error.message, error.stack);
+    const errorMessage = process.env.NODE_ENV === 'production' 
+      ? "퀴즈 수정에 실패했습니다." 
+      : error.message || "퀴즈 수정에 실패했습니다.";
+    res.status(500).json({ error: errorMessage, details: error.message });
   }
 });
 

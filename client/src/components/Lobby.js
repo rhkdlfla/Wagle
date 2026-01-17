@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import QuizForm from "./QuizForm";
 import "./Lobby.css";
 
 // 게임 목록
@@ -36,6 +37,8 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [gameDuration, setGameDuration] = useState(30); // 클릭 배틀 기본 30초
   const [selectedQuizId, setSelectedQuizId] = useState(null); // 선택된 퀴즈 ID
   const [availableQuizzes, setAvailableQuizzes] = useState([]); // 사용 가능한 퀴즈 목록
+  const [showQuizForm, setShowQuizForm] = useState(false); // 퀴즈 추가 폼 표시 여부
+  const [quizToEdit, setQuizToEdit] = useState(null); // 편집할 퀴즈
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
@@ -150,6 +153,46 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     } catch (error) {
       console.error("퀴즈 목록 불러오기 실패:", error);
     }
+  };
+
+  // 퀴즈 추가/수정 성공 처리
+  const handleQuizCreated = (quiz) => {
+    if (quizToEdit) {
+      // 편집인 경우 목록 업데이트
+      setAvailableQuizzes(availableQuizzes.map(q => q._id === quiz._id ? quiz : q));
+      setQuizToEdit(null);
+    } else {
+      // 새 퀴즈인 경우 목록에 추가
+      setAvailableQuizzes([quiz, ...availableQuizzes]);
+      // 새로 생성된 퀴즈를 자동 선택
+      setSelectedQuizId(quiz._id);
+    }
+    setShowQuizForm(false);
+  };
+
+  // 퀴즈 편집 시작
+  const handleEditQuiz = async (quizId) => {
+    try {
+      const response = await fetch(`/api/quiz/${quizId}`);
+      const quiz = await response.json();
+      setQuizToEdit(quiz);
+      setShowQuizForm(true);
+    } catch (error) {
+      console.error("퀴즈 로드 실패:", error);
+      alert("퀴즈를 불러올 수 없습니다.");
+    }
+  };
+
+  // 퀴즈 폼 닫기
+  const handleCloseQuizForm = () => {
+    setShowQuizForm(false);
+    setQuizToEdit(null);
+  };
+
+  // 내가 만든 퀴즈인지 확인 (로그인된 사용자만, 게스트 제외)
+  const isMyQuiz = (quiz) => {
+    if (!user || user.provider === "guest" || !quiz.creator || !quiz.creator.userId) return false;
+    return user.id === quiz.creator.userId;
   };
 
   const handleStartGame = () => {
@@ -652,7 +695,22 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
           {/* 퀴즈 배틀 퀴즈 선택 UI */}
           {selectedGame === "quizBattle" && isHost && (
             <div className="quiz-selection-section">
-              <h3>🧩 퀴즈 선택</h3>
+              <div className="quiz-selection-header">
+                <h3>🧩 퀴즈 선택</h3>
+                <button
+                  onClick={() => {
+                    if (!user || user.provider === "guest") {
+                      alert("퀴즈 생성을 위해서는 로그인이 필요합니다.");
+                      return;
+                    }
+                    setQuizToEdit(null);
+                    setShowQuizForm(true);
+                  }}
+                  className="create-quiz-button"
+                >
+                  + 새 퀴즈 만들기
+                </button>
+              </div>
               {availableQuizzes.length === 0 ? (
                 <div className="quiz-loading">
                   <p>퀴즈 목록을 불러오는 중...</p>
@@ -662,32 +720,53 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                 </div>
               ) : (
                 <div className="quiz-list">
-                  {availableQuizzes.map((quiz) => (
-                    <div
-                      key={quiz._id}
-                      className={`quiz-item ${
-                        selectedQuizId === quiz._id ? "selected" : ""
-                      }`}
-                      onClick={() => setSelectedQuizId(quiz._id)}
-                    >
-                      <div className="quiz-icon">🧩</div>
-                      <div className="quiz-info">
-                        <div className="quiz-name">{quiz.title}</div>
-                        <div className="quiz-meta">
-                          <span className="quiz-category">{quiz.category}</span>
-                          <span className="quiz-questions-count">
-                            {quiz.questions?.length || 0}문제
-                          </span>
+                  {availableQuizzes.map((quiz) => {
+                    const isMyOwnQuiz = isMyQuiz(quiz);
+                    return (
+                      <div
+                        key={quiz._id}
+                        className={`quiz-item ${
+                          selectedQuizId === quiz._id ? "selected" : ""
+                        } ${isMyOwnQuiz ? "my-quiz" : ""}`}
+                      >
+                        <div 
+                          className="quiz-item-content"
+                          onClick={() => setSelectedQuizId(quiz._id)}
+                        >
+                          <div className="quiz-icon">🧩</div>
+                          <div className="quiz-info">
+                            <div className="quiz-name">
+                              {quiz.title}
+                              {isMyOwnQuiz && <span className="my-quiz-badge">내가 만든 퀴즈</span>}
+                            </div>
+                            <div className="quiz-meta">
+                              <span className="quiz-questions-count">
+                                {quiz.questions?.length || 0}문제
+                              </span>
+                            </div>
+                            {quiz.description && (
+                              <div className="quiz-description">{quiz.description}</div>
+                            )}
+                          </div>
+                          {selectedQuizId === quiz._id && (
+                            <div className="selected-badge">✓</div>
+                          )}
                         </div>
-                        {quiz.description && (
-                          <div className="quiz-description">{quiz.description}</div>
+                        {isMyOwnQuiz && (
+                          <button
+                            className="edit-quiz-button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditQuiz(quiz._id);
+                            }}
+                            title="퀴즈 편집"
+                          >
+                            ✏️ 편집
+                          </button>
                         )}
                       </div>
-                      {selectedQuizId === quiz._id && (
-                        <div className="selected-badge">✓</div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -806,6 +885,16 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
           </button>
         </div>
       </div>
+
+      {/* 퀴즈 추가/편집 모달 (로그인된 사용자만) */}
+      {showQuizForm && user && user.provider !== "guest" && (
+        <QuizForm
+          onClose={handleCloseQuizForm}
+          onSuccess={handleQuizCreated}
+          user={user}
+          quizToEdit={quizToEdit}
+        />
+      )}
     </div>
   );
 }

@@ -10,12 +10,6 @@ const QuizSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
-  category: {
-    type: String,
-    required: true,
-    enum: ["종합인물", "국기", "노래", "게임캐릭터", "기타"],
-    default: "기타",
-  },
   creator: {
     userId: String,
     name: String,
@@ -23,10 +17,6 @@ const QuizSchema = new mongoose.Schema({
   },
   questions: [
     {
-      question: {
-        type: String,
-        required: true,
-      },
       imageUrl: {
         type: String,
         default: null, // 이미지 퀴즈용
@@ -48,12 +38,6 @@ const QuizSchema = new mongoose.Schema({
         required: true,
         min: 0,
       },
-      timeLimit: {
-        type: Number,
-        default: 30, // 기본 30초
-        min: 5,
-        max: 120,
-      },
     },
   ],
   isPublic: {
@@ -66,14 +50,40 @@ const QuizSchema = new mongoose.Schema({
   },
 });
 
-// 정답 인덱스 검증
+// 정답 인덱스 검증 (Mongoose 9.x 호환)
 QuizSchema.pre("save", function (next) {
-  for (const question of this.questions) {
-    if (question.correctAnswer < 0 || question.correctAnswer >= question.options.length) {
-      return next(new Error("정답 인덱스가 선택지 범위를 벗어났습니다."));
+  try {
+    if (!this.questions || !Array.isArray(this.questions)) {
+      if (typeof next === 'function') {
+        return next();
+      }
+      return;
+    }
+    
+    for (const question of this.questions) {
+      if (!question.options || !Array.isArray(question.options)) {
+        continue;
+      }
+      if (typeof question.correctAnswer !== 'number' || 
+          question.correctAnswer < 0 || 
+          question.correctAnswer >= question.options.length) {
+        const error = new Error(`정답 인덱스가 선택지 범위를 벗어났습니다. (인덱스: ${question.correctAnswer}, 선택지 수: ${question.options.length})`);
+        if (typeof next === 'function') {
+          return next(error);
+        }
+        throw error;
+      }
+    }
+    if (typeof next === 'function') {
+      next();
+    }
+  } catch (error) {
+    if (typeof next === 'function') {
+      next(error);
+    } else {
+      throw error;
     }
   }
-  next();
 });
 
 module.exports = mongoose.model("Quiz", QuizSchema);

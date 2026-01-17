@@ -4,6 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "prestart": "lsof -ti :4000 | xargs kill -9 2>/dev/null || true",
+    "start": "node index.js",
+    "predev": "lsof -ti :4000 | xargs kill -9 2>/dev/null || true",
+    "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -19,7 +19,6 @@ class QuizBattle {
         this.gameState.quiz = {
           id: quiz._id.toString(),
           title: quiz.title,
-          category: quiz.category,
           questions: quiz.questions,
         };
       } catch (error) {
@@ -67,30 +66,11 @@ class QuizBattle {
         return;
       }
 
-      // 현재 문제 시간 업데이트
+      // 모든 플레이어가 답했는지 확인하고 시간 업데이트
       if (this.gameState.currentQuestionIndex < this.gameState.quiz?.questions.length) {
-        const question = this.gameState.quiz.questions[this.gameState.currentQuestionIndex];
-        const questionElapsed = Date.now() - this.gameState.questionStartTime;
-        const questionRemaining = Math.max(0, question.timeLimit * 1000 - questionElapsed);
-
-        // 문제 시간이 끝나면 자동으로 다음 문제로
-        if (questionRemaining <= 0 && Object.keys(this.gameState.answers).length < this.room.players.length) {
-          // 아직 답하지 않은 플레이어는 0점 처리
-          this.room.players.forEach((player) => {
-            if (!this.gameState.answers[player.id]) {
-              this.gameState.answers[player.id] = {
-                answer: null,
-                timeSpent: question.timeLimit * 1000,
-                isCorrect: false,
-              };
-            }
-          });
-          this.nextQuestion();
-        }
-
-        // 문제 시간 업데이트 전송
+        // 문제 시간 업데이트 전송 (시간 제한 없음 - 모든 플레이어가 답할 때까지 대기)
         this.io.to(this.room.id).emit("quizUpdate", {
-          questionTimeRemaining: questionRemaining,
+          questionTimeRemaining: null,
           timeRemaining: remaining,
           scores: this.gameState.scores,
           teamScores: this.room.teamMode ? this.gameState.teamScores : null,
@@ -111,11 +91,10 @@ class QuizBattle {
     const question = this.gameState.quiz.questions[this.gameState.currentQuestionIndex];
     const isCorrect = answer === question.correctAnswer;
 
-    // 점수 계산 (빠를수록 높은 점수)
+    // 점수 계산 (정답만 점수)
     let points = 0;
     if (isCorrect) {
-      const timeBonus = Math.max(0, question.timeLimit * 1000 - timeSpent);
-      points = 100 + Math.floor(timeBonus / 100); // 기본 100점 + 시간 보너스 (밀리초당 1점)
+      points = 100; // 기본 100점
     }
 
     this.gameState.scores[socketId] = (this.gameState.scores[socketId] || 0) + points;
@@ -189,11 +168,9 @@ class QuizBattle {
     this.gameState.questionStartTime = Date.now();
 
     this.io.to(this.room.id).emit("newQuestion", {
-      question: question.question,
       imageUrl: question.imageUrl,
       audioUrl: question.audioUrl,
       options: question.options,
-      timeLimit: question.timeLimit,
       questionNumber: this.gameState.currentQuestionIndex + 1,
       totalQuestions: this.gameState.quiz.questions.length,
     });
@@ -277,11 +254,7 @@ class QuizBattle {
     const remaining = Math.max(0, this.gameState.duration - elapsed);
 
     const question = this.gameState.quiz?.questions[this.gameState.currentQuestionIndex];
-    let questionTimeRemaining = 0;
-    if (question) {
-      const questionElapsed = Date.now() - this.gameState.questionStartTime;
-      questionTimeRemaining = Math.max(0, question.timeLimit * 1000 - questionElapsed);
-    }
+    let questionTimeRemaining = null; // 시간 제한 없음
 
     return {
       duration: this.gameState.duration,

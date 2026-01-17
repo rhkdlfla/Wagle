@@ -64,28 +64,10 @@ function QuizBattle({ socket, room, onBackToLobby }) {
       console.log("새 문제 수신:", questionData);
       setCurrentQuestion(questionData);
       setSelectedAnswer(null);
-      setQuestionTimeRemaining(questionData.timeLimit * 1000);
+      setQuestionTimeRemaining(null); // 시간 제한 없음
       setQuestionResult(null);
       questionStartTimeRef.current = Date.now();
       setCurrentQuestionIndex(questionData.questionNumber - 1);
-
-      // 문제 타이머 시작
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-
-      timerIntervalRef.current = setInterval(() => {
-        if (questionStartTimeRef.current) {
-          const elapsed = Date.now() - questionStartTimeRef.current;
-          const remaining = Math.max(0, questionData.timeLimit * 1000 - elapsed);
-          setQuestionTimeRemaining(remaining);
-
-          if (remaining <= 0) {
-            clearInterval(timerIntervalRef.current);
-            timerIntervalRef.current = null;
-          }
-        }
-      }, 100);
     });
 
     // 정답 제출 확인
@@ -298,9 +280,6 @@ function QuizBattle({ socket, room, onBackToLobby }) {
                 <div className="question-number">
                   문제 {currentQuestion.questionNumber} / {currentQuestion.totalQuestions}
                 </div>
-                <div className="question-timer">
-                  ⏱️ {formatQuestionTime(questionTimeRemaining)}초
-                </div>
               </div>
 
               {currentQuestion.imageUrl && (
@@ -314,10 +293,6 @@ function QuizBattle({ socket, room, onBackToLobby }) {
                   <audio src={currentQuestion.audioUrl} controls autoPlay />
                 </div>
               )}
-
-              <div className="question-text">
-                <h2>{currentQuestion.question}</h2>
-              </div>
 
               <div className="answer-options">
                 {currentQuestion.options.map((option, index) => {
