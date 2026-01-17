@@ -3,28 +3,41 @@ import "./Login.css";
 
 function Login({ onLoginSuccess }) {
   const SERVER_URL = process.env.REACT_APP_SERVER_URL || "/api";
+  const clearLoginErrorShown = (errorKey) => {
+    sessionStorage.removeItem(`loginErrorShown:${errorKey}`);
+  };
   useEffect(() => {
     // URL에서 인증 성공 여부 확인
     const urlParams = new URLSearchParams(window.location.search);
     const error = urlParams.get("error");
+    const reason = urlParams.get("reason");
     if (error) {
+      const shownKey = `loginErrorShown:${error}`;
+      const hasShown = sessionStorage.getItem(shownKey);
       if (error === "kakao_config") {
-        alert("카카오 로그인이 설정되지 않았습니다. 서버 관리자에게 문의하세요.");
+        if (!hasShown) alert("카카오 로그인이 설정되지 않았습니다. 서버 관리자에게 문의하세요.");
       } else if (error === "kakao_timeout") {
-        alert("카카오 로그인 시간이 초과되었습니다. 다시 시도해주세요.");
+        if (!hasShown) alert("카카오 로그인 시간이 초과되었습니다. 다시 시도해주세요.");
       } else if (error === "kakao") {
-        alert("카카오 로그인에 실패했습니다. 다시 시도해주세요.");
+        if (!hasShown) {
+          const reasonText = reason ? ` (사유: ${reason})` : "";
+          alert(`카카오 로그인에 실패했습니다. 다시 시도해주세요.${reasonText}`);
+        }
       } else {
-        alert("로그인에 실패했습니다. 다시 시도해주세요.");
+        if (!hasShown) alert("로그인에 실패했습니다. 다시 시도해주세요.");
       }
+      sessionStorage.setItem(shownKey, "true");
+      window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
 
   const handleGoogleLogin = () => {
+    clearLoginErrorShown("google");
     window.location.href = `${SERVER_URL}/auth/google`;
   };
 
   const handleKakaoLogin = () => {
+    clearLoginErrorShown("kakao");
     window.location.href = `${SERVER_URL}/auth/kakao`;
   };
 
