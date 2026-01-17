@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
+import GameScoreboard from "./GameScoreboard";
+import GameResults from "./GameResults";
 import "./ClickBattle.css";
 
 function ClickBattle({ socket, room, onBackToLobby }) {
@@ -140,66 +142,16 @@ function ClickBattle({ socket, room, onBackToLobby }) {
             </div>
           </div>
 
-          {/* 팀 점수 표시 (팀전 모드일 때만) */}
-          {room.teamMode && teamScores && room.teams ? (
-            <div className="team-scores-display">
-              <h3>팀 점수</h3>
-              <div className="team-scores-list">
-                {room.teams
-                  .map((team) => ({
-                    ...team,
-                    score: teamScores[team.id] || 0,
-                  }))
-                  .sort((a, b) => b.score - a.score)
-                  .map((team) => (
-                    <div key={team.id} className="team-score-item">
-                      <div
-                        className="team-color-dot"
-                        style={{ backgroundColor: team.color }}
-                      />
-                      <span className="team-score-name">{team.name}</span>
-                      <span className="team-score-value">{team.score}회</span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          ) : (
-            <div className="leaderboard">
-              <h3>순위</h3>
-              <div className="player-scores">
-                {room.players
-                  .map((player) => ({
-                    ...player,
-                    clicks: getPlayerClicks(player.id),
-                  }))
-                  .sort((a, b) => b.clicks - a.clicks)
-                  .map((player, index) => (
-                    <div
-                      key={player.id}
-                      className={`player-score ${player.id === socket.id ? "me" : ""} ${
-                        index === 0 ? "first" : ""
-                      }`}
-                    >
-                      <div className="rank">{index + 1}</div>
-                      {player.photo && (
-                        <img
-                          src={player.photo}
-                          alt={player.name}
-                          className="player-avatar"
-                        />
-                      )}
-                      <div className="player-info">
-                        <div className="player-name">
-                          {player.name}
-                          {player.id === socket.id && <span className="me-badge">나</span>}
-                        </div>
-                        <div className="player-clicks">{player.clicks}회</div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
+          <GameScoreboard
+            teams={room.teamMode ? room.teams : []}
+            teamScores={teamScores}
+            players={room.players}
+            scores={clicks}
+            myPlayerId={socket.id}
+            teamMode={room.teamMode}
+            scoreUnit="회"
+            getPlayerScore={getPlayerClicks}
+          />
         </div>
       )}
 
@@ -207,91 +159,13 @@ function ClickBattle({ socket, room, onBackToLobby }) {
         <div className="results-screen">
           <h2>게임 종료! 🎉</h2>
           
-          {/* 팀전 모드일 때 팀 점수 표시 */}
-          {room.teamMode && results[0]?.teamScore !== undefined && room.teams && (
-            <div className="results-team-scores">
-              <h3>팀 점수</h3>
-              <div className="results-team-list">
-                {room.teams
-                  .map((team) => {
-                    const teamResult = results.find((r) => r.teamId === team.id);
-                    const teamScore = teamResult?.teamScore || 0;
-                    const isWinner = results.some((r) => r.teamId === team.id && r.isWinner);
-                    return {
-                      ...team,
-                      score: teamScore,
-                      isWinner,
-                    };
-                  })
-                  .sort((a, b) => b.score - a.score)
-                  .map((team, index) => (
-                    <div
-                      key={team.id}
-                      className={`result-team-item ${team.isWinner ? "winner" : ""}`}
-                    >
-                      <div className="result-team-rank">
-                        {index === 0 && team.isWinner ? "👑" : index + 1}
-                      </div>
-                      <div
-                        className="result-team-color"
-                        style={{ backgroundColor: team.color }}
-                      />
-                      <div className="result-team-info">
-                        <div className="result-team-name">
-                          {team.name}
-                          {team.isWinner && <span className="winner-badge">승리팀!</span>}
-                        </div>
-                        <div className="result-team-score">{team.score}회 클릭</div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-          
-          {/* 개인 점수 표시 */}
-          <div className="results-list">
-            <h3>{room.teamMode ? "개인 점수" : "순위"}</h3>
-            {results.map((result, index) => {
-              const playerTeam = room.teamMode && result.teamId
-                ? room.teams?.find((t) => t.id === result.teamId)
-                : null;
-              return (
-                <div
-                  key={result.id}
-                  className={`result-item ${result.isWinner ? "winner" : ""} ${
-                    result.id === socket.id ? "me" : ""
-                  }`}
-                  style={
-                    playerTeam
-                      ? {
-                          borderLeft: `4px solid ${playerTeam.color}`,
-                        }
-                      : {}
-                  }
-                >
-                  <div className="result-rank">
-                    {index === 0 && result.isWinner ? "👑" : index + 1}
-                  </div>
-                  {result.photo && (
-                    <img
-                      src={result.photo}
-                      alt={result.name}
-                      className="result-avatar"
-                    />
-                  )}
-                  <div className="result-info">
-                    <div className="result-name">
-                      {result.name}
-                      {result.isWinner && <span className="winner-badge">승자!</span>}
-                      {result.id === socket.id && <span className="me-badge">나</span>}
-                    </div>
-                    <div className="result-clicks">{result.score || 0}회 클릭</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <GameResults
+            results={results}
+            teams={room.teamMode ? room.teams : []}
+            myPlayerId={socket.id}
+            teamMode={room.teamMode}
+            scoreUnit="회"
+          />
           <div className="result-actions">
             <button onClick={onBackToLobby} className="back-button">
               로비로 돌아가기

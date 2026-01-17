@@ -268,6 +268,104 @@ function setupRoomHandlers(socket, io, rooms, user) {
     console.log(`방 ${roomId}의 팀 모드 해제됨`);
   });
 
+  // 팀 추가 (방장만 가능)
+  socket.on("addTeam", ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room) {
+      socket.emit("setTeamsError", { message: "방을 찾을 수 없습니다." });
+      return;
+    }
+
+    // 방장만 팀 추가 가능
+    if (room.players[0].id !== socket.id) {
+      socket.emit("setTeamsError", { message: "방장만 팀을 추가할 수 있습니다." });
+      return;
+    }
+
+    if (!room.teamMode) {
+      socket.emit("setTeamsError", { message: "팀전 모드가 활성화되지 않았습니다." });
+      return;
+    }
+
+    // 최대 8개 팀
+    if (room.teams && room.teams.length >= 8) {
+      socket.emit("setTeamsError", { message: "최대 8개 팀까지 추가할 수 있습니다." });
+      return;
+    }
+
+    const teamColorsList = [
+      "#FF5733", // 빨간색
+      "#33C3F0", // 파란색
+      "#33FF57", // 초록색
+      "#FFD933", // 노란색
+      "#9D33FF", // 보라색
+      "#FF33A1", // 분홍색
+      "#33FFF0", // 청록색
+      "#FF8C33", // 주황색
+    ];
+
+    // 새 팀 ID 계산
+    const maxId = room.teams.length > 0 
+      ? Math.max(...room.teams.map(t => t.id)) 
+      : 0;
+    const newTeamId = maxId + 1;
+    
+    // 새 팀 추가
+    room.teams.push({
+      id: newTeamId,
+      name: `팀 ${newTeamId}`,
+      color: teamColorsList[(newTeamId - 1) % teamColorsList.length],
+    });
+
+    io.to(roomId).emit("roomUpdated", room);
+    console.log(`방 ${roomId}에 팀 추가됨: 팀 ${newTeamId}`);
+  });
+
+  // 팀 삭제 (방장만 가능)
+  socket.on("removeTeam", ({ roomId, teamId }) => {
+    const room = rooms.get(roomId);
+    if (!room) {
+      socket.emit("setTeamsError", { message: "방을 찾을 수 없습니다." });
+      return;
+    }
+
+    // 방장만 팀 삭제 가능
+    if (room.players[0].id !== socket.id) {
+      socket.emit("setTeamsError", { message: "방장만 팀을 삭제할 수 있습니다." });
+      return;
+    }
+
+    if (!room.teamMode) {
+      socket.emit("setTeamsError", { message: "팀전 모드가 활성화되지 않았습니다." });
+      return;
+    }
+
+    // 최소 2개 팀 유지
+    if (room.teams && room.teams.length <= 2) {
+      socket.emit("setTeamsError", { message: "최소 2개 팀은 유지해야 합니다." });
+      return;
+    }
+
+    // 팀 삭제
+    const teamIndex = room.teams.findIndex(t => t.id === teamId);
+    if (teamIndex === -1) {
+      socket.emit("setTeamsError", { message: "팀을 찾을 수 없습니다." });
+      return;
+    }
+
+    // 해당 팀에 속한 플레이어들의 팀 배치 해제
+    room.players.forEach((player) => {
+      if (player.teamId === teamId) {
+        player.teamId = null;
+      }
+    });
+
+    room.teams.splice(teamIndex, 1);
+
+    io.to(roomId).emit("roomUpdated", room);
+    console.log(`방 ${roomId}에서 팀 삭제됨: 팀 ${teamId}`);
+  });
+
   // 플레이어 팀 배치/변경
   socket.on("assignPlayerToTeam", ({ roomId, playerId, teamId }) => {
     const room = rooms.get(roomId);

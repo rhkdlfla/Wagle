@@ -702,25 +702,19 @@
   font-size: 1.1rem;
 }
 
-.team-count-buttons {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.team-count-button {
-  padding: 8px 16px;
+.enable-team-mode-button {
+  padding: 10px 20px;
   background: rgba(33, 150, 243, 0.8);
   color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 600;
   transition: all 0.3s;
 }
 
-.team-count-button:hover {
+.enable-team-mode-button:hover {
   background: rgba(33, 150, 243, 1);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
@@ -746,15 +740,54 @@
   color: #4caf50;
 }
 
+.team-control-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.add-team-button,
+.remove-team-button,
 .disable-team-mode-button {
   padding: 6px 12px;
-  background: rgba(244, 67, 54, 0.8);
-  color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.85rem;
+  font-weight: 500;
   transition: all 0.3s;
+}
+
+.add-team-button {
+  background: rgba(76, 175, 80, 0.8);
+  color: white;
+}
+
+.add-team-button:hover:not(:disabled) {
+  background: rgba(76, 175, 80, 1);
+  transform: translateY(-1px);
+}
+
+.add-team-button:disabled {
+  background: rgba(128, 128, 128, 0.5);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: not-allowed;
+}
+
+.remove-team-button {
+  background: rgba(255, 152, 0, 0.8);
+  color: white;
+}
+
+.remove-team-button:hover {
+  background: rgba(255, 152, 0, 1);
+  transform: translateY(-1px);
+}
+
+.disable-team-mode-button {
+  background: rgba(244, 67, 54, 0.8);
+  color: white;
 }
 
 .disable-team-mode-button:hover {

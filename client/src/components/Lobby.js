@@ -122,11 +122,29 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     }
   };
 
-  const handleSetTeams = (teamCount) => {
+  const handleEnableTeamMode = () => {
     if (isHost) {
+      // 기본 2팀으로 시작
       socket.emit("setTeams", {
         roomId: currentRoom.id,
-        teamCount: teamCount,
+        teamCount: 2,
+      });
+    }
+  };
+
+  const handleAddTeam = () => {
+    if (isHost) {
+      socket.emit("addTeam", {
+        roomId: currentRoom.id,
+      });
+    }
+  };
+
+  const handleRemoveTeam = (teamId) => {
+    if (isHost) {
+      socket.emit("removeTeam", {
+        roomId: currentRoom.id,
+        teamId: teamId,
       });
     }
   };
@@ -324,28 +342,46 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
               {!currentRoom.teamMode ? (
                 <div className="team-mode-toggle">
                   <h3>팀전 모드</h3>
-                  <div className="team-count-buttons">
-                    {[2, 3, 4, 5, 6].map((count) => (
-                      <button
-                        key={count}
-                        onClick={() => handleSetTeams(count)}
-                        className="team-count-button"
-                      >
-                        {count}팀
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    onClick={handleEnableTeamMode}
+                    className="enable-team-mode-button"
+                  >
+                    팀전 모드 활성화
+                  </button>
                 </div>
               ) : (
                 <div className="team-mode-active">
                   <div className="team-mode-header">
                     <h3>팀전 모드 활성화됨 ({currentRoom.teams?.length || 0}팀)</h3>
-                    <button
-                      onClick={handleDisableTeamMode}
-                      className="disable-team-mode-button"
-                    >
-                      팀전 모드 해제
-                    </button>
+                    <div className="team-control-buttons">
+                      <button
+                        onClick={handleAddTeam}
+                        className="add-team-button"
+                        disabled={currentRoom.teams && currentRoom.teams.length >= 8}
+                        title="팀 추가 (최대 8개)"
+                      >
+                        + 팀 추가
+                      </button>
+                      {currentRoom.teams && currentRoom.teams.length > 2 && (
+                        <button
+                          onClick={() => {
+                            // 마지막 팀 삭제
+                            const lastTeam = currentRoom.teams[currentRoom.teams.length - 1];
+                            handleRemoveTeam(lastTeam.id);
+                          }}
+                          className="remove-team-button"
+                          title="팀 삭제 (최소 2개 유지)"
+                        >
+                          - 팀 삭제
+                        </button>
+                      )}
+                      <button
+                        onClick={handleDisableTeamMode}
+                        className="disable-team-mode-button"
+                      >
+                        팀전 모드 해제
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
