@@ -272,12 +272,18 @@ function RoomGame({ socket, user }) {
 }
 
 function App() {
+  const navigate = useNavigate();
   const [isConnected, setIsConnected] = useState(socket.connected);
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // 사용자 인증 상태 확인
   useEffect(() => {
+    const isAuthSuccessRedirect = window.location.pathname === "/auth/success";
+    if (isAuthSuccessRedirect) {
+      navigate("/", { replace: true });
+    }
+
     const checkAuth = async () => {
       try {
         // 먼저 로컬 스토리지에서 게스트 정보 확인
