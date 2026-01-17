@@ -10,6 +10,8 @@ function ClickBattle({ socket, room, onBackToLobby }) {
   const [isActive, setIsActive] = useState(false);
   const [results, setResults] = useState(null);
   const [myClicks, setMyClicks] = useState(0);
+  const [teamActivePlayers, setTeamActivePlayers] = useState(null); // 이어달리기 모드: 각 팀의 현재 활성 플레이어
+  const [relayMode, setRelayMode] = useState(false); // 이어달리기 모드 여부
   const timerIntervalRef = useRef(null);
 
   useEffect(() => {
@@ -48,7 +50,7 @@ function ClickBattle({ socket, room, onBackToLobby }) {
     socket.on("gameStarted", handleGameStarted);
 
     // 클릭 업데이트 수신
-    socket.on("clickUpdate", ({ updates, teamScores: scores, timeRemaining: remaining }) => {
+    socket.on("clickUpdate", ({ updates, teamScores: scores, timeRemaining: remaining, teamActivePlayers: activePlayers }) => {
       const newClicks = {};
       updates.forEach((update) => {
         newClicks[update.id] = update.clicks;
@@ -56,6 +58,7 @@ function ClickBattle({ socket, room, onBackToLobby }) {
       setClicks(newClicks);
       setTeamScores(scores || null);
       setTimeRemaining(remaining);
+      setTeamActivePlayers(activePlayers || null);
       
       // 내 클릭 수 업데이트
       const myUpdate = updates.find((u) => u.id === socket.id);
@@ -97,11 +100,59 @@ function ClickBattle({ socket, room, onBackToLobby }) {
       socket.emit("getGameState", { roomId: room.id });
     }
   }, [room, socket]);
+  
+  // 이어달리기 모드 감지 (팀전 모드이고 teamActivePlayers가 있으면 이어달리기 모드)
+  useEffect(() => {
+    setRelayMode(room?.teamMode && teamActivePlayers !== null);
+  }, [room?.teamMode, teamActivePlayers]);
 
-  const handleClick = () => {
+  const handleClick = (e) => {
     if (isActive && timeRemaining > 0) {
+      // 우클릭: 이어달리기 모드에서 다음 팀원에게 순서 넘기기
+      if (e.button === 2 || (e.type === "contextmenu")) {
+        e.preventDefault();
+        if (relayMode && room.teamMode) {
+          const myTeamId = room.players.find((p) => p.id === socket.id)?.teamId;
+          if (myTeamId && teamActivePlayers?.[myTeamId] === socket.id) {
+            socket.emit("passTurn", { roomId: room.id });
+          }
+        }
+        return;
+      }
+      
+      // 좌클릭: 클릭 처리
       socket.emit("gameClick", { roomId: room.id });
     }
+  };
+  
+  // 현재 클릭 가능한지 확인 (이어달리기 모드일 때)
+  const canClick = () => {
+    if (!relayMode || !room.teamMode) {
+      return true; // 이어달리기 모드가 아니면 항상 클릭 가능
+    }
+    
+    const myTeamId = room.players.find((p) => p.id === socket.id)?.teamId;
+    if (!myTeamId) {
+      return false; // 팀이 없으면 클릭 불가
+    }
+    
+    return teamActivePlayers?.[myTeamId] === socket.id;
+  };
+  
+  // 현재 활성 플레이어 이름 가져오기
+  const getActivePlayerName = () => {
+    if (!relayMode || !room.teamMode || !teamActivePlayers) {
+      return null;
+    }
+    
+    const myTeamId = room.players.find((p) => p.id === socket.id)?.teamId;
+    if (!myTeamId) {
+      return null;
+    }
+    
+    const activePlayerId = teamActivePlayers[myTeamId];
+    const activePlayer = room.players.find((p) => p.id === activePlayerId);
+    return activePlayer ? activePlayer.name : null;
   };
 
   const getPlayerClicks = (playerId) => {
@@ -112,11 +163,39 @@ function ClickBattle({ socket, room, onBackToLobby }) {
     return (ms / 1000).toFixed(1);
   };
 
+  const isHost = room?.players?.[0]?.id === socket.id;
+
+  const handleLeaveGame = () => {
+    if (window.confirm("게임을 나가시겠습니까?")) {
+      onBackToLobby();
+    }
+  };
+
+  const handleEndGame = () => {
+    if (window.confirm("게임을 종료하시겠습니까? 모든 플레이어가 로비로 돌아갑니다.")) {
+      socket.emit("endGame", { roomId: room.id });
+    }
+  };
+
   return (
     <div className="click-battle-container">
       <div className="game-header">
-        <h1>🎯 클릭 대결!</h1>
-        <p>일정 시간 동안 최대한 많이 클릭하세요!</p>
+        <div className="game-header-content">
+          <div>
+            <h1>🎯 클릭 대결!</h1>
+            <p>일정 시간 동안 최대한 많이 클릭하세요!</p>
+          </div>
+          <div className="game-header-actions">
+            {isHost && isActive && (
+              <button onClick={handleEndGame} className="end-game-button" title="게임 종료">
+                🛑 게임 종료
+              </button>
+            )}
+            <button onClick={handleLeaveGame} className="leave-game-button" title="게임 나가기">
+              🚪 나가기
+            </button>
+          </div>
+        </div>
       </div>
 
       {!isActive && !results && (
@@ -134,12 +213,28 @@ function ClickBattle({ socket, room, onBackToLobby }) {
             </div>
           </div>
 
-          <div className="click-area" onClick={handleClick}>
-            <div className="click-button">
+          <div 
+            className="click-area" 
+            onClick={handleClick}
+            onContextMenu={handleClick}
+          >
+            <div className={`click-button ${!canClick() ? "disabled" : ""}`}>
               <span className="click-icon">👆</span>
-              <span className="click-text">클릭!</span>
+              <span className="click-text">
+                {relayMode && !canClick() ? "대기 중..." : "클릭!"}
+              </span>
               <span className="click-count">{myClicks}</span>
             </div>
+            {relayMode && room.teamMode && (
+              <div className="relay-mode-info">
+                <p className="active-player-text">
+                  현재 차례: <strong>{getActivePlayerName() || "대기 중"}</strong>
+                </p>
+                <p className="relay-instruction">
+                  💡 우클릭으로 다음 팀원에게 순서 넘기기
+                </p>
+              </div>
+            )}
           </div>
 
           <GameScoreboard

@@ -32,6 +32,18 @@ class AppleBattle {
         this.gameState.teamScores[team.id] = 0;
       });
     }
+    
+    // 이어달리기 모드 초기화 (팀전 모드일 때만)
+    if (this.gameState.relayMode && this.room.teamMode && this.room.teams) {
+      this.gameState.teamActivePlayers = {};
+      this.room.teams.forEach((team) => {
+        const teamPlayers = this.room.players.filter((p) => p.teamId === team.id);
+        if (teamPlayers.length > 0) {
+          // 각 팀의 첫 번째 플레이어를 활성 플레이어로 설정
+          this.gameState.teamActivePlayers[team.id] = teamPlayers[0].id;
+        }
+      });
+    }
   }
 
   // 주기적 업데이트 시작
@@ -53,8 +65,10 @@ class AppleBattle {
       
       this.io.to(this.room.id).emit("appleBattleUpdate", {
         scores: scoreUpdates,
+        teamScores: this.room.teamMode ? this.gameState.teamScores : null,
         timeRemaining: remaining,
         grid: this.gameState.grid,
+        teamActivePlayers: this.gameState.relayMode ? this.gameState.teamActivePlayers : null,
       });
     }, 1000);
     
@@ -63,6 +77,19 @@ class AppleBattle {
 
   // 사과 제거 및 땅따먹기 처리
   handleRemove(socketId, startRow, startCol, endRow, endCol) {
+    // 이어달리기 모드일 때 현재 플레이어가 활성 플레이어인지 확인
+    if (this.gameState.relayMode && this.room.teamMode) {
+      const player = this.room.players.find((p) => p.id === socketId);
+      if (!player || !player.teamId) {
+        return false; // 팀이 없는 플레이어는 클릭 불가
+      }
+      
+      const activePlayerId = this.gameState.teamActivePlayers?.[player.teamId];
+      if (activePlayerId !== socketId) {
+        return false; // 현재 차례가 아닌 플레이어는 클릭 불가
+      }
+    }
+    
     // 선택된 영역의 사과 합 계산
     let sum = 0;
     const allSelectedCells = []; // 모든 선택된 칸 (덮어쓰기용)
@@ -151,6 +178,58 @@ class AppleBattle {
       teamScores: isTeamMode ? this.gameState.teamScores : null,
       timeRemaining: Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime)),
       grid: this.gameState.grid,
+      teamActivePlayers: this.gameState.relayMode ? this.gameState.teamActivePlayers : null,
+    });
+    
+    return true;
+  }
+  
+  // 이어달리기 모드: 다음 팀원에게 순서 넘기기
+  passTurn(socketId) {
+    if (!this.gameState.relayMode || !this.room.teamMode) {
+      return false;
+    }
+    
+    const player = this.room.players.find((p) => p.id === socketId);
+    if (!player || !player.teamId) {
+      return false;
+    }
+    
+    const activePlayerId = this.gameState.teamActivePlayers?.[player.teamId];
+    if (activePlayerId !== socketId) {
+      return false; // 현재 차례가 아닌 플레이어는 순서 넘기기 불가
+    }
+    
+    const teamPlayers = this.room.players
+      .filter((p) => p.teamId === player.teamId)
+      .sort((a, b) => {
+        // 플레이어 ID로 정렬 (순서 일관성 유지)
+        return a.id.localeCompare(b.id);
+      });
+    
+    const currentIndex = teamPlayers.findIndex((p) => p.id === socketId);
+    if (currentIndex === -1) {
+      return false;
+    }
+    
+    // 다음 플레이어로 순서 넘기기 (순환)
+    const nextIndex = (currentIndex + 1) % teamPlayers.length;
+    this.gameState.teamActivePlayers[player.teamId] = teamPlayers[nextIndex].id;
+    
+    // 업데이트 전송
+    const scoreUpdates = this.room.players.map((p) => ({
+      id: p.id,
+      score: this.gameState.scores[p.id] || 0,
+    }));
+    
+    const isTeamMode = this.room.teamMode && this.room.teams && this.room.teams.length > 0;
+    
+    this.io.to(this.room.id).emit("appleBattleUpdate", {
+      scores: scoreUpdates,
+      teamScores: isTeamMode ? this.gameState.teamScores : null,
+      timeRemaining: Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime)),
+      grid: this.gameState.grid,
+      teamActivePlayers: this.gameState.teamActivePlayers,
     });
     
     return true;
@@ -242,7 +321,9 @@ class AppleBattle {
       gameType: this.gameState.gameType,
       grid: this.gameState.grid,
       scoreUpdates,
+      teamScores: this.room.teamMode ? this.gameState.teamScores : null,
       timeRemaining: remaining,
+      teamActivePlayers: this.gameState.relayMode ? this.gameState.teamActivePlayers : null,
     };
   }
 }

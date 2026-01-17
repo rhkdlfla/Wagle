@@ -7,7 +7,7 @@ const GAMES = [
   {
     id: "clickBattle",
     name: "클릭 대결",
-    description: "30초 동안 최대한 많이 클릭하세요!",
+    description: "일정 시간 동안 최대한 많이 클릭하세요!",
     icon: "👆",
     minPlayers: 1,
   },
@@ -45,6 +45,11 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       if (updatedRoom.selectedGame) {
         setSelectedGame(updatedRoom.selectedGame);
       }
+    });
+    
+    // 이어달리기 모드 에러 수신
+    socket.on("relayModeError", ({ message }) => {
+      alert(message);
     });
 
     // 게임 시작 수신
@@ -86,6 +91,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       socket.off("messageError");
       socket.off("setTeamsError");
       socket.off("assignTeamError");
+      socket.off("relayModeError");
     };
   }, [socket, onLeaveRoom, onStartGame]);
 
@@ -122,6 +128,15 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         roomId: currentRoom.id,
         gameType: selectedGame,
         duration: duration,
+      });
+    }
+  };
+  
+  const handleRelayModeChange = (enabled) => {
+    if (isHost) {
+      socket.emit("setRelayMode", {
+        roomId: currentRoom.id,
+        relayMode: enabled,
       });
     }
   };
@@ -649,6 +664,44 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+          
+          {/* 게임 설정 정보 표시 (모든 플레이어가 볼 수 있음) */}
+          {(selectedGame === "clickBattle" || selectedGame === "appleBattle") && currentRoom.teamMode && (
+            <div className="game-setting-info">
+              <h3>⚙️ 게임 모드 설정</h3>
+              {isHost ? (
+                <div className="game-setting-item">
+                  <label className="game-setting-label">
+                    <input
+                      type="checkbox"
+                      checked={currentRoom.relayMode || false}
+                      onChange={(e) => handleRelayModeChange(e.target.checked)}
+                      style={{ marginRight: "8px" }}
+                    />
+                    <span className={currentRoom.relayMode ? "mode-active" : ""}>
+                      이어달리기 모드 {currentRoom.relayMode && "✓"}
+                    </span>
+                    <span className="setting-description">
+                      (각 팀당 한 명씩만 클릭 가능, 우클릭으로 다음 팀원에게 순서 넘기기)
+                    </span>
+                  </label>
+                </div>
+              ) : (
+                <div className="game-setting-display">
+                  <div className="setting-status">
+                    <span className={`mode-badge ${currentRoom.relayMode ? "mode-active" : "mode-inactive"}`}>
+                      {currentRoom.relayMode ? "🔄 이어달리기 모드 활성화" : "⚡ 일반 모드"}
+                    </span>
+                  </div>
+                  {currentRoom.relayMode && (
+                    <div className="setting-description">
+                      각 팀당 한 명씩만 클릭 가능하며, 우클릭으로 다음 팀원에게 순서를 넘길 수 있습니다.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

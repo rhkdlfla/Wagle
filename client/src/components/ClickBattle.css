@@ -9,8 +9,28 @@
 }
 
 .game-header {
-  text-align: center;
+  width: 100%;
+  max-width: 1200px;
   margin-bottom: 30px;
+}
+
+.game-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.game-header-content > div:first-child {
+  flex: 1;
+  text-align: center;
+}
+
+.game-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 .game-header h1 {
@@ -32,6 +52,40 @@
 .game-header p {
   font-size: 1.2rem;
   opacity: 0.9;
+}
+
+.end-game-button,
+.leave-game-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.end-game-button {
+  background: rgba(244, 67, 54, 0.9);
+  color: white;
+}
+
+.end-game-button:hover {
+  background: rgba(244, 67, 54, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+}
+
+.leave-game-button {
+  background: rgba(158, 158, 158, 0.8);
+  color: white;
+}
+
+.leave-game-button:hover {
+  background: rgba(158, 158, 158, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(158, 158, 158, 0.4);
 }
 
 .waiting-screen {
@@ -105,9 +159,47 @@
   border: 5px solid rgba(255, 255, 255, 0.3);
 }
 
-.click-button:active {
+.click-button:active:not(.disabled) {
   transform: scale(0.95);
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.click-button.disabled {
+  background: linear-gradient(135deg, #999 0%, #888 100%);
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.click-area {
+  position: relative;
+}
+
+.relay-mode-info {
+  margin-top: 20px;
+  text-align: center;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.active-player-text {
+  font-size: 1.1rem;
+  margin: 0 0 8px 0;
+  font-weight: 600;
+}
+
+.active-player-text strong {
+  color: #ffc107;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.relay-instruction {
+  font-size: 0.9rem;
+  margin: 0;
+  opacity: 0.8;
+  font-style: italic;
 }
 
 .click-icon {

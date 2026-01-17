@@ -81,6 +81,7 @@ function setupRoomHandlers(socket, io, rooms, user) {
       isPublic: isPublic !== false, // 기본값은 true (공개)
       teams: [], // 팀 목록: [{ id: 1, name: "팀 1", color: "#FF5733" }, ...]
       teamMode: false, // 팀전 모드 활성화 여부
+      relayMode: false, // 이어달리기 모드 (클릭 대결 전용)
     };
 
     rooms.set(roomId, newRoom);
@@ -180,6 +181,10 @@ function setupRoomHandlers(socket, io, rooms, user) {
     if (room && room.players[0].id === socket.id) {
       // 방장만 게임 선택 가능
       room.selectedGame = gameId;
+      // 클릭 대결이 아니거나 팀전 모드가 아니면 이어달리기 모드 해제
+      if (gameId !== "clickBattle" || !room.teamMode) {
+        room.relayMode = false;
+      }
       io.to(roomId).emit("roomUpdated", room);
       console.log(`게임 선택: ${roomId} -> ${gameId}`);
     }
@@ -260,6 +265,7 @@ function setupRoomHandlers(socket, io, rooms, user) {
 
     room.teamMode = false;
     room.teams = [];
+    room.relayMode = false; // 팀 모드 해제 시 이어달리기 모드도 해제
     room.players.forEach((player) => {
       player.teamId = null;
     });
@@ -364,6 +370,25 @@ function setupRoomHandlers(socket, io, rooms, user) {
 
     io.to(roomId).emit("roomUpdated", room);
     console.log(`방 ${roomId}에서 팀 삭제됨: 팀 ${teamId}`);
+  });
+
+  // 이어달리기 모드 설정 (방장만 가능)
+  socket.on("setRelayMode", ({ roomId, relayMode }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.players[0].id !== socket.id) {
+      socket.emit("relayModeError", { message: "권한이 없거나 방을 찾을 수 없습니다." });
+      return;
+    }
+    
+    // 클릭 대결 또는 사과배틀이고 팀전 모드일 때만 설정 가능
+    if ((room.selectedGame !== "clickBattle" && room.selectedGame !== "appleBattle") || !room.teamMode) {
+      socket.emit("relayModeError", { message: "이어달리기 모드는 팀전 모드에서만 사용 가능합니다." });
+      return;
+    }
+    
+    room.relayMode = relayMode === true;
+    io.to(roomId).emit("roomUpdated", room);
+    console.log(`방 ${roomId}의 이어달리기 모드: ${room.relayMode ? "활성화" : "비활성화"}`);
   });
 
   // 플레이어 팀 배치/변경

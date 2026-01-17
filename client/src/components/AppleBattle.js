@@ -23,6 +23,8 @@ function AppleBattle({ socket, room, onBackToLobby }) {
   const [isActive, setIsActive] = useState(false);
   const [results, setResults] = useState(null);
   const [myScore, setMyScore] = useState(0);
+  const [teamActivePlayers, setTeamActivePlayers] = useState(null); // 이어달리기 모드: 각 팀의 현재 활성 플레이어
+  const [relayMode, setRelayMode] = useState(false); // 이어달리기 모드 여부
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [dragEnd, setDragEnd] = useState(null);
@@ -100,7 +102,7 @@ function AppleBattle({ socket, room, onBackToLobby }) {
     socket.on("gameStarted", handleGameStarted);
 
     // 사과배틀 업데이트 수신
-    socket.on("appleBattleUpdate", ({ scores: scoreUpdates, teamScores: teamScoresData, timeRemaining: remaining, grid: updatedGrid }) => {
+    socket.on("appleBattleUpdate", ({ scores: scoreUpdates, teamScores: teamScoresData, timeRemaining: remaining, grid: updatedGrid, teamActivePlayers: activePlayers }) => {
       setScores(prev => {
         const newScores = {};
         scoreUpdates.forEach(({ id, score }) => {
@@ -110,6 +112,7 @@ function AppleBattle({ socket, room, onBackToLobby }) {
       });
       setTeamScores(teamScoresData || null);
       setTimeRemaining(remaining);
+      setTeamActivePlayers(activePlayers || null);
       if (updatedGrid) {
         // 그리드를 깊은 복사하여 React가 변경을 감지하도록 함
         setGrid(JSON.parse(JSON.stringify(updatedGrid)));
@@ -144,6 +147,11 @@ function AppleBattle({ socket, room, onBackToLobby }) {
       }
     };
   }, [socket, room]);
+  
+  // 이어달리기 모드 감지 (팀전 모드이고 teamActivePlayers가 있으면 이어달리기 모드)
+  useEffect(() => {
+    setRelayMode(room?.teamMode && teamActivePlayers !== null);
+  }, [room?.teamMode, teamActivePlayers]);
 
   // 그리드 좌표 계산
   const getGridPosition = (e) => {
@@ -187,6 +195,26 @@ function AppleBattle({ socket, room, onBackToLobby }) {
   const handleMouseDown = (e) => {
     if (!isActive) return;
     
+    // 우클릭: 이어달리기 모드에서 다음 팀원에게 순서 넘기기
+    if (e.button === 2 || (e.type === "contextmenu")) {
+      e.preventDefault();
+      if (relayMode && room.teamMode) {
+        const myTeamId = room.players.find((p) => p.id === socket.id)?.teamId;
+        if (myTeamId && teamActivePlayers?.[myTeamId] === socket.id) {
+          socket.emit("passTurn", { roomId: room.id });
+        }
+      }
+      return;
+    }
+    
+    // 이어달리기 모드에서 현재 차례가 아니면 드래그 불가
+    if (relayMode && room.teamMode) {
+      const myTeamId = room.players.find((p) => p.id === socket.id)?.teamId;
+      if (!myTeamId || teamActivePlayers?.[myTeamId] !== socket.id) {
+        return; // 현재 차례가 아님
+      }
+    }
+    
     const pos = getGridPosition(e);
     if (pos) {
       setIsDragging(true);
@@ -194,6 +222,36 @@ function AppleBattle({ socket, room, onBackToLobby }) {
       setDragEnd(pos);
       setSelectedSum(calculateSelectedSum(pos.row, pos.col, pos.row, pos.col));
     }
+  };
+  
+  // 현재 클릭 가능한지 확인 (이어달리기 모드일 때)
+  const canPlay = () => {
+    if (!relayMode || !room.teamMode) {
+      return true; // 이어달리기 모드가 아니면 항상 플레이 가능
+    }
+    
+    const myTeamId = room.players.find((p) => p.id === socket.id)?.teamId;
+    if (!myTeamId) {
+      return false; // 팀이 없으면 플레이 불가
+    }
+    
+    return teamActivePlayers?.[myTeamId] === socket.id;
+  };
+  
+  // 현재 활성 플레이어 이름 가져오기
+  const getActivePlayerName = () => {
+    if (!relayMode || !room.teamMode || !teamActivePlayers) {
+      return null;
+    }
+    
+    const myTeamId = room.players.find((p) => p.id === socket.id)?.teamId;
+    if (!myTeamId) {
+      return null;
+    }
+    
+    const activePlayerId = teamActivePlayers[myTeamId];
+    const activePlayer = room.players.find((p) => p.id === activePlayerId);
+    return activePlayer ? activePlayer.name : null;
   };
 
   // 마우스 이동
@@ -262,6 +320,19 @@ function AppleBattle({ socket, room, onBackToLobby }) {
   };
 
   const selectedArea = getSelectedArea();
+  const isHost = room?.players?.[0]?.id === socket.id;
+
+  const handleLeaveGame = () => {
+    if (window.confirm("게임을 나가시겠습니까?")) {
+      onBackToLobby();
+    }
+  };
+
+  const handleEndGame = () => {
+    if (window.confirm("게임을 종료하시겠습니까? 모든 플레이어가 로비로 돌아갑니다.")) {
+      socket.emit("endGame", { roomId: room.id });
+    }
+  };
 
   if (results) {
     return (
@@ -297,16 +368,31 @@ function AppleBattle({ socket, room, onBackToLobby }) {
   return (
     <div className="apple-battle-container">
       <div className="apple-battle-header">
-        <h1>🍎 사과배틀</h1>
-        <div className="timer">⏱️ {formatTime(timeRemaining)}</div>
+        <div className="game-header-content">
+          <div>
+            <h1>🍎 사과배틀</h1>
+            <div className="timer">⏱️ {formatTime(timeRemaining)}</div>
+          </div>
+          <div className="game-header-actions">
+            {isHost && isActive && (
+              <button onClick={handleEndGame} className="end-game-button" title="게임 종료">
+                🛑 게임 종료
+              </button>
+            )}
+            <button onClick={handleLeaveGame} className="leave-game-button" title="게임 나가기">
+              🚪 나가기
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="apple-battle-content">
         <div className="game-grid-container">
           <div
             ref={gridRef}
-            className="game-grid"
+            className={`game-grid ${relayMode && !canPlay() ? "disabled" : ""}`}
             onMouseDown={handleMouseDown}
+            onContextMenu={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
@@ -393,6 +479,16 @@ function AppleBattle({ socket, room, onBackToLobby }) {
             teamMode={room.teamMode}
             scoreUnit="칸"
           />
+          {relayMode && room.teamMode && (
+            <div className="relay-mode-info">
+              <p className="active-player-text">
+                현재 차례: <strong>{getActivePlayerName() || "대기 중"}</strong>
+              </p>
+              <p className="relay-instruction">
+                💡 우클릭으로 다음 팀원에게 순서 넘기기
+              </p>
+            </div>
+          )}
           <div className="game-instructions">
             <p>📌 드래그로 사과를 선택하세요</p>
             <p>📌 합이 10이 되면 빨간색으로 표시됩니다</p>

@@ -39,6 +39,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
           duration: gameDuration,
           clicks: {},
           isActive: true,
+          relayMode: (gameType === "clickBattle" || gameType === "appleBattle") && room.teamMode && room.relayMode ? true : false, // 팀전 모드이고 room에 relayMode가 활성화되어 있을 때만 이어달리기 모드 활성화
         };
         
         // 게임 인스턴스 생성 및 초기화
@@ -158,7 +159,9 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
           
           socket.emit("clickUpdate", {
             updates: gameStateData.clickUpdates,
+            teamScores: gameStateData.teamScores || null,
             timeRemaining: gameStateData.timeRemaining,
+            teamActivePlayers: gameStateData.teamActivePlayers || null,
           });
         } else if (gameState.gameType === "appleBattle") {
           socket.emit("gameStarted", {
@@ -173,8 +176,10 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
           
           socket.emit("appleBattleUpdate", {
             scores: gameStateData.scoreUpdates,
+            teamScores: gameStateData.teamScores || null,
             timeRemaining: gameStateData.timeRemaining,
             grid: gameStateData.grid,
+            teamActivePlayers: gameStateData.teamActivePlayers || null,
           });
         }
       }
@@ -208,6 +213,57 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     if (instance && instance.game instanceof ClickBattle) {
       instance.game.handleClick(socket.id);
     }
+  });
+  
+  // 이어달리기 모드: 다음 팀원에게 순서 넘기기 (우클릭)
+  socket.on("passTurn", ({ roomId }) => {
+    const gameState = gameStates.get(roomId);
+    const room = rooms.get(roomId);
+    
+    if (!gameState || !room || !gameState.isActive || !gameState.relayMode) {
+      return;
+    }
+    
+    if (gameState.gameType !== "clickBattle" && gameState.gameType !== "appleBattle") {
+      return;
+    }
+    
+    const player = room.players.find((p) => p.id === socket.id);
+    if (!player) {
+      return;
+    }
+    
+    const instance = gameInstances.get(roomId);
+    if (instance) {
+      if (instance.game instanceof ClickBattle && gameState.gameType === "clickBattle") {
+        instance.game.passTurn(socket.id);
+      } else if (instance.game instanceof AppleBattle && gameState.gameType === "appleBattle") {
+        instance.game.passTurn(socket.id);
+      }
+    }
+  });
+  
+  // 게임 종료 (방장만 가능)
+  socket.on("endGame", ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room) {
+      return;
+    }
+    
+    // 방장만 게임 종료 가능
+    if (room.players[0].id !== socket.id) {
+      socket.emit("gameError", { message: "방장만 게임을 종료할 수 있습니다." });
+      return;
+    }
+    
+    const gameState = gameStates.get(roomId);
+    if (!gameState || !gameState.isActive) {
+      return; // 게임이 진행 중이 아닌 경우 무시
+    }
+    
+    // 게임 종료
+    endGame(roomId);
+    console.log(`방장이 게임을 강제 종료함: ${roomId}`);
   });
 
   // 사과 제거 이벤트 (사과배틀)

@@ -10,6 +10,18 @@ class ClickBattle {
     this.room.players.forEach((player) => {
       this.gameState.clicks[player.id] = 0;
     });
+    
+    // 이어달리기 모드 초기화 (팀전 모드일 때만)
+    if (this.gameState.relayMode && this.room.teamMode && this.room.teams) {
+      this.gameState.teamActivePlayers = {};
+      this.room.teams.forEach((team) => {
+        const teamPlayers = this.room.players.filter((p) => p.teamId === team.id);
+        if (teamPlayers.length > 0) {
+          // 각 팀의 첫 번째 플레이어를 활성 플레이어로 설정
+          this.gameState.teamActivePlayers[team.id] = teamPlayers[0].id;
+        }
+      });
+    }
   }
 
   // 주기적 업데이트 시작
@@ -48,6 +60,7 @@ class ClickBattle {
         updates: clickUpdates,
         teamScores: this.room.teamMode ? teamScores : null,
         timeRemaining: remaining,
+        teamActivePlayers: this.gameState.relayMode ? this.gameState.teamActivePlayers : null,
       });
     }, 1000);
     
@@ -56,6 +69,19 @@ class ClickBattle {
 
   // 클릭 처리
   handleClick(socketId) {
+    // 이어달리기 모드일 때 현재 플레이어가 활성 플레이어인지 확인
+    if (this.gameState.relayMode && this.room.teamMode) {
+      const player = this.room.players.find((p) => p.id === socketId);
+      if (!player || !player.teamId) {
+        return false; // 팀이 없는 플레이어는 클릭 불가
+      }
+      
+      const activePlayerId = this.gameState.teamActivePlayers?.[player.teamId];
+      if (activePlayerId !== socketId) {
+        return false; // 현재 차례가 아닌 플레이어는 클릭 불가
+      }
+    }
+    
     if (!this.gameState.clicks[socketId]) {
       this.gameState.clicks[socketId] = 0;
     }
@@ -85,7 +111,70 @@ class ClickBattle {
       updates: clickUpdates,
       teamScores: this.room.teamMode ? teamScores : null,
       timeRemaining: Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime)),
+      teamActivePlayers: this.gameState.relayMode ? this.gameState.teamActivePlayers : null,
     });
+  }
+  
+  // 이어달리기 모드: 다음 팀원에게 순서 넘기기
+  passTurn(socketId) {
+    if (!this.gameState.relayMode || !this.room.teamMode) {
+      return false;
+    }
+    
+    const player = this.room.players.find((p) => p.id === socketId);
+    if (!player || !player.teamId) {
+      return false;
+    }
+    
+    const activePlayerId = this.gameState.teamActivePlayers?.[player.teamId];
+    if (activePlayerId !== socketId) {
+      return false; // 현재 차례가 아닌 플레이어는 순서 넘기기 불가
+    }
+    
+    const teamPlayers = this.room.players
+      .filter((p) => p.teamId === player.teamId)
+      .sort((a, b) => {
+        // 플레이어 ID로 정렬 (순서 일관성 유지)
+        return a.id.localeCompare(b.id);
+      });
+    
+    const currentIndex = teamPlayers.findIndex((p) => p.id === socketId);
+    if (currentIndex === -1) {
+      return false;
+    }
+    
+    // 다음 플레이어로 순서 넘기기 (순환)
+    const nextIndex = (currentIndex + 1) % teamPlayers.length;
+    this.gameState.teamActivePlayers[player.teamId] = teamPlayers[nextIndex].id;
+    
+    // 업데이트 전송
+    const clickUpdates = this.room.players.map((p) => ({
+      id: p.id,
+      clicks: this.gameState.clicks[p.id] || 0,
+      teamId: p.teamId || null,
+    }));
+    
+    let teamScores = {};
+    if (this.room.teamMode && this.room.teams && this.room.teams.length > 0) {
+      this.room.teams.forEach((team) => {
+        teamScores[team.id] = 0;
+      });
+      Object.entries(this.gameState.clicks).forEach(([playerId, clicks]) => {
+        const p = this.room.players.find((pl) => pl.id === playerId);
+        if (p && p.teamId) {
+          teamScores[p.teamId] = (teamScores[p.teamId] || 0) + clicks;
+        }
+      });
+    }
+    
+    this.io.to(this.room.id).emit("clickUpdate", {
+      updates: clickUpdates,
+      teamScores: this.room.teamMode ? teamScores : null,
+      timeRemaining: Math.max(0, this.gameState.duration - (Date.now() - this.gameState.startTime)),
+      teamActivePlayers: this.gameState.teamActivePlayers,
+    });
+    
+    return true;
   }
 
   // 게임 결과 계산
@@ -214,6 +303,7 @@ class ClickBattle {
       clickUpdates,
       teamScores: this.room.teamMode ? teamScores : null,
       timeRemaining: remaining,
+      teamActivePlayers: this.gameState.relayMode ? this.gameState.teamActivePlayers : null,
     };
   }
 }
