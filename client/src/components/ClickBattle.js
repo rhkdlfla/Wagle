@@ -62,6 +62,7 @@ function ClickBattle({ socket, room, onBackToLobby }) {
 
     // 게임 종료 수신
     socket.on("gameEnded", ({ results: gameResults }) => {
+      console.log("ClickBattle: 게임 종료 이벤트 수신", gameResults);
       setIsActive(false);
       setResults(gameResults);
       // 타이머 정리
@@ -111,7 +112,7 @@ function ClickBattle({ socket, room, onBackToLobby }) {
     <div className="click-battle-container">
       <div className="game-header">
         <h1>🎯 클릭 대결!</h1>
-        <p>30초 동안 최대한 많이 클릭하세요!</p>
+        <p>일정 시간 동안 최대한 많이 클릭하세요!</p>
       </div>
 
       {!isActive && !results && (
@@ -202,7 +203,7 @@ function ClickBattle({ socket, room, onBackToLobby }) {
                     {result.isWinner && <span className="winner-badge">승자!</span>}
                     {result.id === socket.id && <span className="me-badge">나</span>}
                   </div>
-                  <div className="result-clicks">{result.clicks}회 클릭</div>
+                  <div className="result-clicks">{result.score || 0}회 클릭</div>
                 </div>
               </div>
             ))}

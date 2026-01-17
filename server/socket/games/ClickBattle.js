@@ -58,10 +58,15 @@ class ClickBattle {
 
   // 게임 결과 계산
   calculateResults() {
+    console.log(`[ClickBattle] 결과 계산 시작 - roomId: ${this.room.id}`);
+    console.log(`[ClickBattle] gameState.clicks:`, this.gameState.clicks);
+    console.log(`[ClickBattle] room.players:`, this.room.players.map(p => ({ id: p.id, name: p.name })));
+    
     let winners = [];
     let maxScore = 0;
     
     Object.entries(this.gameState.clicks).forEach(([playerId, clicks]) => {
+      console.log(`[ClickBattle] 플레이어 ${playerId}: ${clicks}회 클릭`);
       if (clicks > maxScore) {
         maxScore = clicks;
         winners.length = 0;
@@ -71,15 +76,23 @@ class ClickBattle {
       }
     });
     
-    const results = this.room.players.map((player) => ({
-      id: player.id,
-      name: player.name,
-      photo: player.photo,
-      score: this.gameState.clicks[player.id] || 0,
-      isWinner: winners.includes(player.id),
-    }));
+    // 모든 플레이어에 대해 결과 생성 (clicks가 없는 경우 0으로 설정)
+    const results = this.room.players.map((player) => {
+      const score = this.gameState.clicks[player.id] || 0;
+      console.log(`[ClickBattle] 플레이어 ${player.name} (${player.id}): score=${score}`);
+      return {
+        id: player.id,
+        name: player.name,
+        photo: player.photo,
+        score: score,
+        isWinner: winners.includes(player.id),
+      };
+    });
     
     results.sort((a, b) => b.score - a.score);
+    
+    console.log(`[ClickBattle] 최종 결과:`, results);
+    console.log(`[ClickBattle] 승자:`, winners);
     
     return { results, winners };
   }

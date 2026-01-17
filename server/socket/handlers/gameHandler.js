@@ -6,7 +6,7 @@ const gameInstances = new Map(); // roomId -> { game, updateInterval }
 
 function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
   // 게임 시작
-  socket.on("startGame", ({ roomId, gameType = "clickBattle" }) => {
+  socket.on("startGame", ({ roomId, gameType = "clickBattle", duration }) => {
     const room = rooms.get(roomId);
     if (room && room.players.length > 0) {
       // 방장만 게임 시작 가능 (첫 번째 플레이어)
@@ -14,11 +14,29 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
         room.status = "playing";
         room.selectedGame = gameType;
         
+        // 게임 시간 설정 (밀리초)
+        let gameDuration;
+        if (gameType === "appleBattle") {
+          // 사과배틀: 기본 2분, 범위 30초 ~ 5분
+          const minDuration = 30000; // 30초
+          const maxDuration = 300000; // 5분
+          gameDuration = duration 
+            ? Math.max(minDuration, Math.min(maxDuration, parseInt(duration))) 
+            : 120000; // 기본 2분
+        } else {
+          // 클릭대결: 기본 30초, 범위 5초 ~ 5분
+          const minDuration = 5000; // 5초
+          const maxDuration = 300000; // 5분
+          gameDuration = duration 
+            ? Math.max(minDuration, Math.min(maxDuration, parseInt(duration))) 
+            : 30000; // 기본 30초
+        }
+        
         // 게임 상태 초기화
         const gameState = {
           gameType: gameType,
           startTime: Date.now(),
-          duration: gameType === "appleBattle" ? 120000 : 30000, // 사과배틀: 2분, 클릭대결: 30초
+          duration: gameDuration,
           clicks: {},
           isActive: true,
         };
