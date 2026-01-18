@@ -51,20 +51,25 @@ function ClickBattle({ socket, room, onBackToLobby }) {
 
     // 클릭 업데이트 수신
     socket.on("clickUpdate", ({ updates, teamScores: scores, timeRemaining: remaining, teamActivePlayers: activePlayers }) => {
-      const newClicks = {};
-      updates.forEach((update) => {
-        newClicks[update.id] = update.clicks;
-      });
-      setClicks(newClicks);
-      setTeamScores(scores || null);
-      setTimeRemaining(remaining);
-      setTeamActivePlayers(activePlayers || null);
-      
-      // 내 클릭 수 업데이트
-      const myUpdate = updates.find((u) => u.id === socket.id);
-      if (myUpdate) {
-        setMyClicks(myUpdate.clicks);
+      if (updates && Array.isArray(updates)) {
+        const newClicks = {};
+        updates.forEach((update) => {
+          newClicks[update.id] = update.clicks;
+        });
+        setClicks(newClicks);
+        
+        // 내 클릭 수 업데이트
+        const myUpdate = updates.find((u) => u.id === socket.id);
+        if (myUpdate) {
+          setMyClicks(myUpdate.clicks);
+        }
       }
+      
+      setTeamScores(scores || null);
+      if (remaining !== undefined) {
+        setTimeRemaining(remaining);
+      }
+      setTeamActivePlayers(activePlayers || null);
     });
 
     // 게임 종료 수신

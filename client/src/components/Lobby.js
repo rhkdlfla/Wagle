@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./Lobby.css";
 
 // 게임 목록
@@ -13,6 +13,12 @@ const GAMES = [
     description: "일정 시간 동안 최대한 많이 클릭하세요!",
     icon: "👆",
     minPlayers: 1,
+    defaultDuration: 30,
+    minDuration: 5,
+    maxDuration: 300,
+    durationPresets: [10, 30, 60, 120, 300],
+    supportsDuration: true,
+    supportsRelayMode: true,
   },
   {
     id: "appleBattle",
@@ -20,6 +26,12 @@ const GAMES = [
     description: "합이 10이 되는 사과를 선택해 땅따먹기!",
     icon: "🍎",
     minPlayers: 1,
+    defaultDuration: 120,
+    minDuration: 30,
+    maxDuration: 300,
+    durationPresets: [30, 60, 120, 180, 300],
+    supportsDuration: true,
+    supportsRelayMode: true,
   },
   {
     id: "drawGuess",
@@ -27,8 +39,63 @@ const GAMES = [
     description: "그림을 보고 제시어를 맞혀보세요!",
     icon: "🎨",
     minPlayers: ALLOW_SOLO_DRAW_GUESS ? 1 : 2,
+    defaultDuration: 90,
+    minDuration: 30,
+    maxDuration: 180,
+    durationPresets: [60, 90, 120, 150, 180],
+    supportsDuration: true,
+    supportsRelayMode: false,
+  },
+  {
+    id: "quizBattle",
+    name: "퀴즈 배틀",
+    description: "다양한 퀴즈를 풀어보세요!",
+    icon: "🧩",
+    minPlayers: 1,
+    defaultDuration: 600,
+    minDuration: 60,
+    maxDuration: 1800,
+    durationPresets: [300, 600, 900, 1200],
+    supportsDuration: true,
+    supportsRelayMode: false,
+  },
+  {
+    id: "numberRush",
+    name: "넘버 러시",
+    description: "숫자를 빠르게 입력하세요!",
+    icon: "🔢",
+    minPlayers: 1,
+    defaultDuration: 60,
+    minDuration: 10,
+    maxDuration: 300,
+    durationPresets: [30, 60, 120, 180, 300],
+    supportsDuration: true,
+    supportsRelayMode: false,
   },
 ];
+
+// 게임 설정 가져오기 함수
+function getGameConfig(gameId) {
+  const game = GAMES.find(g => g.id === gameId);
+  if (!game) {
+    return {
+      supportsDuration: false,
+      supportsRelayMode: false,
+      defaultDuration: 30,
+      minDuration: 5,
+      maxDuration: 300,
+      durationPresets: [],
+    };
+  }
+  return {
+    supportsDuration: game.supportsDuration || false,
+    supportsRelayMode: game.supportsRelayMode || false,
+    defaultDuration: game.defaultDuration || 30,
+    minDuration: game.minDuration || 5,
+    maxDuration: game.maxDuration || 300,
+    durationPresets: game.durationPresets || [],
+  };
+}
 
 function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [playerName, setPlayerName] = useState("");
@@ -36,14 +103,26 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [selectedGame, setSelectedGame] = useState(
     currentRoom?.selectedGame || GAMES[0].id
   );
-  const [gameDuration, setGameDuration] = useState(30); // 클릭 배틀 기본 30초
   const [drawGuessRounds, setDrawGuessRounds] = useState(1);
+  const [selectedQuizId, setSelectedQuizId] = useState(null); // 선택된 퀴즈 ID
+  const [availableQuizzes, setAvailableQuizzes] = useState([]); // 사용 가능한 퀴즈 목록
+  // 게임별 duration 관리 (게임 ID -> duration 초 단위)
+  const [gameDurations, setGameDurations] = useState(() => {
+    const durations = {};
+    GAMES.forEach((game) => {
+      if (game.supportsDuration) {
+        durations[game.id] = game.defaultDuration;
+      }
+    });
+    return durations;
+  });
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
   const [chatMode, setChatMode] = useState("room"); // "room" or "team"
   const messagesEndRef = useRef(null);
   const location = useLocation();
+  const navigate = useNavigate();
   const isHost = currentRoom?.players[0]?.id === socket.id;
   
   // 현재 플레이어의 팀 ID 가져오기
@@ -129,7 +208,74 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         roomId: currentRoom.id,
         gameId: gameId,
       });
+      // 퀴즈 배틀 선택 시 퀴즈 목록 불러오기
+      if (gameId === "quizBattle") {
+        fetchAvailableQuizzes();
+      } else {
+        setSelectedQuizId(null);
+      }
     }
+  };
+
+  // 퀴즈 목록 불러오기
+  const fetchAvailableQuizzes = async () => {
+    try {
+      const response = await fetch("/api/quiz/list?limit=20");
+      const data = await response.json();
+      if (data.quizzes) {
+        setAvailableQuizzes(data.quizzes);
+        if (data.quizzes.length > 0 && !selectedQuizId) {
+          setSelectedQuizId(data.quizzes[0]._id);
+        }
+      }
+    } catch (error) {
+      console.error("퀴즈 목록 불러오기 실패:", error);
+    }
+  };
+
+  // 퀴즈 페이지에서 돌아왔을 때 목록 새로고침
+  useEffect(() => {
+    if (selectedGame === "quizBattle" && location.pathname.includes("/room/")) {
+      fetchAvailableQuizzes();
+      
+      // 게임 변경 시 해당 게임의 기본 duration 설정 (없으면)
+      const gameConfig = getGameConfig(selectedGame);
+      if (gameConfig.supportsDuration && !gameDurations[selectedGame]) {
+        setGameDurations((prev) => ({
+          ...prev,
+          [selectedGame]: gameConfig.defaultDuration,
+        }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, selectedGame]);
+
+  // 퀴즈 편집 시작 - 페이지로 이동
+  const handleEditQuiz = (quizId) => {
+    navigate(`/quiz/edit/${quizId}`);
+  };
+
+  // 내가 만든 퀴즈인지 확인 (로그인된 사용자만, 게스트 제외)
+  const isMyQuiz = (quiz) => {
+    if (!user || user.provider === "guest" || !quiz.creator || !quiz.creator.userId) {
+      return false;
+    }
+    // user.id 또는 user._id 사용 (서버에서 id로 변환하여 반환)
+    const userId = String(user.id || user._id || "");
+    const creatorUserId = String(quiz.creator.userId || "");
+    const isMine = userId === creatorUserId && userId !== "";
+    
+    // 디버깅용 로그 (필요시 주석 해제)
+    // console.log("퀴즈 소유자 확인:", {
+    //   userId,
+    //   creatorUserId,
+    //   isMine,
+    //   quizTitle: quiz.title,
+    //   userProvider: user.provider,
+    //   userObject: { id: user.id, _id: user._id }
+    // });
+    
+    return isMine;
   };
 
   const handleStartGame = () => {
@@ -139,12 +285,21 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         alert(`이 게임은 최소 ${selected.minPlayers}명 이상 필요합니다.`);
         return;
       }
-      const duration = selectedGame === "clickBattle" ? gameDuration * 1000 : undefined;
+      if (selectedGame === "quizBattle" && !selectedQuizId) {
+        alert("퀴즈를 선택해주세요.");
+        return;
+      }
+      const gameConfig = getGameConfig(selectedGame);
+      const duration = gameConfig.supportsDuration
+        ? (gameDurations[selectedGame] || gameConfig.defaultDuration) * 1000
+        : undefined;
       const rounds = selectedGame === "drawGuess" ? drawGuessRounds : undefined;
       socket.emit("startGame", {
         roomId: currentRoom.id,
         gameType: selectedGame,
         duration: duration,
+        rounds: rounds,
+        quizId: selectedGame === "quizBattle" ? selectedQuizId : undefined,
         rounds: rounds,
       });
     }
@@ -631,57 +786,82 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
             ))}
           </div>
           
-          {/* 클릭 배틀 시간 조절 UI */}
-          {selectedGame === "clickBattle" && isHost && (
-            <div className="game-duration-section">
-              <h3>⏱️ 게임 시간 설정</h3>
-              <div className="duration-controls">
-                <label htmlFor="duration-slider">
-                  시간: <strong>{formatDuration(gameDuration)}</strong>
-                </label>
-                <input
-                  id="duration-slider"
-                  type="range"
-                  min="5"
-                  max="300"
-                  step="5"
-                  value={gameDuration}
-                  onChange={(e) => setGameDuration(parseInt(e.target.value))}
-                  className="duration-slider"
-                />
-                <div className="duration-presets">
-                  <button
-                    onClick={() => setGameDuration(10)}
-                    className={gameDuration === 10 ? "active" : ""}
-                  >
-                    10초
-                  </button>
-                  <button
-                    onClick={() => setGameDuration(30)}
-                    className={gameDuration === 30 ? "active" : ""}
-                  >
-                    30초
-                  </button>
-                  <button
-                    onClick={() => setGameDuration(60)}
-                    className={gameDuration === 60 ? "active" : ""}
-                  >
-                    1분
-                  </button>
-                  <button
-                    onClick={() => setGameDuration(120)}
-                    className={gameDuration === 120 ? "active" : ""}
-                  >
-                    2분
-                  </button>
-                  <button
-                    onClick={() => setGameDuration(300)}
-                    className={gameDuration === 300 ? "active" : ""}
-                  >
-                    5분
+          {/* 퀴즈 배틀 퀴즈 선택 UI */}
+          {selectedGame === "quizBattle" && isHost && (
+            <div className="quiz-selection-section">
+              <div className="quiz-selection-header">
+                <h3>🧩 퀴즈 선택</h3>
+                <button
+                  onClick={() => {
+                    if (!user || user.provider === "guest") {
+                      alert("퀴즈 생성을 위해서는 로그인이 필요합니다.");
+                      return;
+                    }
+                    navigate("/quiz/create");
+                  }}
+                  className="create-quiz-button"
+                >
+                  + 새 퀴즈 만들기
+                </button>
+              </div>
+              {availableQuizzes.length === 0 ? (
+                <div className="quiz-loading">
+                  <p>퀴즈 목록을 불러오는 중...</p>
+                  <button onClick={fetchAvailableQuizzes} className="refresh-quiz-button">
+                    새로고침
                   </button>
                 </div>
-              </div>
+              ) : (
+                <div className="quiz-list">
+                  {availableQuizzes.map((quiz) => {
+                    const isMyOwnQuiz = isMyQuiz(quiz);
+                    return (
+                      <div
+                        key={quiz._id}
+                        className={`quiz-item ${
+                          selectedQuizId === quiz._id ? "selected" : ""
+                        } ${isMyOwnQuiz ? "my-quiz" : ""}`}
+                      >
+                        <div 
+                          className="quiz-item-content"
+                          onClick={() => setSelectedQuizId(quiz._id)}
+                        >
+                          <div className="quiz-icon">🧩</div>
+                          <div className="quiz-info">
+                            <div className="quiz-name">
+                              {quiz.title}
+                              {isMyOwnQuiz && <span className="my-quiz-badge">내가 만든 퀴즈</span>}
+                            </div>
+                            <div className="quiz-meta">
+                              <span className="quiz-questions-count">
+                                {quiz.questions?.length || 0}문제
+                              </span>
+                            </div>
+                            {quiz.description && (
+                              <div className="quiz-description">{quiz.description}</div>
+                            )}
+                          </div>
+                          {selectedQuizId === quiz._id && (
+                            <div className="selected-badge">✓</div>
+                          )}
+                        </div>
+                        {isMyOwnQuiz && (
+                          <button
+                            className="edit-quiz-button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditQuiz(quiz._id);
+                            }}
+                            title="퀴즈 편집"
+                          >
+                            ✏️ 편집
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -706,9 +886,62 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
               </div>
             </div>
           )}
+          {/* 게임 시간 설정 UI (범용) */}
+          {(() => {
+            const gameConfig = getGameConfig(selectedGame);
+            if (!gameConfig.supportsDuration || !isHost) return null;
+            
+            const currentDuration = gameDurations[selectedGame] || gameConfig.defaultDuration;
+            const step = gameConfig.minDuration < 30 ? 5 : 10;
+            
+            return (
+              <div className="game-duration-section">
+                <h3>⏱️ 게임 시간 설정</h3>
+                <div className="duration-controls">
+                  <label htmlFor={`duration-slider-${selectedGame}`}>
+                    시간: <strong>{formatDuration(currentDuration)}</strong>
+                  </label>
+                  <input
+                    id={`duration-slider-${selectedGame}`}
+                    type="range"
+                    min={gameConfig.minDuration}
+                    max={gameConfig.maxDuration}
+                    step={step}
+                    value={currentDuration}
+                    onChange={(e) =>
+                      setGameDurations((prev) => ({
+                        ...prev,
+                        [selectedGame]: parseInt(e.target.value),
+                      }))
+                    }
+                    className="duration-slider"
+                  />
+                  <div className="duration-presets">
+                    {gameConfig.durationPresets.map((preset) => (
+                      <button
+                        key={preset}
+                        onClick={() =>
+                          setGameDurations((prev) => ({
+                            ...prev,
+                            [selectedGame]: preset,
+                          }))
+                        }
+                        className={currentDuration === preset ? "active" : ""}
+                      >
+                        {formatDuration(preset)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           
           {/* 게임 설정 정보 표시 (모든 플레이어가 볼 수 있음) */}
-          {(selectedGame === "clickBattle" || selectedGame === "appleBattle") && currentRoom.teamMode && (
+          {(() => {
+            const gameConfig = getGameConfig(selectedGame);
+            return gameConfig.supportsRelayMode && currentRoom.teamMode;
+          })() && (
             <div className="game-setting-info">
               <h3>⚙️ 게임 모드 설정</h3>
               {isHost ? (
