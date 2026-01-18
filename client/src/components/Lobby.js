@@ -3,6 +3,9 @@ import { useLocation } from "react-router-dom";
 import "./Lobby.css";
 
 // 게임 목록
+const ALLOW_SOLO_DRAW_GUESS =
+  process.env.REACT_APP_ALLOW_SOLO_DRAW_GUESS === "true" ||
+  process.env.NODE_ENV === "development";
 const GAMES = [
   {
     id: "clickBattle",
@@ -18,6 +21,13 @@ const GAMES = [
     icon: "🍎",
     minPlayers: 1,
   },
+  {
+    id: "drawGuess",
+    name: "그림 맞히기",
+    description: "그림을 보고 제시어를 맞혀보세요!",
+    icon: "🎨",
+    minPlayers: ALLOW_SOLO_DRAW_GUESS ? 1 : 2,
+  },
 ];
 
 function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
@@ -27,6 +37,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     currentRoom?.selectedGame || GAMES[0].id
   );
   const [gameDuration, setGameDuration] = useState(30); // 클릭 배틀 기본 30초
+  const [drawGuessRounds, setDrawGuessRounds] = useState(1);
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
@@ -123,11 +134,18 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
 
   const handleStartGame = () => {
     if (isHost && currentRoom.players.length > 0) {
+      const selected = GAMES.find((game) => game.id === selectedGame);
+      if (selected && currentRoom.players.length < selected.minPlayers) {
+        alert(`이 게임은 최소 ${selected.minPlayers}명 이상 필요합니다.`);
+        return;
+      }
       const duration = selectedGame === "clickBattle" ? gameDuration * 1000 : undefined;
+      const rounds = selectedGame === "drawGuess" ? drawGuessRounds : undefined;
       socket.emit("startGame", {
         roomId: currentRoom.id,
         gameType: selectedGame,
         duration: duration,
+        rounds: rounds,
       });
     }
   };
@@ -663,6 +681,28 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                     5분
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* 그림 맞히기 라운드 설정 UI */}
+          {selectedGame === "drawGuess" && isHost && (
+            <div className="game-duration-section">
+              <h3>🎨 라운드 설정</h3>
+              <div className="duration-controls">
+                <label htmlFor="rounds-slider">
+                  라운드(모두 한 번씩): <strong>{drawGuessRounds}회</strong>
+                </label>
+                <input
+                  id="rounds-slider"
+                  type="range"
+                  min="1"
+                  max="5"
+                  step="1"
+                  value={drawGuessRounds}
+                  onChange={(e) => setDrawGuessRounds(parseInt(e.target.value))}
+                  className="duration-slider"
+                />
               </div>
             </div>
           )}

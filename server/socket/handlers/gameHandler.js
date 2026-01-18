@@ -1,12 +1,13 @@
 const ClickBattle = require("../games/ClickBattle");
 const AppleBattle = require("../games/AppleBattle");
+const DrawGuess = require("../games/DrawGuess");
 
 // 게임 인스턴스 저장 (updateInterval 관리를 위해)
 const gameInstances = new Map(); // roomId -> { game, updateInterval }
 
 function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
   // 게임 시작
-  socket.on("startGame", ({ roomId, gameType = "clickBattle", duration }) => {
+  socket.on("startGame", ({ roomId, gameType = "clickBattle", duration, rounds }) => {
     const room = rooms.get(roomId);
     if (room && room.players.length > 0) {
       // 방장만 게임 시작 가능 (첫 번째 플레이어)
@@ -23,6 +24,13 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
           gameDuration = duration 
             ? Math.max(minDuration, Math.min(maxDuration, parseInt(duration))) 
             : 120000; // 기본 2분
+        } else if (gameType === "drawGuess") {
+          // 그림 맞히기: 기본 90초, 범위 30초 ~ 3분
+          const minDuration = 30000; // 30초
+          const maxDuration = 180000; // 3분
+          gameDuration = duration
+            ? Math.max(minDuration, Math.min(maxDuration, parseInt(duration)))
+            : 90000; // 기본 1분 30초
         } else {
           // 클릭대결: 기본 30초, 범위 5초 ~ 5분
           const minDuration = 5000; // 5초
@@ -41,6 +49,9 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
           isActive: true,
           relayMode: (gameType === "clickBattle" || gameType === "appleBattle") && room.teamMode && room.relayMode ? true : false, // 팀전 모드이고 room에 relayMode가 활성화되어 있을 때만 이어달리기 모드 활성화
         };
+        if (gameType === "drawGuess") {
+          gameState.roundsPerPlayer = rounds ? Math.max(1, parseInt(rounds)) : 1;
+        }
         
         // 게임 인스턴스 생성 및 초기화
         let game;
@@ -50,6 +61,9 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
         } else if (gameType === "appleBattle") {
           game = new AppleBattle(io, gameState, room);
           game.initialize();
+        } else if (gameType === "drawGuess") {
+          game = new DrawGuess(io, gameState, room);
+          game.initialize();
         } else {
           socket.emit("gameError", { message: "알 수 없는 게임 타입입니다." });
           return;
@@ -58,7 +72,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
         gameStates.set(roomId, gameState);
         
         // 게임 시작 이벤트 전송
-        const gameStateData = game.getGameStateData();
+        const gameStateData = game.getGameStateData(socket.id);
         io.to(roomId).emit("gameStarted", {
           room: room,
           gameState: {
@@ -66,6 +80,9 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
             startTime: gameState.startTime,
             gameType: gameType,
             grid: gameType === "appleBattle" ? gameState.grid : undefined,
+            drawerId: gameType === "drawGuess" ? gameStateData.drawerId : undefined,
+            round: gameType === "drawGuess" ? gameStateData.round : undefined,
+            totalRounds: gameType === "drawGuess" ? gameStateData.totalRounds : undefined,
           },
         });
         
@@ -79,13 +96,15 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
         gameInstances.set(roomId, { game, updateInterval });
         
         // 게임 종료 타이머
-        setTimeout(() => {
-          const instance = gameInstances.get(roomId);
-          if (instance && instance.updateInterval) {
-            clearInterval(instance.updateInterval);
-          }
-          endGame(roomId);
-        }, gameState.duration);
+        if (gameType !== "drawGuess") {
+          setTimeout(() => {
+            const instance = gameInstances.get(roomId);
+            if (instance && instance.updateInterval) {
+              clearInterval(instance.updateInterval);
+            }
+            endGame(roomId);
+          }, gameState.duration);
+        }
       }
     }
   });
@@ -145,7 +164,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     if (gameState && room && gameState.isActive) {
       const instance = gameInstances.get(roomId);
       if (instance && instance.game) {
-        const gameStateData = instance.game.getGameStateData();
+        const gameStateData = instance.game.getGameStateData(socket.id);
         
         if (gameState.gameType === "clickBattle") {
           socket.emit("gameStarted", {
@@ -181,6 +200,33 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
             grid: gameStateData.grid,
             teamActivePlayers: gameStateData.teamActivePlayers || null,
           });
+        } else if (gameState.gameType === "drawGuess") {
+          socket.emit("gameStarted", {
+            room: room,
+            gameState: {
+              duration: gameStateData.duration,
+              startTime: gameStateData.startTime,
+              gameType: gameState.gameType,
+              drawerId: gameStateData.drawerId,
+              round: gameStateData.round,
+              totalRounds: gameStateData.totalRounds,
+            },
+          });
+
+          socket.emit("drawGuessState", {
+            strokes: gameStateData.strokes || [],
+            scores: gameStateData.scores || {},
+            timeRemaining: gameStateData.timeRemaining || null,
+            drawerId: gameStateData.drawerId,
+            round: gameStateData.round,
+            totalRounds: gameStateData.totalRounds,
+            wordLength: gameStateData.wordLength,
+            isDrawer: gameStateData.isDrawer,
+          });
+
+          if (gameStateData.isDrawer) {
+            socket.emit("drawGuessWord", { word: gameState.word });
+          }
         }
       }
     } else {
@@ -290,6 +336,106 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     if (instance && instance.game instanceof AppleBattle) {
       instance.game.handleRemove(socket.id, startRow, startCol, endRow, endCol);
     }
+  });
+
+  socket.on("drawGuessStroke", ({ roomId, stroke }) => {
+    const gameState = gameStates.get(roomId);
+    const room = rooms.get(roomId);
+
+    if (!gameState || !room || gameState.gameType !== "drawGuess") {
+      socket.emit("gameError", { message: "게임이 진행 중이 아닙니다." });
+      return;
+    }
+
+    if (!gameState.isActive) {
+      return;
+    }
+
+    const instance = gameInstances.get(roomId);
+    if (instance && instance.game instanceof DrawGuess) {
+      instance.game.handleStroke(socket.id, stroke);
+    }
+  });
+
+  socket.on("drawGuessClear", ({ roomId }) => {
+    const gameState = gameStates.get(roomId);
+    const room = rooms.get(roomId);
+
+    if (!gameState || !room || gameState.gameType !== "drawGuess") {
+      return;
+    }
+
+    if (!gameState.isActive) {
+      return;
+    }
+
+    const instance = gameInstances.get(roomId);
+    if (instance && instance.game instanceof DrawGuess) {
+      instance.game.handleClear(socket.id);
+    }
+  });
+
+  socket.on("drawGuessGuess", ({ roomId, guess }) => {
+    const gameState = gameStates.get(roomId);
+    const room = rooms.get(roomId);
+
+    if (!gameState || !room || gameState.gameType !== "drawGuess") {
+      return;
+    }
+
+    if (!gameState.isActive) {
+      return;
+    }
+
+    const instance = gameInstances.get(roomId);
+    if (instance && instance.game instanceof DrawGuess) {
+      instance.game.handleGuess(socket.id, guess);
+    }
+  });
+
+  socket.on("drawGuessMessage", ({ roomId, message }) => {
+    const room = rooms.get(roomId);
+    const gameState = gameStates.get(roomId);
+    if (!room || !gameState || gameState.gameType !== "drawGuess") {
+      return;
+    }
+
+    const player = room.players.find((p) => p.id === socket.id);
+    if (!player) {
+      return;
+    }
+
+    const trimmedMessage = (message || "").trim();
+    if (!trimmedMessage) {
+      return;
+    }
+    if (trimmedMessage.length > 100) {
+      socket.emit("messageError", { message: "메시지는 100자 이하여야 합니다." });
+      return;
+    }
+
+    const instance = gameInstances.get(roomId);
+    let isCorrect = false;
+    if (instance && instance.game instanceof DrawGuess) {
+      isCorrect = instance.game.handleGuess(socket.id, trimmedMessage);
+    }
+
+    if (isCorrect) {
+      return;
+    }
+
+    const messageData = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      roomId: roomId,
+      playerId: socket.id,
+      playerName: player.name,
+      playerPhoto: player.photo || null,
+      message: trimmedMessage,
+      timestamp: Date.now(),
+      type: "room",
+    };
+
+    io.to(roomId).emit("messageReceived", messageData);
   });
 }
 
