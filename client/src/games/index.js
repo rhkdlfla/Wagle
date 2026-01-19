@@ -6,6 +6,7 @@ import AppleBattle from "../components/AppleBattle";
 import DrawGuess from "../components/DrawGuess";
 import NumberRush from "../components/NumberRush";
 import QuizBattle from "../components/QuizBattle";
+import LiarGame from "../components/LiarGame";
 
 // 게임 컴포넌트 맵핑
 // gameType (서버에서 사용하는 ID) -> React 컴포넌트
@@ -15,6 +16,7 @@ export const GAME_COMPONENTS = {
   drawGuess: DrawGuess,
   numberRush: NumberRush,
   quizBattle: QuizBattle,
+  liarGame: LiarGame,
   // 새로운 게임을 추가할 때 여기에 추가:
   // newGame: NewGameComponent,
 };
@@ -86,6 +88,19 @@ export const GAME_METADATA = [
     durationPresets: [30, 60, 120, 180, 300],
     supportsDuration: true,
     supportsRelayMode: false, // 이어달리기 모드 미지원
+  },
+  {
+    id: "liarGame",
+    name: "라이어 게임",
+    description: "제시어를 공유하고 라이어를 찾아보세요!",
+    icon: "🕵️",
+    minPlayers: 2,
+    defaultDuration: 600, // 초 단위 (전역 타이머 사용 안 함)
+    minDuration: 60,
+    maxDuration: 1800,
+    durationPresets: [300, 600, 900],
+    supportsDuration: false,
+    supportsRelayMode: false,
   },
   // 새로운 게임을 추가할 때 여기에 추가:
   // {

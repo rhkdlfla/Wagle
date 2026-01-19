@@ -14,6 +14,7 @@ require("./config/passport"); // Passport 인증 설정
 const authRoutes = require("./routes/auth");
 const quizRoutes = require("./routes/quiz");
 const uploadRoutes = require("./routes/upload");
+const liarRoutes = require("./routes/liar");
 
 // 환경 변수
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
@@ -54,6 +55,7 @@ app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/auth", authRoutes);
 app.use("/api/quiz", quizRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/liar", liarRoutes);
 
 // HTTP 서버 및 Socket.IO 설정
 const server = http.createServer(app);
