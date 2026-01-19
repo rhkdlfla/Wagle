@@ -3,14 +3,18 @@
 
 import ClickBattle from "../components/ClickBattle";
 import AppleBattle from "../components/AppleBattle";
+import DrawGuess from "../components/DrawGuess";
 import NumberRush from "../components/NumberRush";
+import QuizBattle from "../components/QuizBattle";
 
 // 게임 컴포넌트 맵핑
 // gameType (서버에서 사용하는 ID) -> React 컴포넌트
 export const GAME_COMPONENTS = {
   clickBattle: ClickBattle,
   appleBattle: AppleBattle,
+  drawGuess: DrawGuess,
   numberRush: NumberRush,
+  quizBattle: QuizBattle,
   // 새로운 게임을 추가할 때 여기에 추가:
   // newGame: NewGameComponent,
 };
@@ -43,6 +47,32 @@ export const GAME_METADATA = [
     durationPresets: [30, 60, 120, 180, 300],
     supportsDuration: true,
     supportsRelayMode: true,
+  },
+  {
+    id: "drawGuess",
+    name: "그림 맞히기",
+    description: "그림을 보고 제시어를 맞혀보세요!",
+    icon: "🎨",
+    minPlayers: 2,
+    defaultDuration: 90, // 초 단위
+    minDuration: 30,
+    maxDuration: 180,
+    durationPresets: [60, 90, 120, 150, 180],
+    supportsDuration: true,
+    supportsRelayMode: false,
+  },
+  {
+    id: "quizBattle",
+    name: "퀴즈 배틀",
+    description: "다양한 퀴즈를 풀어보세요!",
+    icon: "🧩",
+    minPlayers: 1,
+    defaultDuration: 600, // 초 단위
+    minDuration: 60,
+    maxDuration: 1800,
+    durationPresets: [300, 600, 900, 1200],
+    supportsDuration: true,
+    supportsRelayMode: false,
   },
   {
     id: "numberRush",

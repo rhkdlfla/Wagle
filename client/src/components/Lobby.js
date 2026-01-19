@@ -3,6 +3,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import "./Lobby.css";
 
 // 게임 목록
+const ALLOW_SOLO_DRAW_GUESS =
+  process.env.REACT_APP_ALLOW_SOLO_DRAW_GUESS === "true" ||
+  process.env.NODE_ENV === "development";
 const GAMES = [
   {
     id: "clickBattle",
@@ -10,6 +13,12 @@ const GAMES = [
     description: "일정 시간 동안 최대한 많이 클릭하세요!",
     icon: "👆",
     minPlayers: 1,
+    defaultDuration: 30,
+    minDuration: 5,
+    maxDuration: 300,
+    durationPresets: [10, 30, 60, 120, 300],
+    supportsDuration: true,
+    supportsRelayMode: true,
   },
   {
     id: "appleBattle",
@@ -17,6 +26,25 @@ const GAMES = [
     description: "합이 10이 되는 사과를 선택해 땅따먹기!",
     icon: "🍎",
     minPlayers: 1,
+    defaultDuration: 120,
+    minDuration: 30,
+    maxDuration: 300,
+    durationPresets: [30, 60, 120, 180, 300],
+    supportsDuration: true,
+    supportsRelayMode: true,
+  },
+  {
+    id: "drawGuess",
+    name: "그림 맞히기",
+    description: "그림을 보고 제시어를 맞혀보세요!",
+    icon: "🎨",
+    minPlayers: ALLOW_SOLO_DRAW_GUESS ? 1 : 2,
+    defaultDuration: 90,
+    minDuration: 30,
+    maxDuration: 180,
+    durationPresets: [60, 90, 120, 150, 180],
+    supportsDuration: true,
+    supportsRelayMode: false,
   },
   {
     id: "quizBattle",
@@ -24,6 +52,12 @@ const GAMES = [
     description: "다양한 퀴즈를 풀어보세요!",
     icon: "🧩",
     minPlayers: 1,
+    defaultDuration: 600,
+    minDuration: 60,
+    maxDuration: 1800,
+    durationPresets: [300, 600, 900, 1200],
+    supportsDuration: true,
+    supportsRelayMode: false,
   },
   {
     id: "numberRush",
@@ -31,6 +65,12 @@ const GAMES = [
     description: "숫자를 빠르게 입력하세요!",
     icon: "🔢",
     minPlayers: 1,
+    defaultDuration: 60,
+    minDuration: 10,
+    maxDuration: 300,
+    durationPresets: [30, 60, 120, 180, 300],
+    supportsDuration: true,
+    supportsRelayMode: false,
   },
 ];
 
@@ -63,7 +103,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [selectedGame, setSelectedGame] = useState(
     currentRoom?.selectedGame || GAMES[0].id
   );
-  const [gameDuration, setGameDuration] = useState(30); // 클릭 배틀 기본 30초
+  const [drawGuessRounds, setDrawGuessRounds] = useState(1);
   const [selectedQuizId, setSelectedQuizId] = useState(null); // 선택된 퀴즈 ID
   const [availableQuizzes, setAvailableQuizzes] = useState([]); // 사용 가능한 퀴즈 목록
   // 게임별 duration 관리 (게임 ID -> duration 초 단위)
@@ -240,6 +280,11 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
 
   const handleStartGame = () => {
     if (isHost && currentRoom.players.length > 0) {
+      const selected = GAMES.find((game) => game.id === selectedGame);
+      if (selected && currentRoom.players.length < selected.minPlayers) {
+        alert(`이 게임은 최소 ${selected.minPlayers}명 이상 필요합니다.`);
+        return;
+      }
       if (selectedGame === "quizBattle" && !selectedQuizId) {
         alert("퀴즈를 선택해주세요.");
         return;
@@ -248,12 +293,14 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       const duration = gameConfig.supportsDuration
         ? (gameDurations[selectedGame] || gameConfig.defaultDuration) * 1000
         : undefined;
-      
+      const rounds = selectedGame === "drawGuess" ? drawGuessRounds : undefined;
       socket.emit("startGame", {
         roomId: currentRoom.id,
         gameType: selectedGame,
         duration: duration,
+        rounds: rounds,
         quizId: selectedGame === "quizBattle" ? selectedQuizId : undefined,
+        rounds: rounds,
       });
     }
   };
@@ -818,60 +865,27 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
             </div>
           )}
 
-          {/* 클릭 배틀 시간 조절 UI */}
-          {selectedGame === "clickBattle" && isHost && (
+          {/* 그림 맞히기 라운드 설정 UI */}
+          {selectedGame === "drawGuess" && isHost && (
             <div className="game-duration-section">
-              <h3>⏱️ 게임 시간 설정</h3>
+              <h3>🎨 라운드 설정</h3>
               <div className="duration-controls">
-                <label htmlFor="duration-slider">
-                  시간: <strong>{formatDuration(gameDuration)}</strong>
+                <label htmlFor="rounds-slider">
+                  라운드(모두 한 번씩): <strong>{drawGuessRounds}회</strong>
                 </label>
                 <input
-                  id="duration-slider"
+                  id="rounds-slider"
                   type="range"
-                  min="5"
-                  max="300"
-                  step="5"
-                  value={gameDuration}
-                  onChange={(e) => setGameDuration(parseInt(e.target.value))}
+                  min="1"
+                  max="5"
+                  step="1"
+                  value={drawGuessRounds}
+                  onChange={(e) => setDrawGuessRounds(parseInt(e.target.value))}
                   className="duration-slider"
                 />
-                <div className="duration-presets">
-                  <button
-                    onClick={() => setGameDuration(10)}
-                    className={gameDuration === 10 ? "active" : ""}
-                  >
-                    10초
-                  </button>
-                  <button
-                    onClick={() => setGameDuration(30)}
-                    className={gameDuration === 30 ? "active" : ""}
-                  >
-                    30초
-                  </button>
-                  <button
-                    onClick={() => setGameDuration(60)}
-                    className={gameDuration === 60 ? "active" : ""}
-                  >
-                    1분
-                  </button>
-                  <button
-                    onClick={() => setGameDuration(120)}
-                    className={gameDuration === 120 ? "active" : ""}
-                  >
-                    2분
-                  </button>
-                  <button
-                    onClick={() => setGameDuration(300)}
-                    className={gameDuration === 300 ? "active" : ""}
-                  >
-                    5분
-                  </button>
-                </div>
               </div>
             </div>
           )}
-
           {/* 게임 시간 설정 UI (범용) */}
           {(() => {
             const gameConfig = getGameConfig(selectedGame);

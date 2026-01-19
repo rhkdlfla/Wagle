@@ -4,8 +4,7 @@ import io from "socket.io-client";
 import Hub from "./components/Hub";
 import Lobby from "./components/Lobby";
 import Login from "./components/Login";
-import ClickBattle from "./components/ClickBattle";
-import AppleBattle from "./components/AppleBattle";
+import DrawGuess from "./components/DrawGuess";
 import QuizBattle from "./components/QuizBattle";
 import QuizForm from "./components/QuizForm";
 import { getGameComponent } from "./games";
@@ -313,6 +312,16 @@ function RoomGame({ socket, user }) {
   if (room.selectedGame === "quizBattle") {
     return (
       <QuizBattle
+        socket={socket}
+        room={room}
+        onBackToLobby={handleBackToLobby}
+      />
+    );
+  }
+
+  if (room.selectedGame === "drawGuess") {
+    return (
+      <DrawGuess
         socket={socket}
         room={room}
         onBackToLobby={handleBackToLobby}
