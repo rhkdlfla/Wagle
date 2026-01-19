@@ -5,7 +5,7 @@ const QuizBattle = require("../games/QuizBattle");
 const NumberRush = require("../games/NumberRush");
 
 // 게임 인스턴스 저장 (updateInterval 관리를 위해)
-const gameInstances = new Map(); // roomId -> { game, updateInterval, gameType }
+const gameInstances = new Map(); // roomId -> { game, updateInterval, endTimeout, gameType }
 
 // 게임 팩토리: 게임 타입별 클래스 매핑
 const GAME_CLASSES = {
@@ -77,111 +77,199 @@ function calculateGameDuration(gameType, requestedDuration) {
 }
 
 function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
+  // 게임별 업데이트 이벤트 이름 반환 (하위 호환성 - 게임 클래스에 getUpdateEventName이 없을 때 사용)
+  function getUpdateEventName(gameType) {
+    const eventNameMap = {
+      clickBattle: "clickUpdate",
+      appleBattle: "appleBattleUpdate",
+      numberRush: "numberRushUpdate",
+    };
+    return eventNameMap[gameType] || `${gameType}Update`;
+  }
+
+  function getRoomOrNull(roomId) {
+    if (!roomId) return null;
+    return rooms.get(roomId) || null;
+  }
+
+  function getActiveGameContext({ roomId, requireGameType } = {}) {
+    const room = getRoomOrNull(roomId);
+    const gameState = roomId ? gameStates.get(roomId) : null;
+    const instance = roomId ? gameInstances.get(roomId) : null;
+    if (!room || !gameState || !gameState.isActive || !instance || !instance.game) {
+      return { ok: false, room, gameState, instance };
+    }
+    if (requireGameType && gameState.gameType !== requireGameType) {
+      return { ok: false, room, gameState, instance, wrongType: true };
+    }
+    const player = room.players?.find((p) => p.id === socket.id) || null;
+    if (!player) {
+      return { ok: false, room, gameState, instance, noPlayer: true };
+    }
+    return { ok: true, room, gameState, instance, player };
+  }
+
+  function emitNotActiveGameError() {
+    socket.emit("gameError", { message: "게임이 진행 중이 아닙니다." });
+  }
+
+  function safeClearTimer(id) {
+    if (!id) return;
+    clearTimeout(id);
+  }
+
+  function safeClearInterval(id) {
+    if (!id) return;
+    clearInterval(id);
+  }
+
+  function cleanupInstance(roomId) {
+    const instance = gameInstances.get(roomId);
+    if (!instance) return;
+    safeClearInterval(instance.updateInterval);
+    safeClearTimer(instance.endTimeout);
+    gameInstances.delete(roomId);
+  }
+
+  function buildGameStartedPayload(game, roomId, gameType, socketId) {
+    const base = {
+      duration: gameStates.get(roomId)?.duration,
+      startTime: gameStates.get(roomId)?.startTime,
+      gameType,
+    };
+    if (typeof game.getGameStartedPayload === "function") {
+      return { ...base, ...game.getGameStartedPayload(socketId) };
+    }
+    // fallback: 기존 gameStateData 기반 (최소 필드)
+    if (typeof game.getGameStateData === "function") {
+      const state = game.getGameStateData(socketId);
+      return {
+        ...base,
+        duration: state?.duration ?? base.duration,
+        startTime: state?.startTime ?? base.startTime,
+        gameType: state?.gameType ?? base.gameType,
+      };
+    }
+    return base;
+  }
+
+  function emitGameSync(socket, room, roomId, gameState, instance) {
+    const game = instance.game;
+    const gameType = gameState.gameType;
+
+    // 1) gameStarted (공통)
+    socket.emit("gameStarted", {
+      room,
+      gameState: buildGameStartedPayload(game, roomId, gameType, socket.id),
+    });
+
+    // 2) update event (게임이 결정)
+    const updateEventName =
+      (typeof game.getUpdateEventName === "function" && game.getUpdateEventName()) ||
+      getUpdateEventName(gameType);
+
+    const updatePayload =
+      (typeof game.getClientUpdateData === "function" && game.getClientUpdateData(socket.id)) ||
+      (typeof game.getGameStateData === "function" && game.getGameStateData(socket.id)) ||
+      {};
+
+    socket.emit(updateEventName, updatePayload);
+
+    // 3) 개인 전용 데이터(예: drawGuess 단어)
+    if (typeof game.emitPrivateState === "function") {
+      game.emitPrivateState(socket);
+    }
+  }
+
   // 게임 시작
   socket.on("startGame", async ({ roomId, gameType = "clickBattle", duration, quizId, rounds }) => {
     const room = rooms.get(roomId);
-    if (room && room.players.length > 0) {
-      // 방장만 게임 시작 가능 (첫 번째 플레이어)
-      if (room.players[0].id === socket.id) {
-        room.status = "playing";
-        room.selectedGame = gameType;
+    if (!room || room.players.length === 0) return;
 
-        const config = getGameConfig(gameType);
-        let gameDuration = calculateGameDuration(gameType, duration);
-        if (gameType === "quizBattle") {
-          gameDuration = duration ? parseInt(duration) : config.defaultDuration;
-        }
+    // 방장만
+    if (room.players[0].id !== socket.id) {
+      socket.emit("gameError", { message: "방장만 게임을 시작할 수 있습니다." });
+      return;
+    }
 
-        // 게임 상태 초기화
-        const gameState = {
-          gameType: gameType,
-          startTime: Date.now(),
-          duration: gameDuration,
-          clicks: {},
-          isActive: true,
-          relayMode: config.supportsRelayMode && room.teamMode && room.relayMode ? true : false,
-          quizId: gameType === "quizBattle" ? quizId : null,
-        };
-        if (gameType === "drawGuess") {
-          gameState.roundsPerPlayer = rounds ? Math.max(1, parseInt(rounds)) : 1;
-        }
+    // 게임 타입 검증
+    if (!GAME_CLASSES[gameType]) {
+      socket.emit("gameError", { message: "알 수 없는 게임 타입입니다." });
+      return;
+    }
 
-        // 게임 인스턴스 생성 및 초기화
-        let game;
-        if (gameType === "quizBattle") {
-          if (!quizId) {
-            socket.emit("gameError", { message: "퀴즈를 선택해주세요." });
-            return;
-          }
-          game = new QuizBattle(io, gameState, room);
-          try {
-            await game.initialize();
-          } catch (error) {
-            socket.emit("gameError", { message: error.message || "퀴즈 로드에 실패했습니다." });
-            return;
-          }
-        } else {
-          try {
-            game = createGame(gameType, io, gameState, room);
-          } catch (error) {
-            socket.emit("gameError", { message: "알 수 없는 게임 타입입니다." });
-            return;
-          }
-          if (typeof game.initialize === "function") {
-            game.initialize();
-          }
-        }
+    room.status = "playing";
+    room.selectedGame = gameType;
 
-        gameStates.set(roomId, gameState);
+    const config = getGameConfig(gameType);
+    const gameDuration = calculateGameDuration(gameType, duration);
 
-        // 게임 시작 이벤트 전송
-        const gameStateData = game.getGameStateData ? game.getGameStateData(socket.id) : {};
-        io.to(roomId).emit("gameStarted", {
-          room: room,
-          gameState: {
-            duration: gameState.duration,
-            startTime: gameState.startTime,
-            gameType: gameType,
-            grid: gameType === "appleBattle" ? gameState.grid : undefined,
-            drawerId: gameType === "drawGuess" ? gameStateData.drawerId : undefined,
-            round: gameType === "drawGuess" ? gameStateData.round : undefined,
-            totalRounds: gameType === "drawGuess" ? gameStateData.totalRounds : undefined,
-            quiz: gameType === "quizBattle" ? gameStateData.quiz : undefined,
-            currentQuestionIndex: gameType === "quizBattle" ? gameStateData.currentQuestionIndex : undefined,
-            relayMode: gameState.relayMode,
-            teamActivePlayers: gameState.teamActivePlayers,
-          },
-        });
+    const gameState = {
+      gameType,
+      startTime: Date.now(),
+      duration: gameDuration,
+      clicks: {},
+      isActive: true,
+      relayMode: config.supportsRelayMode && room.teamMode && room.relayMode ? true : false,
+      quizId: quizId || null,
+      roundsPerPlayer: rounds ? Math.max(1, parseInt(rounds)) : undefined,
+    };
 
-        io.emit("roomList", getRoomList(rooms));
-        console.log(`게임 시작: ${roomId}, 게임 타입: ${gameType}, 시작 시간: ${new Date(gameState.startTime).toISOString()}`);
+    let game;
+    try {
+      game = createGame(gameType, io, gameState, room);
+      if (typeof game.initialize === "function") {
+        // sync/async 모두 지원
+        await game.initialize();
+      }
+    } catch (error) {
+      socket.emit("gameError", { message: error?.message || "게임을 시작할 수 없습니다." });
+      room.status = "waiting";
+      return;
+    }
 
-        // 업데이트 루프 시작
-        const updateInterval = game.startUpdateLoop(() => endGame(roomId));
+    gameStates.set(roomId, gameState);
 
-        // 게임 인스턴스 저장
-        gameInstances.set(roomId, { game, updateInterval, gameType });
+    // 게임 시작 이벤트 (공통)
+    io.to(roomId).emit("gameStarted", {
+      room,
+      gameState: buildGameStartedPayload(game, roomId, gameType, socket.id),
+    });
 
-        // 게임 종료 타이머
-        if (gameType !== "drawGuess") {
-          setTimeout(() => {
-            const instance = gameInstances.get(roomId);
-            if (instance && instance.updateInterval) {
-              clearInterval(instance.updateInterval);
-            }
-            endGame(roomId);
-          }, gameState.duration);
-        }
+    io.emit("roomList", getRoomList(rooms));
+    console.log(
+      `게임 시작: ${roomId}, 게임 타입: ${gameType}, 시작 시간: ${new Date(
+        gameState.startTime
+      ).toISOString()}`
+    );
+
+    const updateInterval = game.startUpdateLoop(() => endGame(roomId));
+    gameInstances.set(roomId, { game, updateInterval, endTimeout: null, gameType });
+
+    const useGlobalTimer =
+      typeof game.shouldUseGlobalTimer === "function"
+        ? game.shouldUseGlobalTimer()
+        : true;
+
+    if (useGlobalTimer) {
+      const endTimeout = setTimeout(() => {
+        endGame(roomId, { reason: "durationTimeout" });
+      }, gameState.duration);
+      const instance = gameInstances.get(roomId);
+      if (instance) {
+        instance.endTimeout = endTimeout;
       }
     }
   });
 
   // 게임 종료 함수
-  function endGame(roomId) {
+  function endGame(roomId, { reason } = {}) {
     const gameState = gameStates.get(roomId);
     const room = rooms.get(roomId);
     
     if (!gameState || !room) return;
+    // idempotent 보장: 여러 경로에서 endGame이 호출돼도 한 번만 처리
+    if (!gameState.isActive) return;
     
     gameState.isActive = false;
     
@@ -206,180 +294,78 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     
     // 게임 상태 및 인스턴스 삭제
     gameStates.delete(roomId);
-    gameInstances.delete(roomId);
+    cleanupInstance(roomId);
     
     // 방 상태를 대기 중으로 변경
     room.status = "waiting";
     io.emit("roomList", getRoomList(rooms));
     
-    console.log(`게임 종료: ${roomId}, 승자: ${winners.join(", ")}`);
+    console.log(`게임 종료: ${roomId}, 승자: ${winners.join(", ")}`, reason ? `(reason=${reason})` : "");
   }
 
-  // 게임 상태 요청 (개선: 게임별 분기 제거)
+  // 게임 상태 요청 (하드코딩 if/else 제거)
   socket.on("getGameState", ({ roomId }) => {
-    console.log(`게임 상태 요청 받음: ${roomId} from ${socket.id}`);
     const gameState = gameStates.get(roomId);
     const room = rooms.get(roomId);
     
-    console.log("게임 상태:", { 
-      hasGameState: !!gameState, 
-      hasRoom: !!room, 
-      isActive: gameState?.isActive,
-      roomStatus: room?.status 
-    });
-    
-    if (gameState && room && gameState.isActive) {
-      const instance = gameInstances.get(roomId);
-      if (instance && instance.game) {
-        const gameStateData = instance.game.getGameStateData(socket.id);
-        
-        if (gameState.gameType === "clickBattle") {
-          socket.emit("gameStarted", {
-            room: room,
-            gameState: {
-              duration: gameStateData.duration,
-              startTime: gameStateData.startTime,
-              gameType: gameState.gameType,
-            },
-          });
-          
-          socket.emit("clickUpdate", {
-            updates: gameStateData.clickUpdates,
-            teamScores: gameStateData.teamScores || null,
-            timeRemaining: gameStateData.timeRemaining,
-            teamActivePlayers: gameStateData.teamActivePlayers || null,
-          });
-        } else if (gameState.gameType === "appleBattle") {
-          socket.emit("gameStarted", {
-            room: room,
-            gameState: {
-              duration: gameStateData.duration,
-              startTime: gameStateData.startTime,
-              gameType: gameState.gameType,
-              grid: gameStateData.grid,
-            },
-          });
-          
-          socket.emit("appleBattleUpdate", {
-            scores: gameStateData.scoreUpdates,
-            teamScores: gameStateData.teamScores || null,
-            timeRemaining: gameStateData.timeRemaining,
-            grid: gameStateData.grid,
-            teamActivePlayers: gameStateData.teamActivePlayers || null,
-          });
-        } else if (gameState.gameType === "drawGuess") {
-          socket.emit("gameStarted", {
-            room: room,
-            gameState: {
-              duration: gameStateData.duration,
-              startTime: gameStateData.startTime,
-              gameType: gameState.gameType,
-              drawerId: gameStateData.drawerId,
-              round: gameStateData.round,
-              totalRounds: gameStateData.totalRounds,
-            },
-          });
-
-          socket.emit("drawGuessState", {
-            strokes: gameStateData.strokes || [],
-            scores: gameStateData.scores || {},
-            timeRemaining: gameStateData.timeRemaining || null,
-            drawerId: gameStateData.drawerId,
-            round: gameStateData.round,
-            totalRounds: gameStateData.totalRounds,
-            wordLength: gameStateData.wordLength,
-            isDrawer: gameStateData.isDrawer,
-          });
-
-          if (gameStateData.isDrawer) {
-            socket.emit("drawGuessWord", { word: gameState.word });
-          }
-        } else if (gameState.gameType === "quizBattle") {
-          socket.emit("gameStarted", {
-            room: room,
-            gameState: {
-              duration: gameStateData.duration,
-              startTime: gameStateData.startTime,
-              gameType: gameState.gameType,
-              quiz: gameStateData.quiz,
-              currentQuestionIndex: gameStateData.currentQuestionIndex,
-            },
-          });
-        } else if (gameState.gameType === "numberRush") {
-          socket.emit("gameStarted", {
-            room: room,
-            gameState: {
-              duration: gameStateData.duration,
-              startTime: gameStateData.startTime,
-              gameType: gameState.gameType,
-            },
-          });
-        }
-      }
-    } else {
-      console.log(`게임이 진행 중이 아닙니다. roomId: ${roomId}, roomStatus: ${room?.status}`);
+    if (!gameState || !room || !gameState.isActive) {
+      return;
     }
+
+    const instance = gameInstances.get(roomId);
+    if (!instance || !instance.game) {
+      return;
+    }
+
+    emitGameSync(socket, room, roomId, gameState, instance);
   });
 
-  // 게임별 업데이트 이벤트 이름 반환 (하위 호환성 - 게임 클래스에 getUpdateEventName이 없을 때 사용)
-  function getUpdateEventName(gameType) {
-    const eventNameMap = {
-      clickBattle: "clickUpdate",
-      appleBattle: "appleBattleUpdate",
-      numberRush: "numberRushUpdate",
-    };
-    return eventNameMap[gameType] || `${gameType}Update`;
+  function dispatchGameAction({ roomId, action, data, requireGameType }) {
+    const ctx = getActiveGameContext({ roomId, requireGameType });
+    if (!ctx.ok) {
+      if (ctx.noPlayer) {
+        socket.emit("gameError", { message: "플레이어를 찾을 수 없습니다." });
+      } else if (!ctx.wrongType) {
+        emitNotActiveGameError();
+      }
+      return null;
+    }
+
+    const game = ctx.instance.game;
+    if (typeof game.handleAction === "function") {
+      try {
+        game.handleAction(socket.id, action, data);
+      } catch (error) {
+        console.error(`게임 액션 처리 실패: ${action}`, error);
+        socket.emit("gameError", { message: "액션을 처리할 수 없습니다." });
+      }
+      return ctx;
+    }
+
+    // 하위 호환성: 기존 게임별 메서드 호출
+    handleLegacyGameAction(ctx.instance, ctx.gameState, socket.id, action, data);
+    return ctx;
   }
 
   // 클릭 이벤트 (클릭 대결)
   socket.on("gameClick", ({ roomId }) => {
-    const gameState = gameStates.get(roomId);
-    const room = rooms.get(roomId);
-    
-    if (!gameState || !room) {
-      socket.emit("gameError", { message: "게임이 진행 중이 아닙니다." });
-      return;
-    }
-    
-    if (!gameState.isActive || gameState.gameType !== "clickBattle") {
-      return;
-    }
-    
-    // 플레이어가 방에 있는지 확인
-    const player = room.players.find((p) => p.id === socket.id);
-    if (!player) {
-      socket.emit("gameError", { message: "플레이어를 찾을 수 없습니다." });
-      return;
-    }
-    
-    const instance = gameInstances.get(roomId);
-    if (instance && instance.game instanceof ClickBattle) {
-      instance.game.handleClick(socket.id);
-    }
+    // 레거시 이벤트를 공통 액션으로 흡수
+    dispatchGameAction({ roomId, action: "click", data: {}, requireGameType: "clickBattle" });
   });
   
   // 이어달리기 모드: 다음 팀원에게 순서 넘기기 (우클릭)
   socket.on("passTurn", ({ roomId }) => {
-    const gameState = gameStates.get(roomId);
-    const room = rooms.get(roomId);
-
-    if (!gameState || !room || !gameState.isActive || !gameState.relayMode) {
-      return;
-    }
-
-    const config = getGameConfig(gameState.gameType);
-    if (!config.supportsRelayMode) {
-      return;
-    }
-
-    const player = room.players.find((p) => p.id === socket.id);
-    if (!player) {
-      return;
-    }
-
-    const instance = gameInstances.get(roomId);
-    if (instance && instance.game && typeof instance.game.passTurn === "function") {
-      instance.game.passTurn(socket.id);
+    const ctx = getActiveGameContext({ roomId });
+    if (!ctx.ok) return;
+    if (!ctx.gameState.relayMode) return;
+    const config = getGameConfig(ctx.gameState.gameType);
+    if (!config.supportsRelayMode) return;
+    const game = ctx.instance.game;
+    if (typeof game.passTurn === "function") {
+      game.passTurn(socket.id);
+    } else if (typeof game.handleAction === "function") {
+      // 향후 통합을 위한 fallback
+      dispatchGameAction({ roomId, action: "passTurn", data: {} });
     }
   });
   
@@ -402,60 +388,40 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     }
     
     // 게임 종료
-    endGame(roomId);
+    endGame(roomId, { reason: "hostEnd" });
     console.log(`방장이 게임을 강제 종료함: ${roomId}`);
   });
 
   // 정답 제출 (퀴즈배틀)
   socket.on("submitAnswer", ({ roomId, answer, timeSpent }) => {
-    const gameState = gameStates.get(roomId);
-    const room = rooms.get(roomId);
-    
-    if (!gameState || !room || gameState.gameType !== "quizBattle") {
-      socket.emit("gameError", { message: "게임이 진행 중이 아닙니다." });
+    // 레거시 이벤트 유지 + 내부는 통합
+    const ctx = getActiveGameContext({ roomId, requireGameType: "quizBattle" });
+    if (!ctx.ok) {
+      if (ctx.noPlayer) socket.emit("gameError", { message: "플레이어를 찾을 수 없습니다." });
+      else emitNotActiveGameError();
       return;
     }
-    
-    if (!gameState.isActive) {
-      return;
-    }
-    
-    const player = room.players.find((p) => p.id === socket.id);
-    if (!player) {
-      socket.emit("gameError", { message: "플레이어를 찾을 수 없습니다." });
-      return;
-    }
-    
-    const instance = gameInstances.get(roomId);
-    if (instance && instance.game instanceof QuizBattle) {
-      instance.game.submitAnswer(socket.id, answer, timeSpent);
+    const game = ctx.instance.game;
+    if (typeof game.submitAnswer === "function") {
+      game.submitAnswer(socket.id, answer, timeSpent);
+    } else {
+      dispatchGameAction({
+        roomId,
+        action: "submitAnswer",
+        data: { answer, timeSpent },
+        requireGameType: "quizBattle",
+      });
     }
   });
 
   // 사과 제거 이벤트 (사과배틀)
   socket.on("appleBattleRemove", ({ roomId, startRow, startCol, endRow, endCol }) => {
-    const gameState = gameStates.get(roomId);
-    const room = rooms.get(roomId);
-    
-    if (!gameState || !room || gameState.gameType !== "appleBattle") {
-      socket.emit("gameError", { message: "게임이 진행 중이 아닙니다." });
-      return;
-    }
-    
-    if (!gameState.isActive) {
-      return;
-    }
-    
-    // 플레이어가 방에 있는지 확인
-    const player = room.players.find((p) => p.id === socket.id);
-    if (!player) {
-      return;
-    }
-    
-    const instance = gameInstances.get(roomId);
-    if (instance && instance.game instanceof AppleBattle) {
-      instance.game.handleRemove(socket.id, startRow, startCol, endRow, endCol);
-    }
+    dispatchGameAction({
+      roomId,
+      action: "remove",
+      data: { startRow, startCol, endRow, endCol },
+      requireGameType: "appleBattle",
+    });
   });
 
   socket.on("drawGuessStroke", ({ roomId, stroke }) => {
@@ -516,14 +482,11 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
   socket.on("drawGuessMessage", ({ roomId, message }) => {
     const room = rooms.get(roomId);
     const gameState = gameStates.get(roomId);
-    if (!room || !gameState || gameState.gameType !== "drawGuess") {
+    if (!room || !gameState || !gameState.isActive || gameState.gameType !== "drawGuess") {
       return;
     }
-
     const player = room.players.find((p) => p.id === socket.id);
-    if (!player) {
-      return;
-    }
+    if (!player) return;
 
     const trimmedMessage = (message || "").trim();
     if (!trimmedMessage) {
@@ -560,37 +523,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
 
   // 범용 게임 액션 핸들러 (새로운 방식, 하위 호환성 유지)
   socket.on("gameAction", ({ roomId, action, data }) => {
-    const gameState = gameStates.get(roomId);
-    const room = rooms.get(roomId);
-
-    if (!gameState || !room || !gameState.isActive) {
-      socket.emit("gameError", { message: "게임이 진행 중이 아닙니다." });
-      return;
-    }
-
-    const player = room.players.find((p) => p.id === socket.id);
-    if (!player) {
-      socket.emit("gameError", { message: "플레이어를 찾을 수 없습니다." });
-      return;
-    }
-
-    const instance = gameInstances.get(roomId);
-    if (!instance || !instance.game) {
-      return;
-    }
-
-    // 게임 클래스의 handleAction 메서드 호출 (있는 경우)
-    if (typeof instance.game.handleAction === "function") {
-      try {
-        instance.game.handleAction(socket.id, action, data);
-      } catch (error) {
-        console.error(`게임 액션 처리 실패: ${action}`, error);
-        socket.emit("gameError", { message: "액션을 처리할 수 없습니다." });
-      }
-    } else {
-      // 하위 호환성: 기존 게임별 메서드 호출
-      handleLegacyGameAction(instance, gameState, socket.id, action, data);
-    }
+    dispatchGameAction({ roomId, action, data });
   });
 
   // 하위 호환성: 기존 게임별 액션 처리

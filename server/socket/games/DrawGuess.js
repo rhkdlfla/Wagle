@@ -267,6 +267,50 @@ class DrawGuess {
       isDrawer: socketId === drawerId,
     };
   }
+
+  // ===== Refactor hooks (gameHandler에서 하드코딩 제거용) =====
+  getUpdateEventName() {
+    // 재연결 시에는 전체 상태를 보내야 하므로 State 이벤트 사용
+    return "drawGuessState";
+  }
+
+  getClientUpdateData(socketId) {
+    const state = this.getGameStateData(socketId);
+    return {
+      strokes: state.strokes || [],
+      scores: state.scores || {},
+      timeRemaining: state.timeRemaining ?? null,
+      drawerId: state.drawerId,
+      round: state.round,
+      totalRounds: state.totalRounds,
+      wordLength: state.wordLength,
+      isDrawer: state.isDrawer,
+    };
+  }
+
+  getGameStartedPayload(socketId) {
+    const state = this.getGameStateData(socketId);
+    return {
+      duration: state.duration,
+      startTime: state.startTime,
+      gameType: state.gameType,
+      drawerId: state.drawerId,
+      round: state.round,
+      totalRounds: state.totalRounds,
+    };
+  }
+
+  emitPrivateState(socket) {
+    const state = this.getGameStateData(socket.id);
+    if (state.isDrawer) {
+      socket.emit("drawGuessWord", { word: this.gameState.word });
+    }
+  }
+
+  shouldUseGlobalTimer() {
+    // 라운드 진행/종료를 게임 내부에서 제어
+    return false;
+  }
 }
 
 module.exports = DrawGuess;

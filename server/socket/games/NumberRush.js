@@ -478,6 +478,11 @@ class NumberRush {
     return "numberRushUpdate";
   }
 
+  shouldUseGlobalTimer() {
+    // 라운드 기반으로 자체 종료 처리
+    return false;
+  }
+
   // 게임 업데이트 전송 헬퍼
   sendUpdate() {
     const gameStateData = this.getGameStateData();

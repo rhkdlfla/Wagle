@@ -345,6 +345,39 @@ class QuizBattle {
       questionTimeRemaining: questionTimeRemaining,
     };
   }
+
+  // ===== Refactor hooks (gameHandler에서 하드코딩 제거용) =====
+  getUpdateEventName() {
+    return "quizUpdate";
+  }
+
+  getClientUpdateData() {
+    const state = this.getGameStateData();
+    return {
+      questionTimeRemaining: state.questionTimeRemaining ?? null,
+      timeRemaining: state.timeRemaining ?? 0,
+      scores: state.scores || {},
+      teamScores: state.teamScores || null,
+    };
+  }
+
+  getGameStartedPayload() {
+    const state = this.getGameStateData();
+    return {
+      duration: state.duration,
+      startTime: state.startTime,
+      gameType: state.gameType,
+      quiz: state.quiz,
+      currentQuestionIndex: state.currentQuestionIndex,
+    };
+  }
+
+  handleAction(socketId, action, data) {
+    if (action === "submitAnswer") {
+      return this.submitAnswer(socketId, data?.answer, data?.timeSpent);
+    }
+    return false;
+  }
 }
 
 module.exports = QuizBattle;

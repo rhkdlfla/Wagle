@@ -319,6 +319,16 @@ class AppleBattle {
   getUpdateEventName() {
     return "appleBattleUpdate";
   }
+
+  getGameStartedPayload() {
+    const state = this.getGameStateData();
+    return {
+      duration: state.duration,
+      startTime: state.startTime,
+      gameType: state.gameType,
+      grid: state.grid,
+    };
+  }
 }
 
 module.exports = AppleBattle;

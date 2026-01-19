@@ -262,6 +262,15 @@ class ClickBattle {
   getUpdateEventName() {
     return "clickUpdate";
   }
+
+  getGameStartedPayload() {
+    const state = this.getGameStateData();
+    return {
+      duration: state.duration,
+      startTime: state.startTime,
+      gameType: state.gameType,
+    };
+  }
 }
 
 module.exports = ClickBattle;
