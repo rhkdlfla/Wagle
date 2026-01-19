@@ -98,16 +98,48 @@ function getGameConfig(gameId) {
 }
 
 function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
+  // localStorage에서 게임 설정 복원
+  const loadGameSettings = (roomId) => {
+    if (!roomId) return null;
+    try {
+      const saved = localStorage.getItem(`gameSettings_${roomId}`);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error("게임 설정 로드 실패:", error);
+    }
+    return null;
+  };
+
+  // 게임 설정 저장
+  const saveGameSettings = (settings, roomId) => {
+    if (!roomId) return;
+    try {
+      localStorage.setItem(`gameSettings_${roomId}`, JSON.stringify(settings));
+    } catch (error) {
+      console.error("게임 설정 저장 실패:", error);
+    }
+  };
+
+  const savedSettings = loadGameSettings(room?.id);
   const [playerName, setPlayerName] = useState("");
   const [currentRoom, setCurrentRoom] = useState(room);
   const [selectedGame, setSelectedGame] = useState(
-    currentRoom?.selectedGame || GAMES[0].id
+    currentRoom?.selectedGame || savedSettings?.selectedGame || GAMES[0].id
   );
-  const [drawGuessRounds, setDrawGuessRounds] = useState(1);
-  const [selectedQuizId, setSelectedQuizId] = useState(null); // 선택된 퀴즈 ID
+  const [drawGuessRounds, setDrawGuessRounds] = useState(
+    savedSettings?.drawGuessRounds || 1
+  );
+  const [selectedQuizId, setSelectedQuizId] = useState(
+    savedSettings?.selectedQuizId || null
+  ); // 선택된 퀴즈 ID
   const [availableQuizzes, setAvailableQuizzes] = useState([]); // 사용 가능한 퀴즈 목록
   // 게임별 duration 관리 (게임 ID -> duration 초 단위)
   const [gameDurations, setGameDurations] = useState(() => {
+    if (savedSettings?.gameDurations) {
+      return savedSettings.gameDurations;
+    }
     const durations = {};
     GAMES.forEach((game) => {
       if (game.supportsDuration) {
@@ -117,11 +149,19 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     return durations;
   });
   // 퀴즈 배틀 문제당 시간 제한 (초 단위, null이면 무제한)
-  const [quizQuestionTimeLimit, setQuizQuestionTimeLimit] = useState(null); // null = 무제한
+  const [quizQuestionTimeLimit, setQuizQuestionTimeLimit] = useState(
+    savedSettings?.quizQuestionTimeLimit !== undefined 
+      ? savedSettings.quizQuestionTimeLimit 
+      : null
+  ); // null = 무제한
   // 퀴즈 배틀 시간 비례 점수 모드 (남은 시간에 비례해서 점수 부여)
-  const [quizTimeBasedScoring, setQuizTimeBasedScoring] = useState(false);
+  const [quizTimeBasedScoring, setQuizTimeBasedScoring] = useState(
+    savedSettings?.quizTimeBasedScoring || false
+  );
   // 퀴즈 배틀 무한 도전 모드 (틀린 답을 내도 계속 시도 가능)
-  const [quizInfiniteRetry, setQuizInfiniteRetry] = useState(false);
+  const [quizInfiniteRetry, setQuizInfiniteRetry] = useState(
+    savedSettings?.quizInfiniteRetry || false
+  );
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
@@ -134,11 +174,27 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   // 현재 플레이어의 팀 ID 가져오기
   const myTeamId = currentRoom?.players?.find((p) => p.id === socket.id)?.teamId || null;
 
+  // 게임 설정 변경 시 자동 저장
+  useEffect(() => {
+    if (currentRoom?.id) {
+      saveGameSettings({
+        selectedGame,
+        drawGuessRounds,
+        selectedQuizId,
+        gameDurations,
+        quizQuestionTimeLimit,
+        quizTimeBasedScoring,
+        quizInfiniteRetry,
+      }, currentRoom.id);
+    }
+  }, [selectedGame, drawGuessRounds, selectedQuizId, gameDurations, quizQuestionTimeLimit, quizTimeBasedScoring, quizInfiniteRetry, currentRoom?.id]);
+
   useEffect(() => {
     // 방 업데이트 수신
     socket.on("roomUpdated", (updatedRoom) => {
       setCurrentRoom(updatedRoom);
-      if (updatedRoom.selectedGame) {
+      // selectedGame만 서버에서 업데이트 (다른 설정은 localStorage에서 복원)
+      if (updatedRoom.selectedGame && updatedRoom.selectedGame !== selectedGame) {
         setSelectedGame(updatedRoom.selectedGame);
       }
     });
@@ -295,6 +351,18 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         alert("퀴즈를 선택해주세요.");
         return;
       }
+      
+      // 게임 시작 전 현재 설정 저장
+      saveGameSettings({
+        selectedGame,
+        drawGuessRounds,
+        selectedQuizId,
+        gameDurations,
+        quizQuestionTimeLimit,
+        quizTimeBasedScoring,
+        quizInfiniteRetry,
+      }, currentRoom.id);
+      
       const gameConfig = getGameConfig(selectedGame);
       // 퀴즈 배틀은 문제를 다 풀면 끝나므로 duration 설정 불필요
       const duration = (selectedGame === "quizBattle" || !gameConfig.supportsDuration)

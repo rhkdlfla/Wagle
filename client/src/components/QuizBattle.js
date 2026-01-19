@@ -17,7 +17,7 @@ function QuizBattle({ socket, room, onBackToLobby }) {
   const [quiz, setQuiz] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [correctPlayers, setCorrectPlayers] = useState([]); // 정답을 맞춘 플레이어 목록
-  const [skipVotes, setSkipVotes] = useState({ voteCount: 0, totalPlayers: 0, majority: 0, hasVoted: false }); // 스킵 투표 상태
+  const [skipVotes, setSkipVotes] = useState({ voteCount: 0, totalPlayers: 0, unansweredCount: 0, majority: 0, hasVoted: false }); // 스킵 투표 상태
   const timerIntervalRef = useRef(null);
   const questionStartTimeRef = useRef(null);
   const isHost = room?.players[0]?.id === socket.id;
@@ -63,7 +63,7 @@ function QuizBattle({ socket, room, onBackToLobby }) {
       setQuestionTimeRemaining(null); // 시간 제한 없음
       setQuestionResult(null);
       setCorrectPlayers([]); // 정답을 맞춘 플레이어 목록 초기화
-      setSkipVotes({ voteCount: 0, totalPlayers: room.players.length, majority: Math.ceil(room.players.length / 2), hasVoted: false }); // 스킵 투표 초기화
+      setSkipVotes({ voteCount: 0, totalPlayers: room.players.length, unansweredCount: room.players.length, majority: Math.ceil(room.players.length / 2), hasVoted: false }); // 스킵 투표 초기화
       questionStartTimeRef.current = Date.now();
       setCurrentQuestionIndex(questionData.questionNumber - 1);
     });
@@ -94,11 +94,12 @@ function QuizBattle({ socket, room, onBackToLobby }) {
     });
 
     // 스킵 투표 업데이트
-    socket.on("skipVoteUpdate", ({ voteCount, totalPlayers, majority, voters }) => {
-      console.log("스킵 투표 업데이트:", { voteCount, totalPlayers, majority });
+    socket.on("skipVoteUpdate", ({ voteCount, totalPlayers, unansweredCount, majority, voters }) => {
+      console.log("스킵 투표 업데이트:", { voteCount, totalPlayers, unansweredCount, majority });
       setSkipVotes({
         voteCount,
         totalPlayers,
+        unansweredCount: unansweredCount || totalPlayers,
         majority,
         hasVoted: voters.includes(socket.id),
       });
@@ -380,14 +381,15 @@ function QuizBattle({ socket, room, onBackToLobby }) {
               <div className="skip-vote-section">
                 <button
                   onClick={handleVoteSkip}
-                  disabled={skipVotes.hasVoted || questionResult !== null}
-                  className={`skip-vote-button ${skipVotes.hasVoted ? "voted" : ""}`}
+                  disabled={skipVotes.hasVoted || questionResult !== null || selectedAnswer !== null}
+                  className={`skip-vote-button ${skipVotes.hasVoted ? "voted" : ""} ${selectedAnswer !== null ? "disabled" : ""}`}
+                  title={selectedAnswer !== null ? "이미 답을 제출했습니다. 못 푼 사람만 스킵 투표할 수 있습니다." : ""}
                 >
-                  {skipVotes.hasVoted ? "✓ 투표 완료" : "⏭️ 문제 스킵 투표"}
+                  {skipVotes.hasVoted ? "✓ 투표 완료" : selectedAnswer !== null ? "❌ 답 제출 완료 (스킵 불가)" : "⏭️ 문제 스킵 투표"}
                 </button>
                 {skipVotes.voteCount > 0 && (
                   <div className="skip-vote-info">
-                    투표: {skipVotes.voteCount} / {skipVotes.majority} (과반수 필요)
+                    투표: {skipVotes.voteCount} / {skipVotes.majority} (못 푼 사람 {skipVotes.unansweredCount}명 중 과반수 필요)
                   </div>
                 )}
               </div>

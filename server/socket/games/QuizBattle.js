@@ -235,6 +235,9 @@ class QuizBattle {
           currentScore: this.gameState.scores[socketId],
         });
       }
+      
+      // 정답을 맞춘 후 스킵 투표 상태 업데이트 (정답 맞춘 사람의 스킵 투표 제거 및 과반수 재계산)
+      this.updateSkipVoteStatus();
     }
 
     return true;
@@ -561,29 +564,59 @@ class QuizBattle {
     return false;
   }
 
-  // 문제 스킵 투표
-  voteSkip(socketId) {
-    // 이미 투표한 경우 무시
-    if (this.gameState.skipVotes.has(socketId)) {
-      return false;
-    }
+  // 스킵 투표 상태 업데이트 및 전송 (정답 맞춘 후 호출)
+  updateSkipVoteStatus() {
+    // 정답을 맞춘 사람의 스킵 투표 제거
+    const votersToRemove = [];
+    this.gameState.skipVotes.forEach((voterId) => {
+      if (!this.gameState.infiniteRetry) {
+        // 무한 도전 모드가 아닌 경우: 답을 제출한 사람은 스킵 투표 제거
+        if (this.gameState.answers[voterId] && this.gameState.answers[voterId].isCorrect) {
+          votersToRemove.push(voterId);
+        }
+      } else {
+        // 무한 도전 모드: 정답을 맞춘 사람은 스킵 투표 제거
+        if (this.gameState.correctAnswers[voterId]) {
+          votersToRemove.push(voterId);
+        }
+      }
+    });
+    
+    // 스킵 투표 제거
+    votersToRemove.forEach((voterId) => {
+      this.gameState.skipVotes.delete(voterId);
+    });
 
-    // 스킵 투표 추가
-    this.gameState.skipVotes.add(socketId);
+    // 못 푼 사람 수 계산
+    let unansweredCount = 0;
+    this.room.players.forEach((player) => {
+      if (!this.gameState.infiniteRetry) {
+        // 무한 도전 모드가 아닌 경우: 답을 제출하지 않았거나 오답인 사람
+        if (!this.gameState.answers[player.id] || !this.gameState.answers[player.id].isCorrect) {
+          unansweredCount++;
+        }
+      } else {
+        // 무한 도전 모드: 정답을 맞추지 않은 사람
+        if (!this.gameState.correctAnswers[player.id]) {
+          unansweredCount++;
+        }
+      }
+    });
+
     const voteCount = this.gameState.skipVotes.size;
-    const totalPlayers = this.room.players.length;
-    const majority = Math.ceil(totalPlayers / 2); // 과반수 (50% 이상)
+    const majority = Math.ceil(unansweredCount / 2); // 못 푼 사람 기준 과반수 (50% 이상)
 
     // 모든 클라이언트에 투표 현황 전송
     this.io.to(this.room.id).emit("skipVoteUpdate", {
       voteCount,
-      totalPlayers,
+      totalPlayers: this.room.players.length,
+      unansweredCount,
       majority,
       voters: Array.from(this.gameState.skipVotes),
     });
 
     // 과반수 달성 시 문제 스킵
-    if (voteCount >= majority) {
+    if (voteCount >= majority && majority > 0 && unansweredCount > 0) {
       // 문제당 시간 제한 타이머 정리
       if (this.questionTimeout) {
         clearTimeout(this.questionTimeout);
@@ -606,6 +639,47 @@ class QuizBattle {
         this.nextQuestion();
       }, 1000);
     }
+  }
+
+  // 문제 스킵 투표
+  voteSkip(socketId) {
+    // 이미 투표한 경우 무시
+    if (this.gameState.skipVotes.has(socketId)) {
+      return false;
+    }
+
+    // 못 푼 사람만 스킵 투표 가능
+    // 무한 도전 모드가 아닌 경우: 이미 답을 제출한 사람은 스킵 투표 불가
+    if (!this.gameState.infiniteRetry && this.gameState.answers[socketId]) {
+      return false;
+    }
+    
+    // 무한 도전 모드: 이미 정답을 맞춘 사람은 스킵 투표 불가
+    if (this.gameState.infiniteRetry && this.gameState.correctAnswers[socketId]) {
+      return false;
+    }
+
+    // 못 푼 사람 수 계산
+    let unansweredCount = 0;
+    this.room.players.forEach((player) => {
+      if (!this.gameState.infiniteRetry) {
+        // 무한 도전 모드가 아닌 경우: 답을 제출하지 않은 사람
+        if (!this.gameState.answers[player.id]) {
+          unansweredCount++;
+        }
+      } else {
+        // 무한 도전 모드: 정답을 맞추지 않은 사람
+        if (!this.gameState.correctAnswers[player.id]) {
+          unansweredCount++;
+        }
+      }
+    });
+
+    // 스킵 투표 추가
+    this.gameState.skipVotes.add(socketId);
+    
+    // 스킵 투표 상태 업데이트 및 전송 (과반수 체크 포함)
+    this.updateSkipVoteStatus();
 
     return true;
   }
