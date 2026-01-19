@@ -73,7 +73,9 @@ function setupRoomHandlers(socket, io, rooms) {
     
     const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const { currentUser, userKey, userId, providerId } = getUserFromSocket(socket);
-    const playerName = currentUser ? currentUser.name : `플레이어 ${socket.id.substring(0, 6)}`;
+    const playerName = currentUser
+      ? currentUser.nickname || currentUser.name
+      : `플레이어 ${socket.id.substring(0, 6)}`;
     
     // 방 이름이 없으면 랜덤 이름 생성
     const finalRoomName = roomName && roomName.trim() 
@@ -165,7 +167,8 @@ function setupRoomHandlers(socket, io, rooms) {
         existingPlayerByUserKey.provider = currentUser?.provider || existingPlayerByUserKey.provider;
         existingPlayerByUserKey.providerId = providerId || existingPlayerByUserKey.providerId;
         existingPlayerByUserKey.photo = currentUser?.photo || existingPlayerByUserKey.photo;
-        existingPlayerByUserKey.name = currentUser?.name || existingPlayerByUserKey.name;
+        existingPlayerByUserKey.name =
+          currentUser?.nickname || currentUser?.name || existingPlayerByUserKey.name;
         socket.join(roomId);
         socket.emit("joinedRoom", room);
         io.to(roomId).emit("roomUpdated", room);
@@ -184,7 +187,9 @@ function setupRoomHandlers(socket, io, rooms) {
       }
     }
 
-    const playerName = currentUser ? currentUser.name : `플레이어 ${socket.id.substring(0, 6)}`;
+    const playerName = currentUser
+      ? currentUser.nickname || currentUser.name
+      : `플레이어 ${socket.id.substring(0, 6)}`;
 
     room.players.push({ 
       id: socket.id, 

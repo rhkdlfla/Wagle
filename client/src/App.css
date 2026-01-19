@@ -67,10 +67,18 @@
   z-index: 1000;
 }
 
-.user-info {
+.user-info-button {
   display: flex;
   align-items: center;
   gap: 12px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.user-info-button:hover .user-name {
+  color: #4b59d2;
 }
 
 .user-avatar {

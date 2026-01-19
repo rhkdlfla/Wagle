@@ -4,6 +4,7 @@ const DrawGuess = require("../games/DrawGuess");
 const QuizBattle = require("../games/QuizBattle");
 const NumberRush = require("../games/NumberRush");
 const LiarGame = require("../games/LiarGame");
+const User = require("../../models/User");
 
 // 게임 인스턴스 저장 (updateInterval 관리를 위해)
 const gameInstances = new Map(); // roomId -> { game, updateInterval, endTimeout, gameType }
@@ -82,6 +83,83 @@ function calculateGameDuration(gameType, requestedDuration) {
     );
   }
   return config.defaultDuration;
+}
+
+function buildRanking(results) {
+  if (!Array.isArray(results)) return new Map();
+  const sorted = [...results].sort((a, b) => {
+    const aTeamScore = a.teamScore ?? null;
+    const bTeamScore = b.teamScore ?? null;
+    if (aTeamScore !== null && bTeamScore !== null && aTeamScore !== bTeamScore) {
+      return bTeamScore - aTeamScore;
+    }
+    const aScore = a.score ?? 0;
+    const bScore = b.score ?? 0;
+    if (aScore !== bScore) return bScore - aScore;
+    return 0;
+  });
+
+  const ranking = new Map();
+  let currentRank = 1;
+  let previousKey = null;
+
+  sorted.forEach((result, index) => {
+    const key = `${result.teamScore ?? "none"}|${result.score ?? 0}`;
+    if (index === 0) {
+      currentRank = 1;
+      previousKey = key;
+    } else if (key !== previousKey) {
+      currentRank = index + 1;
+      previousKey = key;
+    }
+    ranking.set(result.id, currentRank);
+  });
+
+  return ranking;
+}
+
+async function recordGameResults({ room, results, gameType }) {
+  if (!room || !Array.isArray(results) || !gameType) return;
+
+  const playerCount = room.players?.length || results.length || 0;
+  const ranking = buildRanking(results);
+  const playedAt = new Date();
+
+  const updates = (room.players || [])
+    .filter((player) => player.userId && player.provider !== "guest")
+    .map((player) => {
+      const result = results.find((entry) => entry.id === player.id) || {};
+      const rank = ranking.get(player.id) || playerCount || 1;
+      const isWinner = result.isWinner ?? rank === 1;
+      const historyEntry = {
+        gameType,
+        rank,
+        playersCount: playerCount,
+        isWinner,
+        playedAt,
+      };
+
+      return User.updateOne(
+        { _id: player.userId },
+        {
+          $inc: {
+            [`gameStats.${gameType}.plays`]: 1,
+            [`gameStats.${gameType}.wins`]: isWinner ? 1 : 0,
+          },
+          $push: {
+            gameHistory: {
+              $each: [historyEntry],
+              $position: 0,
+              $slice: 10,
+            },
+          },
+        }
+      ).catch((error) => {
+        console.error("게임 결과 저장 실패:", error);
+      });
+    });
+
+  await Promise.allSettled(updates);
 }
 
 function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
@@ -297,7 +375,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
   });
 
   // 게임 종료 함수
-  function endGame(roomId, { reason } = {}) {
+  async function endGame(roomId, { reason } = {}) {
     const gameState = gameStates.get(roomId);
     const room = rooms.get(roomId);
     
@@ -327,6 +405,12 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       results: results,
       winners: winners,
       teamScores: teamScores, // 팀 점수 포함
+    });
+
+    await recordGameResults({
+      room,
+      results,
+      gameType: instance?.gameType || gameState.gameType,
     });
     
     // 게임 상태 및 인스턴스 삭제

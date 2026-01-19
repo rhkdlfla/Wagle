@@ -1,8 +1,29 @@
 const express = require("express");
 const router = express.Router();
 const passport = require("../config/passport");
+const User = require("../models/User");
 
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+
+function buildUserPayload(userDoc) {
+  const userData = userDoc.toObject ? userDoc.toObject() : userDoc;
+  const rawGameStats = userData.gameStats || {};
+  const normalizedGameStats =
+    rawGameStats instanceof Map ? Object.fromEntries(rawGameStats.entries()) : rawGameStats;
+  const userWithId = {
+    ...userData,
+    id: userData._id || userData.id,
+    nickname: userData.nickname || userData.name,
+    gameStats: normalizedGameStats,
+  };
+  delete userWithId._id;
+  return userWithId;
+}
+
+function stripProfileFields(userData) {
+  const { gameHistory, gameStats, ...rest } = userData || {};
+  return rest;
+}
 
 // 구글 로그인
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
@@ -96,16 +117,55 @@ router.get("/logout", (req, res) => {
 router.get("/user", (req, res) => {
   if (req.isAuthenticated()) {
     console.log("✅ 인증된 사용자:", req.user.name, `(${req.user.provider})`);
-    // MongoDB의 _id를 id로 변환하여 반환
-    const userData = req.user.toObject ? req.user.toObject() : req.user;
-    const userWithId = {
-      ...userData,
-      id: userData._id || userData.id, // _id를 id로 변환
-    };
-    delete userWithId._id; // _id 제거
-    res.json({ user: userWithId, authenticated: true });
+    const userWithId = buildUserPayload(req.user);
+    res.json({ user: stripProfileFields(userWithId), authenticated: true });
   } else {
     res.json({ user: null, authenticated: false });
+  }
+});
+
+// 프로필 상세 조회
+router.get("/profile", (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "인증이 필요합니다." });
+  }
+
+  const userWithId = buildUserPayload(req.user);
+  const recentGames = (userWithId.gameHistory || []).slice(0, 10);
+  const gameStats = userWithId.gameStats || {};
+
+  res.json({
+    user: stripProfileFields(userWithId),
+    recentGames,
+    gameStats,
+  });
+});
+
+// 프로필 이름 변경
+router.patch("/profile", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "인증이 필요합니다." });
+  }
+
+  const nickname = req.body?.nickname?.trim();
+  if (!nickname) {
+    return res.status(400).json({ error: "이름을 입력해주세요." });
+  }
+  if (nickname.length < 2 || nickname.length > 20) {
+    return res.status(400).json({ error: "이름은 2~20자여야 합니다." });
+  }
+
+  try {
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { nickname },
+      { new: true }
+    );
+    const userWithId = buildUserPayload(updatedUser);
+    res.json({ user: stripProfileFields(userWithId) });
+  } catch (error) {
+    console.error("프로필 변경 실패:", error);
+    res.status(500).json({ error: "프로필 변경에 실패했습니다." });
   }
 });
 

@@ -95,6 +95,38 @@ function getUserKey(userData) {
   return null;
 }
 
+function updatePlayerInfoInRooms({ rooms, io, socket, userData, userKey }) {
+  if (!userData) return;
+  const displayName = userData.nickname || userData.name;
+  rooms.forEach((room, roomId) => {
+    let updated = false;
+    room.players.forEach((player) => {
+      const matches =
+        player.id === socket.id || (userKey && player.userKey && player.userKey === userKey);
+      if (!matches) return;
+      if (displayName && player.name !== displayName) {
+        player.name = displayName;
+        updated = true;
+      }
+      if (userData.photo && player.photo !== userData.photo) {
+        player.photo = userData.photo;
+        updated = true;
+      }
+      if (userData.provider && player.provider !== userData.provider) {
+        player.provider = userData.provider;
+        updated = true;
+      }
+      if (userData.providerId && player.providerId !== userData.providerId) {
+        player.providerId = userData.providerId;
+        updated = true;
+      }
+    });
+    if (updated) {
+      io.to(roomId).emit("roomUpdated", room);
+    }
+  });
+}
+
 // ✅ 같은 유저가 이미 방에 있으면, 기존 player socketId를 새 socketId로 교체
 function replacePlayerSocketIdEverywhere({ io, rooms, gameStates, userKey, oldSocketId, newSocket }) {
   const newSocketId = newSocket.id;
@@ -197,6 +229,8 @@ io.on("connection", (socket) => {
     const userKey = getUserKey(userData);
     socket.data.userKey = userKey;
     console.log(`유저 접속됨: ${socket.id}`, user ? `(${user.name})` : "(비로그인)", userKey ? `userKey=${userKey}` : "");
+
+    updatePlayerInfoInRooms({ rooms, io, socket, userData, userKey });
   
     // provider/providerId 없으면(게스트 등) 여기서는 중복방지 못함
     if (!userKey) return;

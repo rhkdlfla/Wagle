@@ -7,6 +7,7 @@ import Login from "./components/Login";
 import DrawGuess from "./components/DrawGuess";
 import QuizBattle from "./components/QuizBattle";
 import QuizForm from "./components/QuizForm";
+import UserProfileModal from "./components/UserProfileModal";
 import { getGameComponent } from "./games";
 import "./App.css";
 
@@ -30,8 +31,10 @@ async function updateGameResult() {
 }
 
 // 메인 게임 컴포넌트 (인증 필요)
-function GameApp({ socket, user, onLogout }) {
+function GameApp({ socket, user, onLogout, onUserUpdated }) {
   const navigate = useNavigate();
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const displayName = user.nickname || user.name;
 
   const handleJoinRoom = (room) => {
     navigate(`/room/${room.id}`);
@@ -48,22 +51,33 @@ function GameApp({ socket, user, onLogout }) {
   return (
     <div className="App">
       <div className="user-header">
-        <div className="user-info">
+        <button
+          type="button"
+          className="user-info-button"
+          onClick={() => setIsProfileOpen(true)}
+        >
           {user.photo && (
-            <img src={user.photo} alt={user.name} className="user-avatar" />
+            <img src={user.photo} alt={displayName} className="user-avatar" />
           )}
-          <span className="user-name">{user.name}</span>
+          <span className="user-name">{displayName}</span>
           <span className="user-provider">
             {user.provider === "google" ? "🔵" : user.provider === "kakao" ? "🟡" : "👤"}
           </span>
           {user.provider === "guest" && (
             <span className="guest-badge">게스트</span>
           )}
-        </div>
+        </button>
         <button onClick={onLogout} className="logout-button">
           로그아웃
         </button>
       </div>
+
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        user={user}
+        onUserUpdated={onUserUpdated}
+      />
 
       <Routes>
         <Route
@@ -569,7 +583,14 @@ function App() {
     );
   }
 
-  return <GameApp socket={socket} user={user} onLogout={handleLogout} />;
+  return (
+    <GameApp
+      socket={socket}
+      user={user}
+      onLogout={handleLogout}
+      onUserUpdated={setUser}
+    />
+  );
 }
 
 export default App;
