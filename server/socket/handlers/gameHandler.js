@@ -182,7 +182,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
   }
 
   // 게임 시작
-  socket.on("startGame", async ({ roomId, gameType = "clickBattle", duration, quizId, rounds }) => {
+  socket.on("startGame", async ({ roomId, gameType = "clickBattle", duration, quizId, rounds, questionTimeLimit, timeBasedScoring }) => {
     const room = rooms.get(roomId);
     if (!room || room.players.length === 0) return;
 
@@ -202,7 +202,11 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     room.selectedGame = gameType;
 
     const config = getGameConfig(gameType);
-    const gameDuration = calculateGameDuration(gameType, duration);
+    // 퀴즈 배틀은 문제를 다 풀면 끝나므로 duration 설정 불필요
+    // 전역 타이머를 사용하지 않으므로 duration은 임의의 값으로 설정 (실제로 사용되지 않음)
+    const gameDuration = gameType === "quizBattle" 
+      ? 3600000 // 1시간 (임의의 값, 실제로 사용되지 않음)
+      : calculateGameDuration(gameType, duration);
 
     const gameState = {
       gameType,
@@ -213,6 +217,8 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       relayMode: config.supportsRelayMode && room.teamMode && room.relayMode ? true : false,
       quizId: quizId || null,
       roundsPerPlayer: rounds ? Math.max(1, parseInt(rounds)) : undefined,
+      questionTimeLimit: questionTimeLimit !== undefined ? (questionTimeLimit === null ? null : parseInt(questionTimeLimit)) : null, // 퀴즈 배틀 문제당 시간 제한 (밀리초, null이면 무제한)
+      timeBasedScoring: timeBasedScoring === true, // 퀴즈 배틀 시간 비례 점수 모드
     };
 
     let game;

@@ -30,7 +30,8 @@ function QuizBattle({ socket, room, onBackToLobby }) {
       }
 
       setIsActive(true);
-      setTimeRemaining(gameState.duration);
+      // 퀴즈 배틀은 문제를 다 풀면 끝나므로 전체 게임 시간 표시 불필요
+      setTimeRemaining(null);
       setQuiz(gameState.quiz);
       setCurrentQuestionIndex(0);
       setScores({});
@@ -43,19 +44,10 @@ function QuizBattle({ socket, room, onBackToLobby }) {
       // 기존 타이머가 있으면 정리
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
 
-      // 타이머 시작
-      timerIntervalRef.current = setInterval(() => {
-        const elapsed = Date.now() - gameState.startTime;
-        const remaining = Math.max(0, gameState.duration - elapsed);
-        setTimeRemaining(remaining);
-
-        if (remaining <= 0) {
-          clearInterval(timerIntervalRef.current);
-          timerIntervalRef.current = null;
-        }
-      }, 100);
+      // 퀴즈 배틀은 전체 게임 시간 타이머를 사용하지 않음 (문제를 다 풀면 끝남)
     };
 
     socket.on("gameStarted", handleGameStarted);
@@ -91,8 +83,11 @@ function QuizBattle({ socket, room, onBackToLobby }) {
       if (qTime !== undefined) {
         setQuestionTimeRemaining(qTime);
       }
-      if (tTime !== undefined) {
+      // 퀴즈 배틀은 전체 게임 시간이 의미 없으므로 null이면 무시
+      if (tTime !== undefined && tTime !== null) {
         setTimeRemaining(tTime);
+      } else if (tTime === null) {
+        setTimeRemaining(null);
       }
       if (scoreUpdates) {
         setScores(scoreUpdates);
@@ -172,15 +167,27 @@ function QuizBattle({ socket, room, onBackToLobby }) {
   };
 
   const formatTime = (ms) => {
+    if (ms === null || ms === undefined) {
+      return ""; // 퀴즈 배틀은 전체 게임 시간 표시 안 함
+    }
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
+  // 문제당 남은 시간 포맷팅 (초 단위)
   const formatQuestionTime = (ms) => {
-    const seconds = Math.ceil(ms / 1000);
-    return seconds.toString();
+    if (ms === null || ms === undefined) {
+      return null;
+    }
+    const seconds = Math.ceil(ms / 1000); // 올림 처리로 0초가 되기 전까지 표시
+    if (seconds < 60) {
+      return `${seconds}초`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return remainingSeconds > 0 ? `${minutes}분 ${remainingSeconds}초` : `${minutes}분`;
   };
 
   const handleLeaveGame = () => {
@@ -240,7 +247,9 @@ function QuizBattle({ socket, room, onBackToLobby }) {
         <div className="game-header-content">
           <h1>🧩 퀴즈 배틀</h1>
           {quiz && <h2>{quiz.title}</h2>}
-          <div className="timer">⏱️ {formatTime(timeRemaining)}</div>
+          {timeRemaining !== null && (
+            <div className="timer">⏱️ {formatTime(timeRemaining)}</div>
+          )}
         </div>
         <div className="game-header-actions">
           {isHost && isActive && (
@@ -288,8 +297,14 @@ function QuizBattle({ socket, room, onBackToLobby }) {
                     >
                       <span className="player-name">{player.name}</span>
                       <span className="player-answer-text">
-                        {answer.answer !== null
-                          ? question.options[answer.answer]
+                        {answer.answerText !== undefined && answer.answerText !== null
+                          ? answer.answerText
+                          : answer.answer !== null
+                          ? (question.questionType === "주관식" 
+                              ? String(answer.answer)
+                              : (question.options && question.options[answer.answer] 
+                                  ? question.options[answer.answer] 
+                                  : `선택지 ${answer.answer + 1}`))
                           : "답하지 않음"}
                       </span>
                       {answer.isCorrect && (
@@ -308,6 +323,11 @@ function QuizBattle({ socket, room, onBackToLobby }) {
                 <div className="question-number">
                   문제 {currentQuestion.questionNumber} / {currentQuestion.totalQuestions}
                 </div>
+                {questionTimeRemaining !== null && questionTimeRemaining !== undefined && (
+                  <div className="question-timer">
+                    ⏱️ {formatQuestionTime(questionTimeRemaining)}
+                  </div>
+                )}
               </div>
 
               {currentQuestion.imageUrl && (

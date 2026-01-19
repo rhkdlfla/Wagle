@@ -116,6 +116,10 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     });
     return durations;
   });
+  // 퀴즈 배틀 문제당 시간 제한 (초 단위, null이면 무제한)
+  const [quizQuestionTimeLimit, setQuizQuestionTimeLimit] = useState(null); // null = 무제한
+  // 퀴즈 배틀 시간 비례 점수 모드 (남은 시간에 비례해서 점수 부여)
+  const [quizTimeBasedScoring, setQuizTimeBasedScoring] = useState(false);
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
@@ -290,9 +294,10 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         return;
       }
       const gameConfig = getGameConfig(selectedGame);
-      const duration = gameConfig.supportsDuration
-        ? (gameDurations[selectedGame] || gameConfig.defaultDuration) * 1000
-        : undefined;
+      // 퀴즈 배틀은 문제를 다 풀면 끝나므로 duration 설정 불필요
+      const duration = (selectedGame === "quizBattle" || !gameConfig.supportsDuration)
+        ? undefined
+        : (gameDurations[selectedGame] || gameConfig.defaultDuration) * 1000;
       const rounds = selectedGame === "drawGuess" ? drawGuessRounds : undefined;
       socket.emit("startGame", {
         roomId: currentRoom.id,
@@ -300,7 +305,8 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         duration: duration,
         rounds: rounds,
         quizId: selectedGame === "quizBattle" ? selectedQuizId : undefined,
-        rounds: rounds,
+        questionTimeLimit: selectedGame === "quizBattle" ? (quizQuestionTimeLimit === null ? null : quizQuestionTimeLimit * 1000) : undefined,
+        timeBasedScoring: selectedGame === "quizBattle" ? quizTimeBasedScoring : undefined,
       });
     }
   };
@@ -886,10 +892,73 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
               </div>
             </div>
           )}
-          {/* 게임 시간 설정 UI (범용) */}
+
+          {/* 퀴즈 배틀 문제당 시간 제한 설정 UI */}
+          {selectedGame === "quizBattle" && isHost && (
+            <div className="game-duration-section">
+              <h3>⏱️ 문제당 시간 제한</h3>
+              <div className="duration-controls">
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+                  <input
+                    type="checkbox"
+                    checked={quizQuestionTimeLimit === null}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setQuizQuestionTimeLimit(null);
+                      } else {
+                        setQuizQuestionTimeLimit(30); // 기본값 30초
+                      }
+                    }}
+                    style={{ marginRight: "5px" }}
+                  />
+                  <span>무제한 시간</span>
+                </label>
+                {quizQuestionTimeLimit !== null && (
+                  <>
+                    <label htmlFor="question-time-slider">
+                      시간: <strong>{quizQuestionTimeLimit}초</strong>
+                    </label>
+                    <input
+                      id="question-time-slider"
+                      type="range"
+                      min="5"
+                      max="120"
+                      step="5"
+                      value={quizQuestionTimeLimit}
+                      onChange={(e) => setQuizQuestionTimeLimit(parseInt(e.target.value))}
+                      className="duration-slider"
+                    />
+                    <div className="duration-presets">
+                      {[10, 15, 20, 30, 45, 60, 90, 120].map((preset) => (
+                        <button
+                          key={preset}
+                          onClick={() => setQuizQuestionTimeLimit(preset)}
+                          className={quizQuestionTimeLimit === preset ? "active" : ""}
+                        >
+                          {preset}초
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "15px" }}>
+                  <input
+                    type="checkbox"
+                    checked={quizTimeBasedScoring}
+                    onChange={(e) => setQuizTimeBasedScoring(e.target.checked)}
+                    style={{ marginRight: "5px" }}
+                  />
+                  <span>시간 비례 점수 (빠르게 답할수록 높은 점수)</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* 게임 시간 설정 UI (범용) - 퀴즈 배틀 제외 */}
           {(() => {
             const gameConfig = getGameConfig(selectedGame);
-            if (!gameConfig.supportsDuration || !isHost) return null;
+            // 퀴즈 배틀은 문제당 시간 제한만 사용하므로 전체 게임 시간 설정 제외
+            if (!gameConfig.supportsDuration || !isHost || selectedGame === "quizBattle") return null;
             
             const currentDuration = gameDurations[selectedGame] || gameConfig.defaultDuration;
             const step = gameConfig.minDuration < 30 ? 5 : 10;
