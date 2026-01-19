@@ -16,6 +16,8 @@ function QuizBattle({ socket, room, onBackToLobby }) {
   const [results, setResults] = useState(null);
   const [quiz, setQuiz] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [correctPlayers, setCorrectPlayers] = useState([]); // 정답을 맞춘 플레이어 목록
+  const [skipVotes, setSkipVotes] = useState({ voteCount: 0, totalPlayers: 0, majority: 0, hasVoted: false }); // 스킵 투표 상태
   const timerIntervalRef = useRef(null);
   const questionStartTimeRef = useRef(null);
   const isHost = room?.players[0]?.id === socket.id;
@@ -30,7 +32,8 @@ function QuizBattle({ socket, room, onBackToLobby }) {
       }
 
       setIsActive(true);
-      setTimeRemaining(gameState.duration);
+      // 퀴즈 배틀은 문제를 다 풀면 끝나므로 전체 게임 시간 표시 불필요
+      setTimeRemaining(null);
       setQuiz(gameState.quiz);
       setCurrentQuestionIndex(0);
       setScores({});
@@ -43,19 +46,10 @@ function QuizBattle({ socket, room, onBackToLobby }) {
       // 기존 타이머가 있으면 정리
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
 
-      // 타이머 시작
-      timerIntervalRef.current = setInterval(() => {
-        const elapsed = Date.now() - gameState.startTime;
-        const remaining = Math.max(0, gameState.duration - elapsed);
-        setTimeRemaining(remaining);
-
-        if (remaining <= 0) {
-          clearInterval(timerIntervalRef.current);
-          timerIntervalRef.current = null;
-        }
-      }, 100);
+      // 퀴즈 배틀은 전체 게임 시간 타이머를 사용하지 않음 (문제를 다 풀면 끝남)
     };
 
     socket.on("gameStarted", handleGameStarted);
@@ -68,14 +62,46 @@ function QuizBattle({ socket, room, onBackToLobby }) {
       setEssayAnswer(""); // 주관식 답변 초기화
       setQuestionTimeRemaining(null); // 시간 제한 없음
       setQuestionResult(null);
+      setCorrectPlayers([]); // 정답을 맞춘 플레이어 목록 초기화
+      setSkipVotes({ voteCount: 0, totalPlayers: room.players.length, majority: Math.ceil(room.players.length / 2), hasVoted: false }); // 스킵 투표 초기화
       questionStartTimeRef.current = Date.now();
       setCurrentQuestionIndex(questionData.questionNumber - 1);
     });
 
     // 정답 제출 확인
-    socket.on("answerSubmitted", ({ isCorrect, points, currentScore }) => {
-      console.log("정답 제출 확인:", { isCorrect, points, currentScore });
+    socket.on("answerSubmitted", ({ isCorrect, points, currentScore, canRetry }) => {
+      console.log("정답 제출 확인:", { isCorrect, points, currentScore, canRetry });
+      
+      // 무한 도전 모드: 틀린 답을 낸 경우 다시 시도 가능하도록 UI 리셋
+      if (canRetry && !isCorrect) {
+        setSelectedAnswer(null);
+        setEssayAnswer("");
+        // 틀렸다는 피드백은 잠시 표시 후 다시 시도 가능
+      }
       // UI 피드백은 questionResult에서 처리
+    });
+
+    // 플레이어 정답 맞춤 실시간 알림
+    socket.on("playerCorrectAnswer", ({ playerId, playerName, playerPhoto, points, currentScore }) => {
+      console.log("플레이어 정답 맞춤:", { playerId, playerName, points });
+      // 정답을 맞춘 플레이어 목록에 추가 (중복 방지)
+      setCorrectPlayers((prev) => {
+        if (prev.some((p) => p.playerId === playerId)) {
+          return prev; // 이미 있으면 추가하지 않음
+        }
+        return [...prev, { playerId, playerName, playerPhoto, points, currentScore }];
+      });
+    });
+
+    // 스킵 투표 업데이트
+    socket.on("skipVoteUpdate", ({ voteCount, totalPlayers, majority, voters }) => {
+      console.log("스킵 투표 업데이트:", { voteCount, totalPlayers, majority });
+      setSkipVotes({
+        voteCount,
+        totalPlayers,
+        majority,
+        hasVoted: voters.includes(socket.id),
+      });
     });
 
     // 문제 결과 수신
@@ -91,8 +117,11 @@ function QuizBattle({ socket, room, onBackToLobby }) {
       if (qTime !== undefined) {
         setQuestionTimeRemaining(qTime);
       }
-      if (tTime !== undefined) {
+      // 퀴즈 배틀은 전체 게임 시간이 의미 없으므로 null이면 무시
+      if (tTime !== undefined && tTime !== null) {
         setTimeRemaining(tTime);
+      } else if (tTime === null) {
+        setTimeRemaining(null);
       }
       if (scoreUpdates) {
         setScores(scoreUpdates);
@@ -103,10 +132,14 @@ function QuizBattle({ socket, room, onBackToLobby }) {
     });
 
     // 게임 종료 수신
-    socket.on("gameEnded", ({ results: gameResults }) => {
-      console.log("QuizBattle: 게임 종료 이벤트 수신", gameResults);
+    socket.on("gameEnded", ({ results: gameResults, winners, teamScores: gameTeamScores }) => {
+      console.log("QuizBattle: 게임 종료 이벤트 수신", { results: gameResults, winners, teamScores: gameTeamScores });
       setIsActive(false);
-      setResults(gameResults);
+      setResults({
+        results: gameResults,
+        winners: winners,
+        teamScores: gameTeamScores || null,
+      });
       setCurrentQuestion(null);
       setQuestionResult(null);
       // 타이머 정리
@@ -120,6 +153,8 @@ function QuizBattle({ socket, room, onBackToLobby }) {
       socket.off("gameStarted");
       socket.off("newQuestion");
       socket.off("answerSubmitted");
+      socket.off("playerCorrectAnswer");
+      socket.off("skipVoteUpdate");
       socket.off("questionResult");
       socket.off("quizUpdate");
       socket.off("gameEnded");
@@ -171,16 +206,34 @@ function QuizBattle({ socket, room, onBackToLobby }) {
     setSelectedAnswer(essayAnswer.trim()); // 제출 완료 표시용
   };
 
+  // 문제 스킵 투표
+  const handleVoteSkip = () => {
+    if (skipVotes.hasVoted) return; // 이미 투표한 경우 무시
+    socket.emit("voteSkipQuestion", { roomId: room.id });
+  };
+
   const formatTime = (ms) => {
+    if (ms === null || ms === undefined) {
+      return ""; // 퀴즈 배틀은 전체 게임 시간 표시 안 함
+    }
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
+  // 문제당 남은 시간 포맷팅 (초 단위)
   const formatQuestionTime = (ms) => {
-    const seconds = Math.ceil(ms / 1000);
-    return seconds.toString();
+    if (ms === null || ms === undefined) {
+      return null;
+    }
+    const seconds = Math.ceil(ms / 1000); // 올림 처리로 0초가 되기 전까지 표시
+    if (seconds < 60) {
+      return `${seconds}초`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return remainingSeconds > 0 ? `${minutes}분 ${remainingSeconds}초` : `${minutes}분`;
   };
 
   const handleLeaveGame = () => {
@@ -220,7 +273,7 @@ function QuizBattle({ socket, room, onBackToLobby }) {
         <GameResults
           teams={room.teamMode ? room.teams : []}
           teamScores={results.teamScores}
-          players={results.results}
+          results={results.results || []}
           myPlayerId={socket.id}
           teamMode={room.teamMode}
           scoreUnit="점"
@@ -240,7 +293,9 @@ function QuizBattle({ socket, room, onBackToLobby }) {
         <div className="game-header-content">
           <h1>🧩 퀴즈 배틀</h1>
           {quiz && <h2>{quiz.title}</h2>}
-          <div className="timer">⏱️ {formatTime(timeRemaining)}</div>
+          {timeRemaining !== null && (
+            <div className="timer">⏱️ {formatTime(timeRemaining)}</div>
+          )}
         </div>
         <div className="game-header-actions">
           {isHost && isActive && (
@@ -288,8 +343,14 @@ function QuizBattle({ socket, room, onBackToLobby }) {
                     >
                       <span className="player-name">{player.name}</span>
                       <span className="player-answer-text">
-                        {answer.answer !== null
-                          ? question.options[answer.answer]
+                        {answer.answerText !== undefined && answer.answerText !== null
+                          ? answer.answerText
+                          : answer.answer !== null
+                          ? (question.questionType === "주관식" 
+                              ? String(answer.answer)
+                              : (question.options && question.options[answer.answer] 
+                                  ? question.options[answer.answer] 
+                                  : `선택지 ${answer.answer + 1}`))
                           : "답하지 않음"}
                       </span>
                       {answer.isCorrect && (
@@ -308,7 +369,50 @@ function QuizBattle({ socket, room, onBackToLobby }) {
                 <div className="question-number">
                   문제 {currentQuestion.questionNumber} / {currentQuestion.totalQuestions}
                 </div>
+                {questionTimeRemaining !== null && questionTimeRemaining !== undefined && (
+                  <div className="question-timer">
+                    ⏱️ {formatQuestionTime(questionTimeRemaining)}
+                  </div>
+                )}
               </div>
+
+              {/* 스킵 투표 버튼 */}
+              <div className="skip-vote-section">
+                <button
+                  onClick={handleVoteSkip}
+                  disabled={skipVotes.hasVoted || questionResult !== null}
+                  className={`skip-vote-button ${skipVotes.hasVoted ? "voted" : ""}`}
+                >
+                  {skipVotes.hasVoted ? "✓ 투표 완료" : "⏭️ 문제 스킵 투표"}
+                </button>
+                {skipVotes.voteCount > 0 && (
+                  <div className="skip-vote-info">
+                    투표: {skipVotes.voteCount} / {skipVotes.majority} (과반수 필요)
+                  </div>
+                )}
+              </div>
+
+              {/* 정답을 맞춘 플레이어 실시간 표시 */}
+              {correctPlayers.length > 0 && (
+                <div className="correct-players-list">
+                  <div className="correct-players-title">✅ 정답을 맞춘 플레이어</div>
+                  <div className="correct-players-items">
+                    {correctPlayers.map((player) => (
+                      <div key={player.playerId} className="correct-player-item">
+                        {player.playerPhoto && (
+                          <img
+                            src={player.playerPhoto}
+                            alt={player.playerName}
+                            className="correct-player-avatar"
+                          />
+                        )}
+                        <span className="correct-player-name">{player.playerName}</span>
+                        <span className="correct-player-points">+{player.points}점</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {currentQuestion.imageUrl && (
                 <div className="question-image">

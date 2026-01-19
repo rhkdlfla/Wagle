@@ -42,13 +42,13 @@ router.post("/create", requireAuth, async (req, res) => {
         // 객관식 검증
         if (!q.options || !Array.isArray(q.options) || q.options.length < 2) {
           return res.status(400).json({ error: `문제 ${i + 1}의 형식이 올바르지 않습니다. (객관식은 최소 2개의 선택지가 필요합니다)` });
-        }
-        if (
-          typeof q.correctAnswer !== "number" ||
-          q.correctAnswer < 0 ||
-          q.correctAnswer >= q.options.length
-        ) {
-          return res.status(400).json({ error: `문제 ${i + 1}의 정답 인덱스가 올바르지 않습니다.` });
+      }
+      if (
+        typeof q.correctAnswer !== "number" ||
+        q.correctAnswer < 0 ||
+        q.correctAnswer >= q.options.length
+      ) {
+        return res.status(400).json({ error: `문제 ${i + 1}의 정답 인덱스가 올바르지 않습니다.` });
         }
       } else if (questionType === "주관식") {
         // 주관식 검증
@@ -77,10 +77,10 @@ router.post("/create", requireAuth, async (req, res) => {
         const questionType = q.questionType || "객관식";
         const question = {
           questionType,
-          imageUrl: q.imageUrl || null,
+        imageUrl: q.imageUrl || null,
           correctAnswerImageUrl: q.correctAnswerImageUrl || null,
-          audioUrl: q.audioUrl || null,
-          correctAnswer: q.correctAnswer,
+        audioUrl: q.audioUrl || null,
+        correctAnswer: q.correctAnswer,
         };
         
         if (questionType === "객관식") {
@@ -220,13 +220,13 @@ router.put("/:quizId", requireAuth, async (req, res) => {
         // 객관식 검증
         if (!q.options || !Array.isArray(q.options) || q.options.length < 2) {
           return res.status(400).json({ error: `문제 ${i + 1}의 형식이 올바르지 않습니다. (객관식은 최소 2개의 선택지가 필요합니다)` });
-        }
-        if (
-          typeof q.correctAnswer !== "number" ||
-          q.correctAnswer < 0 ||
-          q.correctAnswer >= q.options.length
-        ) {
-          return res.status(400).json({ error: `문제 ${i + 1}의 정답 인덱스가 올바르지 않습니다.` });
+      }
+      if (
+        typeof q.correctAnswer !== "number" ||
+        q.correctAnswer < 0 ||
+        q.correctAnswer >= q.options.length
+      ) {
+        return res.status(400).json({ error: `문제 ${i + 1}의 정답 인덱스가 올바르지 않습니다.` });
         }
       } else if (questionType === "주관식") {
         // 주관식 검증
@@ -247,10 +247,10 @@ router.put("/:quizId", requireAuth, async (req, res) => {
       const questionType = q.questionType || "객관식";
       const question = {
         questionType,
-        imageUrl: q.imageUrl || null,
+      imageUrl: q.imageUrl || null,
         correctAnswerImageUrl: q.correctAnswerImageUrl || null,
-        audioUrl: q.audioUrl || null,
-        correctAnswer: q.correctAnswer,
+      audioUrl: q.audioUrl || null,
+      correctAnswer: q.correctAnswer,
       };
       
       if (questionType === "객관식") {
