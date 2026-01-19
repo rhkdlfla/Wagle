@@ -185,7 +185,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       ? savedSettings.quizQuestionCount 
       : null
   ); // null = 전체 문제
-  // 사과배틀 최대 숫자 설정 (2~10)
+  // 사과배틀 최대 숫자 설정 (2~9)
   const [appleBattleMaxSum, setAppleBattleMaxSum] = useState(
     savedSettings?.appleBattleMaxSum || 10
   );
@@ -1243,7 +1243,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                   id="max-sum-slider"
                   type="range"
                   min="2"
-                  max="10"
+                  max="9"
                   step="1"
                   value={appleBattleMaxSum}
                   onChange={(e) => setAppleBattleMaxSum(parseInt(e.target.value))}
@@ -1251,7 +1251,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                   disabled={!isHost}
                 />
                 <div className="duration-presets">
-                  {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((preset) => (
+                  {[2, 3, 4, 5, 6, 7, 8, 9].map((preset) => (
                     <button
                       key={preset}
                       onClick={() => setAppleBattleMaxSum(preset)}
