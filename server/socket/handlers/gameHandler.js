@@ -201,6 +201,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       liarCategory,
       liarTurnDuration,
     }) => {
+  socket.on("startGame", async ({ roomId, gameType = "clickBattle", duration, quizId, rounds, questionTimeLimit, timeBasedScoring, infiniteRetry, questionCount, maxSum }) => {
     const room = rooms.get(roomId);
     if (!room || room.players.length === 0) return;
 
@@ -220,7 +221,11 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     room.selectedGame = gameType;
 
     const config = getGameConfig(gameType);
-    const gameDuration = calculateGameDuration(gameType, duration);
+    // 퀴즈 배틀은 문제를 다 풀면 끝나므로 duration 설정 불필요
+    // 전역 타이머를 사용하지 않으므로 duration은 임의의 값으로 설정 (실제로 사용되지 않음)
+    const gameDuration = gameType === "quizBattle" 
+      ? 3600000 // 1시간 (임의의 값, 실제로 사용되지 않음)
+      : calculateGameDuration(gameType, duration);
 
     const gameState = {
       gameType,
@@ -233,7 +238,14 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       roundsPerPlayer: rounds ? Math.max(1, parseInt(rounds)) : undefined,
       liarCategory: liarCategory || null,
       liarTurnDuration: liarTurnDuration === null ? null : liarTurnDuration,
+      questionTimeLimit: questionTimeLimit !== undefined ? (questionTimeLimit === null ? null : parseInt(questionTimeLimit)) : null, // 퀴즈 배틀 문제당 시간 제한 (밀리초, null이면 무제한)
+      timeBasedScoring: timeBasedScoring === true, // 퀴즈 배틀 시간 비례 점수 모드
+      infiniteRetry: infiniteRetry === true, // 퀴즈 배틀 무한 도전 모드
+      questionCount: questionCount !== undefined ? (questionCount === null ? null : Math.max(1, parseInt(questionCount))) : null, // 퀴즈 배틀 풀 문제 수 (null이면 전체 문제)
+      maxSum: maxSum !== undefined ? Math.max(2, Math.min(10, parseInt(maxSum))) : 10, // 사과배틀 최대 숫자 (2~10, 기본값 10)
     };
+    
+    console.log("게임 시작 - maxSum 설정:", gameState.maxSum, "받은 값:", maxSum, "게임 타입:", gameType);
 
     let game;
     try {
@@ -295,22 +307,25 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     gameState.isActive = false;
     
     const instance = gameInstances.get(roomId);
-    let results, winners;
+    let results, winners, teamScores;
     
     if (instance && instance.game) {
       const gameResult = instance.game.calculateResults();
       results = gameResult.results;
       winners = gameResult.winners;
+      teamScores = gameResult.teamScores || null; // 퀴즈 배틀 등에서 teamScores 포함
     } else {
       // 폴백 (게임 인스턴스가 없는 경우)
       results = [];
       winners = [];
+      teamScores = null;
     }
     
     // 게임 종료 이벤트 전송
     io.to(roomId).emit("gameEnded", {
       results: results,
       winners: winners,
+      teamScores: teamScores, // 팀 점수 포함
     });
     
     // 게임 상태 및 인스턴스 삭제
@@ -431,6 +446,27 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
         roomId,
         action: "submitAnswer",
         data: { answer, timeSpent },
+        requireGameType: "quizBattle",
+      });
+    }
+  });
+
+  // 문제 스킵 투표 (퀴즈배틀)
+  socket.on("voteSkipQuestion", ({ roomId }) => {
+    const ctx = getActiveGameContext({ roomId, requireGameType: "quizBattle" });
+    if (!ctx.ok) {
+      if (ctx.noPlayer) socket.emit("gameError", { message: "플레이어를 찾을 수 없습니다." });
+      else emitNotActiveGameError();
+      return;
+    }
+    const game = ctx.instance.game;
+    if (typeof game.voteSkip === "function") {
+      game.voteSkip(socket.id);
+    } else {
+      dispatchGameAction({
+        roomId,
+        action: "voteSkip",
+        data: {},
         requireGameType: "quizBattle",
       });
     }

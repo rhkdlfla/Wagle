@@ -142,6 +142,9 @@ class DrawGuess {
   }
 
   handleGuess(socketId, guess) {
+    if (!this.gameState.isActive || this.isEndingRound) {
+      return false;
+    }
     const drawerId = this.getDrawerId();
     if (!guess) {
       return false;
@@ -190,10 +193,8 @@ class DrawGuess {
       scores: this.gameState.scores,
     });
 
-    const nonDrawerCount = Math.max(0, this.room.players.length - 1);
-    if (this.guessedPlayers.size >= nonDrawerCount) {
-      this.endRound("allGuessed");
-    }
+    // 가장 빠른 정답 1명 기준으로 즉시 다음 라운드로 진행
+    this.endRound("firstCorrect");
 
     return true;
   }

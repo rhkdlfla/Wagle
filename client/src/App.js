@@ -87,11 +87,11 @@ function GameApp({ socket, user, onLogout }) {
         />
         <Route
           path="/quiz/create"
-          element={<QuizFormPage user={user} />}
+          element={<QuizFormPage user={user} socket={socket} />}
         />
         <Route
           path="/quiz/edit/:quizId"
-          element={<QuizFormPage user={user} />}
+          element={<QuizFormPage user={user} socket={socket} />}
         />
       </Routes>
     </div>
@@ -339,7 +339,7 @@ function RoomGame({ socket, user }) {
 }
 
 // 퀴즈 폼 페이지 컴포넌트
-function QuizFormPage({ user }) {
+function QuizFormPage({ user, socket }) {
   const navigate = useNavigate();
   const { quizId } = useParams();
   const [quizToEdit, setQuizToEdit] = useState(null);
@@ -393,6 +393,7 @@ function QuizFormPage({ user }) {
       onSuccess={handleSuccess}
       user={user}
       quizToEdit={quizToEdit}
+      socket={socket}
     />
   );
 }
@@ -498,8 +499,12 @@ function App() {
     });
 
     // 연결이 끊겼을 때 실행
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
       setIsConnected(false);
+      // 서버가 강제로 끊은 경우(io server disconnect)에는 자동 재연결이 되지 않음 → 수동 재연결
+      if (reason === "io server disconnect") {
+        socket.connect();
+      }
       // disconnect 시 세션 스토리지는 유지 (새로고침 복원을 위해)
     });
 
@@ -554,6 +559,11 @@ function App() {
     );
   }
 
+  // 로그인하지 않은 경우 로그인 화면 표시
+  if (!user) {
+    return <Login onLoginSuccess={handleGuestLogin} />;
+  }
+
   if (!isConnected) {
     return (
       <div className="connection-status">
@@ -561,11 +571,6 @@ function App() {
         <p>잠시만 기다려주세요.</p>
       </div>
     );
-  }
-
-  // 로그인하지 않은 경우 로그인 화면 표시
-  if (!user) {
-    return <Login onLoginSuccess={handleGuestLogin} />;
   }
 
   return <GameApp socket={socket} user={user} onLogout={handleLogout} />;

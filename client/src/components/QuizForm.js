@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import "./QuizForm.css";
 
-function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
+function QuizForm({ onClose, onSuccess, user, quizToEdit = null, socket = null }) {
   // 게스트 사용자는 퀴즈를 만들 수 없음 (방어적 체크)
   React.useEffect(() => {
     if (!user || user.provider === "guest") {
@@ -40,11 +40,15 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [editingQuestionIndex, setEditingQuestionIndex] = useState(null); // 현재 편집 중인 문제 인덱스
+  const [crawlUrl, setCrawlUrl] = useState(""); // 크롤링할 URL
+  const [isCrawling, setIsCrawling] = useState(false); // 크롤링 중 여부
+  const [crawlQuestionCount, setCrawlQuestionCount] = useState(10); // 크롤링할 문제 수
+  const [crawlProgress, setCrawlProgress] = useState(null); // 크롤링 진행 상황
 
   const addQuestion = () => {
     const newQuestion = {
       questionType: defaultQuestionType,
-      imageUrl: "",
+        imageUrl: "",
       correctAnswerImageUrl: "",
       options: defaultQuestionType === "객관식" ? ["", ""] : [],
       correctAnswer: defaultQuestionType === "객관식" ? 0 : "",
@@ -508,7 +512,7 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
       const file = files[0];
       if (file.type.startsWith("image/")) {
         if (type === "image") {
-          uploadImage(file, questionIndex);
+        uploadImage(file, questionIndex);
         } else if (type === "correctAnswerImage") {
           uploadCorrectAnswerImage(file, questionIndex);
         }
@@ -555,7 +559,7 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
       const response = await fetch(apiUrl, {
         method: method,
         headers,
-        credentials: "include",
+          credentials: "include",
         body: JSON.stringify(requestBody),
       });
 
@@ -741,27 +745,130 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
     }
   };
 
+  // 맞추기아이오 퀴즈 크롤링
+  const handleCrawlQuiz = async () => {
+    if (!crawlUrl.trim()) {
+      alert("URL을 입력해주세요.");
+      return;
+    }
+
+    setIsCrawling(true);
+    setError("");
+    setCrawlProgress({ current: 0, total: crawlQuestionCount, answer: "" });
+
+    // Socket.IO로 진행 상황 수신
+    const progressHandler = (data) => {
+      setCrawlProgress(data);
+    };
+    
+    // Socket.IO로 완료 결과 수신
+    const completeHandler = (data) => {
+      if (data.success) {
+        // 크롤링 결과를 폼에 채우기
+        if (data.title) {
+          setTitle(data.title);
+        }
+        if (data.description) {
+          setDescription(data.description);
+        }
+        if (data.questions && data.questions.length > 0) {
+          // 문제들을 폼 형식에 맞게 변환
+          const formattedQuestions = data.questions.map((q) => ({
+            questionType: q.questionType || "주관식",
+            imageUrl: q.imageUrl || "",
+            correctAnswerImageUrl: q.correctAnswerImageUrl || "",
+            options: q.options || [],
+            correctAnswer: q.correctAnswer || "",
+          }));
+          setQuestions(formattedQuestions);
+          alert(`퀴즈를 성공적으로 가져왔습니다! (${formattedQuestions.length}개 문제)`);
+          setCrawlUrl(""); // URL 초기화
+        } else {
+          setError("문제를 찾을 수 없습니다.");
+        }
+      } else {
+        setError(data.error || "퀴즈를 가져오는데 실패했습니다.");
+      }
+      setIsCrawling(false);
+      setCrawlProgress(null);
+      if (socket) {
+        socket.off('quizCrawlProgress', progressHandler);
+        socket.off('quizCrawlComplete', completeHandler);
+      }
+    };
+    
+    if (socket) {
+      socket.on('quizCrawlProgress', progressHandler);
+      socket.on('quizCrawlComplete', completeHandler);
+    }
+
+    try {
+      const response = await fetch("/api/quiz/crawl", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ 
+          url: crawlUrl.trim(),
+          questionCount: crawlQuestionCount,
+          socketId: socket?.id || null
+        }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = "퀴즈를 가져오는데 실패했습니다.";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const data = await response.json();
+            errorMessage = data.error || errorMessage;
+          } else {
+            const text = await response.text();
+            errorMessage = `서버 오류 (${response.status}): ${text.substring(0, 100)}`;
+          }
+        } catch (e) {
+          errorMessage = `서버 오류 (${response.status})`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      // 즉시 응답은 시작 확인 메시지일 뿐, 실제 결과는 Socket.IO로 전송됨
+      console.log("크롤링 시작:", data.message);
+    } catch (err) {
+      console.error("퀴즈 크롤링 에러:", err);
+      setError(err.message || "퀴즈를 가져오는데 실패했습니다.");
+      setIsCrawling(false);
+      setCrawlProgress(null);
+      if (socket) {
+        socket.off('quizCrawlProgress', progressHandler);
+        socket.off('quizCrawlComplete', completeHandler);
+      }
+    }
+  };
+
   return (
-    <div 
+      <div 
       className="quiz-form-page"
-      onPaste={(e) => {
+        onPaste={(e) => {
         // 모달이 열려있으면 페이지 레벨 붙여넣기 비활성화
         if (editingQuestionIndex !== null) {
           return;
         }
-        // 입력 필드가 아닌 곳에서 붙여넣기 시 이미지 업로드 영역에 붙여넣기
-        const target = e.target;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-          // 활성화된 이미지 업로드 영역이 있으면 해당 문제에 붙여넣기
-          if (activeImageUploadIndex !== null) {
-            handlePaste(e, activeImageUploadIndex);
-          } else {
-            // 활성화된 영역이 없으면 첫 번째 문제에 붙여넣기
-            handlePaste(e, 0);
+          // 입력 필드가 아닌 곳에서 붙여넣기 시 이미지 업로드 영역에 붙여넣기
+          const target = e.target;
+          if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+            // 활성화된 이미지 업로드 영역이 있으면 해당 문제에 붙여넣기
+            if (activeImageUploadIndex !== null) {
+              handlePaste(e, activeImageUploadIndex);
+            } else {
+              // 활성화된 영역이 없으면 첫 번째 문제에 붙여넣기
+              handlePaste(e, 0);
+            }
           }
-        }
-      }}
-    >
+        }}
+      >
       <div className="quiz-form-container">
         <div className="quiz-form-header">
           <h2>🧩 {showSettings ? "퀴즈 설정" : (quizToEdit ? "퀴즈 편집" : "새 퀴즈 만들기")}</h2>
@@ -775,43 +882,126 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
                 ⚙️ 설정
               </button>
             )}
-            <button className="close-button" onClick={onClose}>
-              ✕
-            </button>
+          <button className="close-button" onClick={onClose}>
+            ✕
+          </button>
           </div>
         </div>
 
         {showSettings ? (
           // 설정 화면
           <div className="quiz-settings-form">
-            {error && <div className="error-message">{error}</div>}
+          {error && <div className="error-message">{error}</div>}
 
-            <div className="form-section">
-              <label>
-                <span className="label-text">퀴즈 제목 *</span>
+          <div className="form-section">
+            <label>
+              <span className="label-text">퀴즈 제목 *</span>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="예: K-pop 아티스트 맞추기"
+                maxLength={100}
+                required
+              />
+            </label>
+          </div>
+
+          <div className="form-section">
+            <label>
+              <span className="label-text">설명</span>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="퀴즈에 대한 간단한 설명을 입력하세요 (선택사항)"
+                rows={3}
+                maxLength={500}
+              />
+            </label>
+          </div>
+
+          {/* 맞추기아이오 퀴즈 크롤링 */}
+          <div className="form-section">
+            <label>
+              <span className="label-text">맞추기아이오 퀴즈 가져오기</span>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "10px" }}>
                 <input
                   type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="예: K-pop 아티스트 맞추기"
-                  maxLength={100}
-                  required
+                  value={crawlUrl}
+                  onChange={(e) => setCrawlUrl(e.target.value)}
+                  placeholder="https://machugi.io/quiz/..."
+                  style={{ flex: 1, padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+                  disabled={isCrawling}
                 />
-              </label>
-            </div>
-
-            <div className="form-section">
-              <label>
-                <span className="label-text">설명</span>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="퀴즈에 대한 간단한 설명을 입력하세요 (선택사항)"
-                  rows={3}
-                  maxLength={500}
-                />
-              </label>
-            </div>
+                <select
+                  value={crawlQuestionCount}
+                  onChange={(e) => setCrawlQuestionCount(parseInt(e.target.value))}
+                  disabled={isCrawling}
+                  style={{
+                    padding: "8px",
+                    borderRadius: "4px",
+                    border: "1px solid #ddd",
+                    backgroundColor: "white",
+                    cursor: isCrawling ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <option value={10}>10개</option>
+                  <option value={20}>20개</option>
+                  <option value={30}>30개</option>
+                  <option value={50}>50개</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={handleCrawlQuiz}
+                  disabled={isCrawling || !crawlUrl.trim()}
+                  style={{
+                    padding: "8px 16px",
+                    backgroundColor: isCrawling ? "#ccc" : "#4CAF50",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: isCrawling ? "not-allowed" : "pointer",
+                    whiteSpace: "nowrap"
+                  }}
+                >
+                  {isCrawling ? "가져오는 중..." : "가져오기"}
+                </button>
+              </div>
+              {isCrawling && crawlProgress && (
+                <div style={{
+                  marginTop: "10px",
+                  padding: "10px",
+                  backgroundColor: "#f0f0f0",
+                  borderRadius: "4px",
+                  fontSize: "14px"
+                }}>
+                  <div style={{ marginBottom: "5px" }}>
+                    진행 중: {crawlProgress.current} / {crawlProgress.total}
+                  </div>
+                  {crawlProgress.answer && (
+                    <div style={{ color: "#666", fontSize: "12px", marginBottom: "5px" }}>
+                      최근 답안: {crawlProgress.answer}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                    {crawlProgress.imageUrl && (
+                      <div>
+                        <div style={{ fontSize: "12px", color: "#666", marginBottom: "3px" }}>문제 이미지:</div>
+                        <img 
+                          src={crawlProgress.imageUrl} 
+                          alt="문제 이미지" 
+                          style={{ maxWidth: "200px", maxHeight: "150px", borderRadius: "4px", border: "1px solid #ddd" }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              <p style={{ fontSize: "0.85em", color: "#666", marginTop: "5px" }}>
+                맞추기아이오 퀴즈 링크를 입력하면 자동으로 가져옵니다 (최대 {crawlQuestionCount}개 문제)
+              </p>
+            </label>
+          </div>
 
             <div className="form-section">
               <label>
@@ -916,16 +1106,16 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
               </label>
             </div>
 
-            <div className="form-section">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={isPublic}
-                  onChange={(e) => setIsPublic(e.target.checked)}
-                />
-                <span>공개 퀴즈</span>
-              </label>
-            </div>
+          <div className="form-section">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+              />
+              <span>공개 퀴즈</span>
+            </label>
+          </div>
 
             <div className="form-actions">
               <button
@@ -981,19 +1171,19 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
                       >
                         ✏️
                       </button>
-                      {questions.length > 1 && (
-                        <button
-                          type="button"
+                  {questions.length > 1 && (
+                    <button
+                      type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             removeQuestion(qIndex);
                           }}
                           className="question-action-button delete-action"
                           title="삭제"
-                        >
+                    >
                           🗑️
-                        </button>
-                      )}
+                    </button>
+                  )}
                     </div>
                   </div>
               </div>
@@ -1011,7 +1201,7 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
               </div>
             </div>
             </div>
-          </div>
+                </div>
 
           <div className="form-actions">
             <button
@@ -1104,58 +1294,58 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
                   </label>
                 </div>
 
-                <div className="form-section">
-                  <label>
-                    <span className="label-text">이미지 (선택)</span>
-                    <div 
-                      className="file-upload-group"
-                      onDragOver={handleDragOver}
+                  <div className="form-section">
+                    <label>
+                      <span className="label-text">이미지 (선택)</span>
+                      <div 
+                        className="file-upload-group"
+                        onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, editingQuestionIndex, "image")}
                       onFocus={() => setActiveImageUploadIndex(editingQuestionIndex)}
-                      onBlur={() => setTimeout(() => setActiveImageUploadIndex(null), 200)}
-                      tabIndex={0}
-                    >
-                      <div className="file-upload-area">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file) {
+                        onBlur={() => setTimeout(() => setActiveImageUploadIndex(null), 200)}
+                        tabIndex={0}
+                      >
+                        <div className="file-upload-area">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
                               uploadImage(file, editingQuestionIndex);
-                            }
-                          }}
-                          className="file-input"
+                              }
+                            }}
+                            className="file-input"
                           id={`image-input-edit-${editingQuestionIndex}`}
-                        />
+                          />
                         <div className="file-upload-buttons">
                           <label htmlFor={`image-input-edit-${editingQuestionIndex}`} className="file-input-label">
                             📁 파일 선택
                           </label>
-                          <button
-                            type="button"
+                            <button
+                              type="button"
                             onClick={() => handleClipboardPaste(editingQuestionIndex)}
                             className="clipboard-button"
-                          >
+                            >
                             📋 클립보드에서 가져오기
-                          </button>
-                        </div>
+                            </button>
+                          </div>
                         <span className="file-upload-hint">또는 이미지를 여기에 붙여넣기 (Ctrl+V) 또는 드래그 앤 드롭</span>
                       </div>
                       {questions[editingQuestionIndex].imageUrl && (
-                        <div className="file-preview">
+                          <div className="file-preview">
                           <img src={questions[editingQuestionIndex].imageUrl} alt="미리보기" className="preview-image" />
-                          <button
-                            type="button"
+                            <button
+                              type="button"
                             onClick={() => updateQuestion(editingQuestionIndex, "imageUrl", "")}
-                            className="remove-file-button"
-                          >
-                            ✕ 삭제
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </label>
+                              className="remove-file-button"
+                            >
+                              ✕ 삭제
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </label>
                 </div>
 
                 <div className="form-section">
@@ -1303,17 +1493,17 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
                     ))}
                   </div>
                 )}
-                
+
                 <div className="form-actions" style={{ marginTop: "15px" }}>
-                  <button
-                    type="button"
+            <button
+              type="button"
                     onClick={() => setEditingQuestionIndex(null)}
-                    className="submit-button"
-                  >
+              className="submit-button"
+            >
                     완료
-                  </button>
-                </div>
-              </div>
+            </button>
+          </div>
+      </div>
             )}
           </div>
         </div>
