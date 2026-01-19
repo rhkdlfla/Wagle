@@ -266,7 +266,7 @@ function RoomGame({ socket, user }) {
     socket.on("roomUpdated", (updatedRoom) => {
       setRoom(updatedRoom);
       // 방 상태가 waiting으로 변경되면 로비로 이동 (게임 종료된 경우)
-      if (updatedRoom.status === "waiting") {
+      if (updatedRoom.status === "waiting" && updatedRoom.selectedGame !== "liarGame") {
         navigate(`/room/${roomId}`);
       }
     });

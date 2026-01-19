@@ -1,0 +1,345 @@
+.liar-game-container {
+  height: 100vh;
+  padding: 12px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.liar-title {
+  font-size: 1.6rem;
+  margin: 0 0 6px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.game-header {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.game-header-content {
+  display: grid;
+  grid-template-columns: minmax(220px, 260px) 1fr auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.liar-header-text {
+  min-width: 0;
+  text-align: center;
+}
+
+.liar-header-text p {
+  margin: 0;
+}
+
+.liar-header-role {
+  min-width: 220px;
+}
+
+.liar-header-role .role-card {
+  padding: 8px 10px;
+  min-width: 220px;
+}
+
+.game-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.liar-game-info {
+  max-width: none;
+  margin: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(160px, 200px);
+  gap: 8px;
+  justify-content: start;
+}
+
+.role-card,
+.phase-card,
+.timer-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  padding: 8px 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.role-card.liar {
+  border: 2px solid rgba(244, 67, 54, 0.5);
+}
+
+.role-card.villager {
+  border: 2px solid rgba(76, 175, 80, 0.5);
+}
+
+.role-label,
+.phase-label,
+.timer-label {
+  font-size: 11px;
+  color: #9fa5b5;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.role-value,
+.phase-value,
+.timer-value {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 4px 0;
+}
+
+.role-word {
+  font-size: 14px;
+  color: #ffeb3b;
+}
+
+.role-category {
+  font-size: 12px;
+  color: #e0e0e0;
+}
+
+.role-subtext,
+.phase-subtext,
+.timer-subtext {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.liar-game-main {
+  max-width: none;
+  margin: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 18px;
+  flex: 1;
+  min-height: 0;
+}
+
+.liar-chat-section,
+.liar-vote-section {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.liar-chat-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.liar-vote-section {
+  width: 260px;
+  min-width: 240px;
+  justify-self: end;
+}
+
+.liar-time-text {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 8px;
+}
+
+.liar-chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.liar-chat-section h2,
+.liar-vote-section h2 {
+  font-size: 16px;
+}
+
+.liar-chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.liar-chat-message {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+}
+
+.liar-chat-message.mine {
+  background: rgba(33, 150, 243, 0.7);
+}
+
+.liar-chat-name {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.liar-chat-text {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.liar-chat-empty,
+.vote-wait {
+  padding: 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.liar-chat-input {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.liar-chat-input input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 8px;
+  padding: 14px;
+  color: #333;
+}
+
+.liar-chat-input button,
+.vote-button {
+  background: rgba(33, 150, 243, 0.85);
+  border: none;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.liar-chat-input button:disabled,
+.vote-button:disabled {
+  background: #495057;
+  cursor: not-allowed;
+}
+
+.vote-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.vote-status {
+  margin-top: 12px;
+  font-weight: 600;
+  color: #22c55e;
+}
+
+.guess-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.guess-category {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.guess-panel select {
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  color: #333;
+}
+
+.guess-feedback {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.liar-reveal {
+  margin-top: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.results-screen {
+  margin-top: 24px;
+}
+
+.liar-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.liar-modal {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
+  padding: 22px 24px;
+  max-width: 460px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+}
+
+.liar-modal h2 {
+  margin-bottom: 10px;
+}
+
+.liar-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.liar-modal-actions button {
+  background: rgba(33, 150, 243, 0.85);
+  border: none;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.liar-modal-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.liar-modal-note {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 900px) {
+  .liar-game-main {
+    grid-template-columns: 1fr;
+  }
+  .liar-game-info {
+    grid-template-columns: 1fr;
+  }
+  .liar-vote-section {
+    max-width: 100%;
+    justify-self: stretch;
+  }
+}

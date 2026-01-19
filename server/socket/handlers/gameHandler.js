@@ -3,6 +3,7 @@ const AppleBattle = require("../games/AppleBattle");
 const DrawGuess = require("../games/DrawGuess");
 const QuizBattle = require("../games/QuizBattle");
 const NumberRush = require("../games/NumberRush");
+const LiarGame = require("../games/LiarGame");
 
 // 게임 인스턴스 저장 (updateInterval 관리를 위해)
 const gameInstances = new Map(); // roomId -> { game, updateInterval, endTimeout, gameType }
@@ -14,6 +15,7 @@ const GAME_CLASSES = {
   drawGuess: DrawGuess,
   quizBattle: QuizBattle,
   numberRush: NumberRush,
+  liarGame: LiarGame,
 };
 
 // 게임 설정 (각 게임의 기본 설정을 중앙에서 관리)
@@ -46,6 +48,12 @@ const GAME_CONFIGS = {
     defaultDuration: 60000, // 1분
     minDuration: 10000,
     maxDuration: 300000,
+    supportsRelayMode: false,
+  },
+  liarGame: {
+    defaultDuration: 600000, // 10분 (전역 타이머 사용 안 함)
+    minDuration: 60000,
+    maxDuration: 1800000,
     supportsRelayMode: false,
   },
 };
@@ -182,7 +190,17 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
   }
 
   // 게임 시작
-  socket.on("startGame", async ({ roomId, gameType = "clickBattle", duration, quizId, rounds }) => {
+  socket.on(
+    "startGame",
+    async ({
+      roomId,
+      gameType = "clickBattle",
+      duration,
+      quizId,
+      rounds,
+      liarCategory,
+      liarTurnDuration,
+    }) => {
     const room = rooms.get(roomId);
     if (!room || room.players.length === 0) return;
 
@@ -213,6 +231,8 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       relayMode: config.supportsRelayMode && room.teamMode && room.relayMode ? true : false,
       quizId: quizId || null,
       roundsPerPlayer: rounds ? Math.max(1, parseInt(rounds)) : undefined,
+      liarCategory: liarCategory || null,
+      liarTurnDuration: liarTurnDuration === null ? null : liarTurnDuration,
     };
 
     let game;
@@ -260,7 +280,8 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
         instance.endTimeout = endTimeout;
       }
     }
-  });
+    }
+  );
 
   // 게임 종료 함수
   function endGame(roomId, { reason } = {}) {
@@ -298,6 +319,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     
     // 방 상태를 대기 중으로 변경
     room.status = "waiting";
+    io.to(roomId).emit("roomUpdated", room);
     io.emit("roomList", getRoomList(rooms));
     
     console.log(`게임 종료: ${roomId}, 승자: ${winners.join(", ")}`, reason ? `(reason=${reason})` : "");

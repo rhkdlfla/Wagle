@@ -72,6 +72,19 @@ const GAMES = [
     supportsDuration: true,
     supportsRelayMode: false,
   },
+  {
+    id: "liarGame",
+    name: "라이어 게임",
+    description: "제시어를 공유하고 라이어를 찾아보세요!",
+    icon: "🕵️",
+    minPlayers: 2,
+    defaultDuration: 600,
+    minDuration: 60,
+    maxDuration: 1800,
+    durationPresets: [300, 600, 900],
+    supportsDuration: false,
+    supportsRelayMode: false,
+  },
 ];
 
 // 게임 설정 가져오기 함수
@@ -106,6 +119,10 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [drawGuessRounds, setDrawGuessRounds] = useState(1);
   const [selectedQuizId, setSelectedQuizId] = useState(null); // 선택된 퀴즈 ID
   const [availableQuizzes, setAvailableQuizzes] = useState([]); // 사용 가능한 퀴즈 목록
+  const [liarCategories, setLiarCategories] = useState([]);
+  const [selectedLiarCategory, setSelectedLiarCategory] = useState("");
+  const [isLiarCategoryLoading, setIsLiarCategoryLoading] = useState(false);
+  const [liarTurnDuration, setLiarTurnDuration] = useState(30000);
   // 게임별 duration 관리 (게임 ID -> duration 초 단위)
   const [gameDurations, setGameDurations] = useState(() => {
     const durations = {};
@@ -214,6 +231,11 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       } else {
         setSelectedQuizId(null);
       }
+      if (gameId === "liarGame") {
+        fetchLiarCategories();
+      } else {
+        setSelectedLiarCategory("");
+      }
     }
   };
 
@@ -233,6 +255,23 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     }
   };
 
+  const fetchLiarCategories = async () => {
+    setIsLiarCategoryLoading(true);
+    try {
+      const response = await fetch("/api/liar/categories");
+      const data = await response.json();
+      const categories = Array.isArray(data.categories) ? data.categories : [];
+      setLiarCategories(categories);
+      if (categories.length > 0 && !selectedLiarCategory) {
+        setSelectedLiarCategory(categories[0]);
+      }
+    } catch (error) {
+      console.error("라이어 게임 카테고리 불러오기 실패:", error);
+    } finally {
+      setIsLiarCategoryLoading(false);
+    }
+  };
+
   // 퀴즈 페이지에서 돌아왔을 때 목록 새로고침
   useEffect(() => {
     if (selectedGame === "quizBattle" && location.pathname.includes("/room/")) {
@@ -246,6 +285,9 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
           [selectedGame]: gameConfig.defaultDuration,
         }));
       }
+    }
+    if (selectedGame === "liarGame" && location.pathname.includes("/room/")) {
+      fetchLiarCategories();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, selectedGame]);
@@ -300,6 +342,13 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         duration: duration,
         rounds: rounds,
         quizId: selectedGame === "quizBattle" ? selectedQuizId : undefined,
+        liarCategory: selectedGame === "liarGame" ? selectedLiarCategory || null : undefined,
+        liarTurnDuration:
+          selectedGame === "liarGame"
+            ? liarTurnDuration === -1
+              ? null
+              : liarTurnDuration
+            : undefined,
         rounds: rounds,
       });
     }
@@ -860,6 +909,60 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {selectedGame === "liarGame" && isHost && (
+            <div className="quiz-selection-section">
+              <div className="quiz-selection-header">
+                <h3>🗂️ 라이어 설정</h3>
+              </div>
+              {isLiarCategoryLoading ? (
+                <div className="quiz-loading">
+                  <p>카테고리를 불러오는 중...</p>
+                  <button onClick={fetchLiarCategories} className="refresh-quiz-button">
+                    새로고침
+                  </button>
+                </div>
+              ) : (
+                <div className="quiz-list">
+                  <div className="quiz-item selected">
+                    <div className="quiz-item-content">
+                      <div className="quiz-icon">🕵️</div>
+                      <div className="quiz-info">
+                        <div className="quiz-name">카테고리 선택</div>
+                        <div className="quiz-meta">
+                          <select
+                            value={selectedLiarCategory}
+                            onChange={(e) => setSelectedLiarCategory(e.target.value)}
+                          >
+                            {liarCategories.map((category) => (
+                              <option key={category} value={category}>
+                                {category}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="quiz-description">발언 시간</div>
+                        <div className="quiz-meta">
+                          <select
+                            value={String(liarTurnDuration)}
+                            onChange={(e) => setLiarTurnDuration(Number(e.target.value))}
+                          >
+                            <option value={30000}>30초</option>
+                            <option value={60000}>1분</option>
+                            <option value={90000}>1분 30초</option>
+                            <option value={-1}>무제한</option>
+                          </select>
+                        </div>
+                        <div className="quiz-description">
+                          선택한 카테고리 내 단어로 게임이 진행됩니다.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
