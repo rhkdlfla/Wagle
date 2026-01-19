@@ -23,10 +23,16 @@ class QuizBattle {
         // 문제 순서를 랜덤으로 섞기
         const shuffledQuestions = this.shuffleArray([...quiz.questions]);
         
+        // 문제 수 제한 적용 (questionCount가 설정된 경우)
+        let finalQuestions = shuffledQuestions;
+        if (this.gameState.questionCount !== null && this.gameState.questionCount !== undefined) {
+          finalQuestions = shuffledQuestions.slice(0, this.gameState.questionCount);
+        }
+        
         this.gameState.quiz = {
           id: quiz._id.toString(),
           title: quiz.title,
-          questions: shuffledQuestions,
+          questions: finalQuestions,
         };
       } catch (error) {
         console.error("퀴즈 로드 오류:", error);

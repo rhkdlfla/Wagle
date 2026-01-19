@@ -162,6 +162,12 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [quizInfiniteRetry, setQuizInfiniteRetry] = useState(
     savedSettings?.quizInfiniteRetry || false
   );
+  // 퀴즈 배틀 풀 문제 수 설정 (null이면 전체 문제)
+  const [quizQuestionCount, setQuizQuestionCount] = useState(
+    savedSettings?.quizQuestionCount !== undefined 
+      ? savedSettings.quizQuestionCount 
+      : null
+  ); // null = 전체 문제
   // 사과배틀 최대 숫자 설정 (2~10)
   const [appleBattleMaxSum, setAppleBattleMaxSum] = useState(
     savedSettings?.appleBattleMaxSum || 10
@@ -189,10 +195,11 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         quizQuestionTimeLimit,
         quizTimeBasedScoring,
         quizInfiniteRetry,
+        quizQuestionCount,
         appleBattleMaxSum,
       }, currentRoom.id);
     }
-  }, [selectedGame, drawGuessRounds, selectedQuizId, gameDurations, quizQuestionTimeLimit, quizTimeBasedScoring, quizInfiniteRetry, appleBattleMaxSum, currentRoom?.id]);
+  }, [selectedGame, drawGuessRounds, selectedQuizId, gameDurations, quizQuestionTimeLimit, quizTimeBasedScoring, quizInfiniteRetry, quizQuestionCount, appleBattleMaxSum, currentRoom?.id]);
 
   useEffect(() => {
     // 방 업데이트 수신
@@ -384,6 +391,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         questionTimeLimit: selectedGame === "quizBattle" ? (quizQuestionTimeLimit === null ? null : quizQuestionTimeLimit * 1000) : undefined,
         timeBasedScoring: selectedGame === "quizBattle" ? quizTimeBasedScoring : undefined,
         infiniteRetry: selectedGame === "quizBattle" ? quizInfiniteRetry : undefined,
+        questionCount: selectedGame === "quizBattle" ? quizQuestionCount : undefined,
         maxSum: selectedGame === "appleBattle" ? appleBattleMaxSum : undefined,
       });
     }
@@ -977,8 +985,74 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
             </div>
           )}
 
-          {/* 퀴즈 배틀 문제당 시간 제한 설정 UI */}
+          {/* 퀴즈 배틀 설정 UI */}
           {selectedGame === "quizBattle" && (
+            <>
+            {/* 퀴즈 배틀 풀 문제 수 설정 UI */}
+            <div className="game-duration-section">
+              <h3>📝 풀 문제 수</h3>
+              <div className="duration-controls">
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+                  <input
+                    type="checkbox"
+                    checked={quizQuestionCount === null}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setQuizQuestionCount(null);
+                      } else {
+                        setQuizQuestionCount(10); // 기본값 10문제
+                      }
+                    }}
+                    style={{ marginRight: "5px" }}
+                    disabled={!isHost}
+                  />
+                  <span>전체 문제</span>
+                </label>
+                {quizQuestionCount !== null && selectedQuizId && (
+                  <>
+                    {(() => {
+                      const selectedQuiz = availableQuizzes.find(q => q._id === selectedQuizId);
+                      const maxQuestions = selectedQuiz?.questions?.length || 50;
+                      return (
+                        <>
+                          <label htmlFor="question-count-slider">
+                            문제 수: <strong>{quizQuestionCount}문제</strong> (최대 {maxQuestions}문제)
+                          </label>
+                          <input
+                            id="question-count-slider"
+                            type="range"
+                            min="1"
+                            max={Math.min(maxQuestions, 50)}
+                            step="1"
+                            value={quizQuestionCount}
+                            onChange={(e) => setQuizQuestionCount(parseInt(e.target.value))}
+                            className="duration-slider"
+                            disabled={!isHost}
+                          />
+                          <div className="duration-presets">
+                            {[5, 10, 15, 20, 30].filter(n => n <= maxQuestions).map((preset) => (
+                              <button
+                                key={preset}
+                                onClick={() => setQuizQuestionCount(preset)}
+                                className={quizQuestionCount === preset ? "active" : ""}
+                                disabled={!isHost}
+                              >
+                                {preset}문제
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
+                {quizQuestionCount !== null && !selectedQuizId && (
+                  <p style={{ color: "#999", fontSize: "14px" }}>퀴즈를 선택하면 문제 수를 설정할 수 있습니다.</p>
+                )}
+              </div>
+            </div>
+
+            {/* 퀴즈 배틀 문제당 시간 제한 설정 UI */}
             <div className="game-duration-section">
               <h3>⏱️ 문제당 시간 제한</h3>
               <div className="duration-controls">
@@ -1050,6 +1124,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                 </label>
               </div>
             </div>
+            </>
           )}
 
           {/* 사과배틀 최대 숫자 설정 UI */}

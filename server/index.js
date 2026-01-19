@@ -57,6 +57,9 @@ app.use("/api/upload", uploadRoutes);
 
 // HTTP 서버 및 Socket.IO 설정
 const server = http.createServer(app);
+// 서버 타임아웃 설정 (60분)
+server.timeout = 3600000;
+server.keepAliveTimeout = 3600000;
 const io = new Server(server, {
   cors: {
     origin: CLIENT_URL,

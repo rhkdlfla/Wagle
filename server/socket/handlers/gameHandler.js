@@ -182,7 +182,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
   }
 
   // 게임 시작
-  socket.on("startGame", async ({ roomId, gameType = "clickBattle", duration, quizId, rounds, questionTimeLimit, timeBasedScoring, infiniteRetry, maxSum }) => {
+  socket.on("startGame", async ({ roomId, gameType = "clickBattle", duration, quizId, rounds, questionTimeLimit, timeBasedScoring, infiniteRetry, questionCount, maxSum }) => {
     const room = rooms.get(roomId);
     if (!room || room.players.length === 0) return;
 
@@ -220,6 +220,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       questionTimeLimit: questionTimeLimit !== undefined ? (questionTimeLimit === null ? null : parseInt(questionTimeLimit)) : null, // 퀴즈 배틀 문제당 시간 제한 (밀리초, null이면 무제한)
       timeBasedScoring: timeBasedScoring === true, // 퀴즈 배틀 시간 비례 점수 모드
       infiniteRetry: infiniteRetry === true, // 퀴즈 배틀 무한 도전 모드
+      questionCount: questionCount !== undefined ? (questionCount === null ? null : Math.max(1, parseInt(questionCount))) : null, // 퀴즈 배틀 풀 문제 수 (null이면 전체 문제)
       maxSum: maxSum !== undefined ? Math.max(2, Math.min(10, parseInt(maxSum))) : 10, // 사과배틀 최대 숫자 (2~10, 기본값 10)
     };
     

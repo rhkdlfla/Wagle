@@ -87,11 +87,11 @@ function GameApp({ socket, user, onLogout }) {
         />
         <Route
           path="/quiz/create"
-          element={<QuizFormPage user={user} />}
+          element={<QuizFormPage user={user} socket={socket} />}
         />
         <Route
           path="/quiz/edit/:quizId"
-          element={<QuizFormPage user={user} />}
+          element={<QuizFormPage user={user} socket={socket} />}
         />
       </Routes>
     </div>
@@ -339,7 +339,7 @@ function RoomGame({ socket, user }) {
 }
 
 // 퀴즈 폼 페이지 컴포넌트
-function QuizFormPage({ user }) {
+function QuizFormPage({ user, socket }) {
   const navigate = useNavigate();
   const { quizId } = useParams();
   const [quizToEdit, setQuizToEdit] = useState(null);
@@ -393,6 +393,7 @@ function QuizFormPage({ user }) {
       onSuccess={handleSuccess}
       user={user}
       quizToEdit={quizToEdit}
+      socket={socket}
     />
   );
 }
