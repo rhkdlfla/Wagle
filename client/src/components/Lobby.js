@@ -621,17 +621,13 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
 
   const headerSection = (
     <div className="lobby-header">
-      <h1>🎯 게임 로비</h1>
-      <div className="room-info-header">
-        <span className="room-name-badge">{currentRoom.name}</span>
-        <span className="room-id">방 ID: {currentRoom.id.substring(0, 15)}...</span>
-      </div>
+      <span className="room-name-badge">{currentRoom.name}</span>
       <button
         onClick={handleCopyInviteLink}
         className="invite-link-button"
         title="초대 링크 복사"
       >
-        {copied ? "✓ 복사됨!" : "🔗 초대 링크 복사"}
+        {copied ? "✓ 복사됨!" : "🔗 초대 링크"}
       </button>
     </div>
   );
@@ -786,6 +782,21 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         </div>
       )}
 
+      <div className="name-input-section">
+        <h3>내 이름 변경</h3>
+        <div className="name-input-group">
+          <input
+            type="text"
+            placeholder="이름을 입력하세요"
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && handleUpdateName()}
+            maxLength={15}
+          />
+          <button onClick={handleUpdateName}>변경</button>
+        </div>
+      </div>
+
       {/* 팀별 플레이어 목록 또는 일반 플레이어 목록 */}
       {currentRoom.teamMode && currentRoom.teams && currentRoom.teams.length > 0 ? (
         <div className="teams-list">
@@ -896,21 +907,6 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
           ))}
         </div>
       )}
-
-      <div className="name-input-section">
-        <h3>내 이름 변경</h3>
-        <div className="name-input-group">
-          <input
-            type="text"
-            placeholder="이름을 입력하세요"
-            value={playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleUpdateName()}
-            maxLength={15}
-          />
-          <button onClick={handleUpdateName}>변경</button>
-        </div>
-      </div>
     </div>
   );
 
@@ -1412,20 +1408,6 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     </div>
   ) : null;
 
-  const gameSelectionSection = (
-    <div className="game-selection-section">
-      <h2>게임 선택</h2>
-      {gamesListSection}
-      {quizBattleQuizSelectionPanel}
-      {liarSettingsPanel}
-      {drawGuessRoundsPanel}
-      {quizBattleSettingsPanel}
-      {appleBattleSettingsPanel}
-      {genericDurationPanel}
-      {relayModePanel}
-    </div>
-  );
-
   const actionsSection = (
     <div className="lobby-actions">
       {isHost && (
@@ -1448,6 +1430,24 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     </div>
   );
 
+  const gameSelectionSection = (
+    <div className="game-selection-section">
+      <h2>게임 선택</h2>
+      {gamesListSection}
+      <div className="game-selection-panels">
+        {quizBattleQuizSelectionPanel}
+        {liarSettingsPanel}
+        {drawGuessRoundsPanel}
+        {quizBattleSettingsPanel}
+        {appleBattleSettingsPanel}
+        {genericDurationPanel}
+        {relayModePanel}
+      </div>
+      {actionsSection}
+    </div>
+  );
+
+
   return (
     <div className="lobby-container">
       {headerSection}
@@ -1455,7 +1455,6 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         {chatSection}
         {gameSelectionSection}
         {playersSection}
-        {actionsSection}
       </div>
     </div>
   );
