@@ -120,6 +120,8 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [quizQuestionTimeLimit, setQuizQuestionTimeLimit] = useState(null); // null = 무제한
   // 퀴즈 배틀 시간 비례 점수 모드 (남은 시간에 비례해서 점수 부여)
   const [quizTimeBasedScoring, setQuizTimeBasedScoring] = useState(false);
+  // 퀴즈 배틀 무한 도전 모드 (틀린 답을 내도 계속 시도 가능)
+  const [quizInfiniteRetry, setQuizInfiniteRetry] = useState(false);
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
@@ -307,6 +309,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         quizId: selectedGame === "quizBattle" ? selectedQuizId : undefined,
         questionTimeLimit: selectedGame === "quizBattle" ? (quizQuestionTimeLimit === null ? null : quizQuestionTimeLimit * 1000) : undefined,
         timeBasedScoring: selectedGame === "quizBattle" ? quizTimeBasedScoring : undefined,
+        infiniteRetry: selectedGame === "quizBattle" ? quizInfiniteRetry : undefined,
       });
     }
   };
@@ -949,6 +952,15 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                     style={{ marginRight: "5px" }}
                   />
                   <span>시간 비례 점수 (빠르게 답할수록 높은 점수)</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px" }}>
+                  <input
+                    type="checkbox"
+                    checked={quizInfiniteRetry}
+                    onChange={(e) => setQuizInfiniteRetry(e.target.checked)}
+                    style={{ marginRight: "5px" }}
+                  />
+                  <span>무한 도전 모드 (틀려도 정답을 맞출 때까지 계속 시도 가능)</span>
                 </label>
               </div>
             </div>

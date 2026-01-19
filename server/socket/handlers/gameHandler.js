@@ -182,7 +182,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
   }
 
   // 게임 시작
-  socket.on("startGame", async ({ roomId, gameType = "clickBattle", duration, quizId, rounds, questionTimeLimit, timeBasedScoring }) => {
+  socket.on("startGame", async ({ roomId, gameType = "clickBattle", duration, quizId, rounds, questionTimeLimit, timeBasedScoring, infiniteRetry }) => {
     const room = rooms.get(roomId);
     if (!room || room.players.length === 0) return;
 
@@ -219,6 +219,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       roundsPerPlayer: rounds ? Math.max(1, parseInt(rounds)) : undefined,
       questionTimeLimit: questionTimeLimit !== undefined ? (questionTimeLimit === null ? null : parseInt(questionTimeLimit)) : null, // 퀴즈 배틀 문제당 시간 제한 (밀리초, null이면 무제한)
       timeBasedScoring: timeBasedScoring === true, // 퀴즈 배틀 시간 비례 점수 모드
+      infiniteRetry: infiniteRetry === true, // 퀴즈 배틀 무한 도전 모드
     };
 
     let game;
@@ -280,22 +281,25 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     gameState.isActive = false;
     
     const instance = gameInstances.get(roomId);
-    let results, winners;
+    let results, winners, teamScores;
     
     if (instance && instance.game) {
       const gameResult = instance.game.calculateResults();
       results = gameResult.results;
       winners = gameResult.winners;
+      teamScores = gameResult.teamScores || null; // 퀴즈 배틀 등에서 teamScores 포함
     } else {
       // 폴백 (게임 인스턴스가 없는 경우)
       results = [];
       winners = [];
+      teamScores = null;
     }
     
     // 게임 종료 이벤트 전송
     io.to(roomId).emit("gameEnded", {
       results: results,
       winners: winners,
+      teamScores: teamScores, // 팀 점수 포함
     });
     
     // 게임 상태 및 인스턴스 삭제
@@ -415,6 +419,27 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
         roomId,
         action: "submitAnswer",
         data: { answer, timeSpent },
+        requireGameType: "quizBattle",
+      });
+    }
+  });
+
+  // 문제 스킵 투표 (퀴즈배틀)
+  socket.on("voteSkipQuestion", ({ roomId }) => {
+    const ctx = getActiveGameContext({ roomId, requireGameType: "quizBattle" });
+    if (!ctx.ok) {
+      if (ctx.noPlayer) socket.emit("gameError", { message: "플레이어를 찾을 수 없습니다." });
+      else emitNotActiveGameError();
+      return;
+    }
+    const game = ctx.instance.game;
+    if (typeof game.voteSkip === "function") {
+      game.voteSkip(socket.id);
+    } else {
+      dispatchGameAction({
+        roomId,
+        action: "voteSkip",
+        data: {},
         requireGameType: "quizBattle",
       });
     }

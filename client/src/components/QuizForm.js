@@ -44,7 +44,7 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
   const addQuestion = () => {
     const newQuestion = {
       questionType: defaultQuestionType,
-      imageUrl: "",
+        imageUrl: "",
       correctAnswerImageUrl: "",
       options: defaultQuestionType === "객관식" ? ["", ""] : [],
       correctAnswer: defaultQuestionType === "객관식" ? 0 : "",
@@ -508,7 +508,7 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
       const file = files[0];
       if (file.type.startsWith("image/")) {
         if (type === "image") {
-          uploadImage(file, questionIndex);
+        uploadImage(file, questionIndex);
         } else if (type === "correctAnswerImage") {
           uploadCorrectAnswerImage(file, questionIndex);
         }
@@ -555,7 +555,7 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
       const response = await fetch(apiUrl, {
         method: method,
         headers,
-        credentials: "include",
+          credentials: "include",
         body: JSON.stringify(requestBody),
       });
 
@@ -742,26 +742,26 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
   };
 
   return (
-    <div 
+      <div 
       className="quiz-form-page"
-      onPaste={(e) => {
+        onPaste={(e) => {
         // 모달이 열려있으면 페이지 레벨 붙여넣기 비활성화
         if (editingQuestionIndex !== null) {
           return;
         }
-        // 입력 필드가 아닌 곳에서 붙여넣기 시 이미지 업로드 영역에 붙여넣기
-        const target = e.target;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
-          // 활성화된 이미지 업로드 영역이 있으면 해당 문제에 붙여넣기
-          if (activeImageUploadIndex !== null) {
-            handlePaste(e, activeImageUploadIndex);
-          } else {
-            // 활성화된 영역이 없으면 첫 번째 문제에 붙여넣기
-            handlePaste(e, 0);
+          // 입력 필드가 아닌 곳에서 붙여넣기 시 이미지 업로드 영역에 붙여넣기
+          const target = e.target;
+          if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+            // 활성화된 이미지 업로드 영역이 있으면 해당 문제에 붙여넣기
+            if (activeImageUploadIndex !== null) {
+              handlePaste(e, activeImageUploadIndex);
+            } else {
+              // 활성화된 영역이 없으면 첫 번째 문제에 붙여넣기
+              handlePaste(e, 0);
+            }
           }
-        }
-      }}
-    >
+        }}
+      >
       <div className="quiz-form-container">
         <div className="quiz-form-header">
           <h2>🧩 {showSettings ? "퀴즈 설정" : (quizToEdit ? "퀴즈 편집" : "새 퀴즈 만들기")}</h2>
@@ -775,43 +775,43 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
                 ⚙️ 설정
               </button>
             )}
-            <button className="close-button" onClick={onClose}>
-              ✕
-            </button>
+          <button className="close-button" onClick={onClose}>
+            ✕
+          </button>
           </div>
         </div>
 
         {showSettings ? (
           // 설정 화면
           <div className="quiz-settings-form">
-            {error && <div className="error-message">{error}</div>}
+          {error && <div className="error-message">{error}</div>}
 
-            <div className="form-section">
-              <label>
-                <span className="label-text">퀴즈 제목 *</span>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="예: K-pop 아티스트 맞추기"
-                  maxLength={100}
-                  required
-                />
-              </label>
-            </div>
+          <div className="form-section">
+            <label>
+              <span className="label-text">퀴즈 제목 *</span>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="예: K-pop 아티스트 맞추기"
+                maxLength={100}
+                required
+              />
+            </label>
+          </div>
 
-            <div className="form-section">
-              <label>
-                <span className="label-text">설명</span>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="퀴즈에 대한 간단한 설명을 입력하세요 (선택사항)"
-                  rows={3}
-                  maxLength={500}
-                />
-              </label>
-            </div>
+          <div className="form-section">
+            <label>
+              <span className="label-text">설명</span>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="퀴즈에 대한 간단한 설명을 입력하세요 (선택사항)"
+                rows={3}
+                maxLength={500}
+              />
+            </label>
+          </div>
 
             <div className="form-section">
               <label>
@@ -916,16 +916,16 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
               </label>
             </div>
 
-            <div className="form-section">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={isPublic}
-                  onChange={(e) => setIsPublic(e.target.checked)}
-                />
-                <span>공개 퀴즈</span>
-              </label>
-            </div>
+          <div className="form-section">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+              />
+              <span>공개 퀴즈</span>
+            </label>
+          </div>
 
             <div className="form-actions">
               <button
@@ -981,19 +981,19 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
                       >
                         ✏️
                       </button>
-                      {questions.length > 1 && (
-                        <button
-                          type="button"
+                  {questions.length > 1 && (
+                    <button
+                      type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             removeQuestion(qIndex);
                           }}
                           className="question-action-button delete-action"
                           title="삭제"
-                        >
+                    >
                           🗑️
-                        </button>
-                      )}
+                    </button>
+                  )}
                     </div>
                   </div>
               </div>
@@ -1011,7 +1011,7 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
               </div>
             </div>
             </div>
-          </div>
+                </div>
 
           <div className="form-actions">
             <button
@@ -1104,58 +1104,58 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
                   </label>
                 </div>
 
-                <div className="form-section">
-                  <label>
-                    <span className="label-text">이미지 (선택)</span>
-                    <div 
-                      className="file-upload-group"
-                      onDragOver={handleDragOver}
+                  <div className="form-section">
+                    <label>
+                      <span className="label-text">이미지 (선택)</span>
+                      <div 
+                        className="file-upload-group"
+                        onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, editingQuestionIndex, "image")}
                       onFocus={() => setActiveImageUploadIndex(editingQuestionIndex)}
-                      onBlur={() => setTimeout(() => setActiveImageUploadIndex(null), 200)}
-                      tabIndex={0}
-                    >
-                      <div className="file-upload-area">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files[0];
-                            if (file) {
+                        onBlur={() => setTimeout(() => setActiveImageUploadIndex(null), 200)}
+                        tabIndex={0}
+                      >
+                        <div className="file-upload-area">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
                               uploadImage(file, editingQuestionIndex);
-                            }
-                          }}
-                          className="file-input"
+                              }
+                            }}
+                            className="file-input"
                           id={`image-input-edit-${editingQuestionIndex}`}
-                        />
+                          />
                         <div className="file-upload-buttons">
                           <label htmlFor={`image-input-edit-${editingQuestionIndex}`} className="file-input-label">
                             📁 파일 선택
                           </label>
-                          <button
-                            type="button"
+                            <button
+                              type="button"
                             onClick={() => handleClipboardPaste(editingQuestionIndex)}
                             className="clipboard-button"
-                          >
+                            >
                             📋 클립보드에서 가져오기
-                          </button>
-                        </div>
+                            </button>
+                          </div>
                         <span className="file-upload-hint">또는 이미지를 여기에 붙여넣기 (Ctrl+V) 또는 드래그 앤 드롭</span>
                       </div>
                       {questions[editingQuestionIndex].imageUrl && (
-                        <div className="file-preview">
+                          <div className="file-preview">
                           <img src={questions[editingQuestionIndex].imageUrl} alt="미리보기" className="preview-image" />
-                          <button
-                            type="button"
+                            <button
+                              type="button"
                             onClick={() => updateQuestion(editingQuestionIndex, "imageUrl", "")}
-                            className="remove-file-button"
-                          >
-                            ✕ 삭제
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </label>
+                              className="remove-file-button"
+                            >
+                              ✕ 삭제
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </label>
                 </div>
 
                 <div className="form-section">
@@ -1303,17 +1303,17 @@ function QuizForm({ onClose, onSuccess, user, quizToEdit = null }) {
                     ))}
                   </div>
                 )}
-                
+
                 <div className="form-actions" style={{ marginTop: "15px" }}>
-                  <button
-                    type="button"
+            <button
+              type="button"
                     onClick={() => setEditingQuestionIndex(null)}
-                    className="submit-button"
-                  >
+              className="submit-button"
+            >
                     완료
-                  </button>
-                </div>
-              </div>
+            </button>
+          </div>
+      </div>
             )}
           </div>
         </div>

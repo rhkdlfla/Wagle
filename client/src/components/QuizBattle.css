@@ -410,3 +410,97 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
 }
+
+/* 정답을 맞춘 플레이어 실시간 표시 */
+.correct-players-list {
+  margin: 20px 0;
+  padding: 15px;
+  background: rgba(76, 175, 80, 0.2);
+  border-radius: 12px;
+  border: 2px solid rgba(76, 175, 80, 0.4);
+}
+
+.correct-players-title {
+  font-size: 1rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #4caf50;
+}
+
+.correct-players-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.correct-player-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.correct-player-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.correct-player-name {
+  font-weight: 600;
+  color: white;
+}
+
+.correct-player-points {
+  color: #ffc107;
+  font-weight: bold;
+}
+
+/* 스킵 투표 섹션 */
+.skip-vote-section {
+  margin: 20px 0;
+  padding: 15px;
+  background: rgba(255, 193, 7, 0.1);
+  border-radius: 12px;
+  border: 2px solid rgba(255, 193, 7, 0.3);
+  text-align: center;
+}
+
+.skip-vote-button {
+  padding: 12px 24px;
+  background: rgba(255, 193, 7, 0.8);
+  color: #333;
+  border: 2px solid rgba(255, 193, 7, 0.5);
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.skip-vote-button:hover:not(:disabled) {
+  background: rgba(255, 193, 7, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+}
+
+.skip-vote-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.skip-vote-button.voted {
+  background: rgba(76, 175, 80, 0.8);
+  border-color: rgba(76, 175, 80, 0.5);
+  color: white;
+}
+
+.skip-vote-info {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+}

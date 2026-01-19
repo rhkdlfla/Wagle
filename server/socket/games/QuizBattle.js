@@ -37,6 +37,8 @@ class QuizBattle {
     // 게임 상태 초기화
     this.gameState.currentQuestionIndex = 0;
     this.gameState.answers = {}; // { playerId: { answer, timeSpent, isCorrect } }
+    this.gameState.correctAnswers = {}; // 무한 도전 모드: 정답을 맞춘 플레이어 { playerId: true }
+    this.gameState.skipVotes = new Set(); // 문제 스킵 투표 { playerId }
     this.gameState.scores = {}; // { playerId: score }
     this.gameState.questionStartTime = Date.now();
     
@@ -105,8 +107,13 @@ class QuizBattle {
 
   // 정답 제출 처리
   submitAnswer(socketId, answer, timeSpent) {
-    // 이미 답한 경우 무시
-    if (this.gameState.answers[socketId]) {
+    // 무한 도전 모드가 아닌 경우: 이미 답한 경우 무시
+    if (!this.gameState.infiniteRetry && this.gameState.answers[socketId]) {
+      return false;
+    }
+    
+    // 무한 도전 모드: 이미 정답을 맞춘 경우 무시
+    if (this.gameState.infiniteRetry && this.gameState.correctAnswers[socketId]) {
       return false;
     }
 
@@ -132,16 +139,37 @@ class QuizBattle {
     // 점수 계산
     let points = 0;
     if (isCorrect) {
-      if (this.gameState.timeBasedScoring && this.gameState.questionTimeLimit) {
-        // 시간 비례 점수 모드: 남은 시간에 비례해서 점수 부여
-        const elapsed = Date.now() - this.gameState.questionStartTime;
-        const remaining = Math.max(0, this.gameState.questionTimeLimit - elapsed);
-        const timeRatio = remaining / this.gameState.questionTimeLimit;
-        // 최소 10점 보장 (0초에 답해도 최소 점수)
-        points = Math.max(10, Math.round(timeRatio * 100));
+      // 무한 도전 모드: 정답을 맞춘 경우에만 점수 부여 (이미 맞춘 경우 중복 점수 없음)
+      if (this.gameState.infiniteRetry && this.gameState.correctAnswers[socketId]) {
+        points = 0; // 이미 정답을 맞춘 경우 점수 없음
       } else {
-        // 기본 모드: 정답이면 100점
-        points = 100;
+        if (this.gameState.timeBasedScoring && this.gameState.questionTimeLimit) {
+          // 시간 비례 점수 모드: 남은 시간에 비례해서 점수 부여
+          const elapsed = Date.now() - this.gameState.questionStartTime;
+          const remaining = Math.max(0, this.gameState.questionTimeLimit - elapsed);
+          const timeRatio = remaining / this.gameState.questionTimeLimit;
+          // 최소 10점 보장 (0초에 답해도 최소 점수)
+          points = Math.max(10, Math.round(timeRatio * 100));
+        } else {
+          // 기본 모드: 정답이면 100점
+          points = 100;
+        }
+        
+        // 무한 도전 모드: 정답을 맞춘 플레이어 기록
+        if (this.gameState.infiniteRetry) {
+          this.gameState.correctAnswers[socketId] = true;
+        }
+      }
+    } else {
+      // 무한 도전 모드: 틀린 답을 낸 경우 피드백만 전송하고 계속 시도 가능
+      if (this.gameState.infiniteRetry) {
+        this.io.to(socketId).emit("answerSubmitted", {
+          isCorrect: false,
+          points: 0,
+          currentScore: this.gameState.scores[socketId] || 0,
+          canRetry: true, // 다시 시도 가능
+        });
+        return true; // 틀렸지만 계속 시도 가능
       }
     }
 
@@ -156,14 +184,26 @@ class QuizBattle {
       }
     }
 
-    this.gameState.answers[socketId] = {
-      answer,
-      timeSpent,
-      isCorrect,
-    };
+    // 답변 기록 (무한 도전 모드에서는 정답을 맞춘 경우에만 기록)
+    if (!this.gameState.infiniteRetry || isCorrect) {
+      this.gameState.answers[socketId] = {
+        answer,
+        timeSpent,
+        isCorrect,
+      };
+    }
 
-    // 모든 플레이어가 답했는지 확인
-    if (Object.keys(this.gameState.answers).length === this.room.players.length) {
+    // 다음 문제로 이동 조건 확인
+    let shouldMoveNext = false;
+    if (this.gameState.infiniteRetry) {
+      // 무한 도전 모드: 모든 플레이어가 정답을 맞춘 경우
+      shouldMoveNext = Object.keys(this.gameState.correctAnswers).length === this.room.players.length;
+    } else {
+      // 기본 모드: 모든 플레이어가 답한 경우
+      shouldMoveNext = Object.keys(this.gameState.answers).length === this.room.players.length;
+    }
+
+    if (shouldMoveNext) {
       // 문제당 시간 제한 타이머 정리
       if (this.questionTimeout) {
         clearTimeout(this.questionTimeout);
@@ -182,6 +222,20 @@ class QuizBattle {
       points,
       currentScore: this.gameState.scores[socketId],
     });
+
+    // 정답을 맞춘 경우 모든 클라이언트에 실시간 알림 전송
+    if (isCorrect) {
+      const player = this.room.players.find((p) => p.id === socketId);
+      if (player) {
+        this.io.to(this.room.id).emit("playerCorrectAnswer", {
+          playerId: socketId,
+          playerName: player.name,
+          playerPhoto: player.photo,
+          points: points,
+          currentScore: this.gameState.scores[socketId],
+        });
+      }
+    }
 
     return true;
   }
@@ -243,6 +297,8 @@ class QuizBattle {
     setTimeout(() => {
       this.gameState.currentQuestionIndex++;
       this.gameState.answers = {};
+      this.gameState.correctAnswers = {}; // 무한 도전 모드 초기화
+      this.gameState.skipVotes = new Set(); // 스킵 투표 초기화
       this.gameState.questionStartTime = Date.now();
       // 섞인 선택지 정보 초기화
       this.gameState.currentShuffledOptions = null;
@@ -280,6 +336,14 @@ class QuizBattle {
       clearTimeout(this.questionTimeout);
       this.questionTimeout = null;
     }
+    
+    // 무한 도전 모드 초기화
+    if (this.gameState.infiniteRetry) {
+      this.gameState.correctAnswers = {};
+    }
+    
+    // 스킵 투표 초기화
+    this.gameState.skipVotes = new Set();
 
     let options = question.options || [];
     let correctAnswerIndex = 0;
@@ -319,17 +383,21 @@ class QuizBattle {
     // 문제당 시간 제한이 설정되어 있으면 타이머 시작
     if (this.gameState.questionTimeLimit !== null && this.gameState.questionTimeLimit > 0) {
       this.questionTimeout = setTimeout(() => {
-        // 시간 초과 시 모든 플레이어의 답변 처리 (미답변은 오답 처리)
-        this.room.players.forEach((player) => {
-          if (!this.gameState.answers[player.id]) {
-            // 미답변 플레이어는 오답 처리 (점수 없음)
-            this.gameState.answers[player.id] = {
-              answer: null,
-              timeSpent: this.gameState.questionTimeLimit,
-              isCorrect: false,
-            };
-          }
-        });
+        // 무한 도전 모드가 아닌 경우: 시간 초과 시 모든 플레이어의 답변 처리 (미답변은 오답 처리)
+        if (!this.gameState.infiniteRetry) {
+          this.room.players.forEach((player) => {
+            if (!this.gameState.answers[player.id]) {
+              // 미답변 플레이어는 오답 처리 (점수 없음)
+              this.gameState.answers[player.id] = {
+                answer: null,
+                timeSpent: this.gameState.questionTimeLimit,
+                isCorrect: false,
+              };
+            }
+          });
+        }
+        // 무한 도전 모드: 시간 초과 시에도 모든 플레이어가 정답을 맞추지 못했으면 다음 문제로 이동
+        // (시간 제한이 있으면 시간이 지나면 다음 문제로 넘어감)
         
         // 타이머 정리
         this.questionTimeout = null;
@@ -487,7 +555,59 @@ class QuizBattle {
     if (action === "submitAnswer") {
       return this.submitAnswer(socketId, data?.answer, data?.timeSpent);
     }
+    if (action === "voteSkip") {
+      return this.voteSkip(socketId);
+    }
     return false;
+  }
+
+  // 문제 스킵 투표
+  voteSkip(socketId) {
+    // 이미 투표한 경우 무시
+    if (this.gameState.skipVotes.has(socketId)) {
+      return false;
+    }
+
+    // 스킵 투표 추가
+    this.gameState.skipVotes.add(socketId);
+    const voteCount = this.gameState.skipVotes.size;
+    const totalPlayers = this.room.players.length;
+    const majority = Math.ceil(totalPlayers / 2); // 과반수 (50% 이상)
+
+    // 모든 클라이언트에 투표 현황 전송
+    this.io.to(this.room.id).emit("skipVoteUpdate", {
+      voteCount,
+      totalPlayers,
+      majority,
+      voters: Array.from(this.gameState.skipVotes),
+    });
+
+    // 과반수 달성 시 문제 스킵
+    if (voteCount >= majority) {
+      // 문제당 시간 제한 타이머 정리
+      if (this.questionTimeout) {
+        clearTimeout(this.questionTimeout);
+        this.questionTimeout = null;
+      }
+
+      // 모든 플레이어를 미답변 처리 (스킵된 문제는 점수 없음)
+      this.room.players.forEach((player) => {
+        if (!this.gameState.answers[player.id]) {
+          this.gameState.answers[player.id] = {
+            answer: null,
+            timeSpent: Date.now() - this.gameState.questionStartTime,
+            isCorrect: false,
+          };
+        }
+      });
+
+      // 잠시 후 다음 문제로 이동
+      setTimeout(() => {
+        this.nextQuestion();
+      }, 1000);
+    }
+
+    return true;
   }
 
   // 전역 타이머 사용 여부 (퀴즈 배틀은 문제를 다 풀면 끝나므로 전역 타이머 불필요)
