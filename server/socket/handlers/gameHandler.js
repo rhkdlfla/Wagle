@@ -190,18 +190,20 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
   }
 
   // 게임 시작
-  socket.on(
-    "startGame",
-    async ({
-      roomId,
-      gameType = "clickBattle",
-      duration,
-      quizId,
-      rounds,
-      liarCategory,
-      liarTurnDuration,
-    }) => {
-  socket.on("startGame", async ({ roomId, gameType = "clickBattle", duration, quizId, rounds, questionTimeLimit, timeBasedScoring, infiniteRetry, questionCount, maxSum }) => {
+  socket.on("startGame", async ({ 
+    roomId, 
+    gameType = "clickBattle", 
+    duration, 
+    quizId, 
+    rounds, 
+    liarCategory, 
+    liarTurnDuration,
+    questionTimeLimit, 
+    timeBasedScoring, 
+    infiniteRetry, 
+    questionCount, 
+    maxSum 
+  }) => {
     const room = rooms.get(roomId);
     if (!room || room.players.length === 0) return;
 
@@ -292,8 +294,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
         instance.endTimeout = endTimeout;
       }
     }
-    }
-  );
+  });
 
   // 게임 종료 함수
   function endGame(roomId, { reason } = {}) {
