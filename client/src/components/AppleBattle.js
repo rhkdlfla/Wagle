@@ -29,6 +29,7 @@ function AppleBattle({ socket, room, onBackToLobby }) {
   const [dragStart, setDragStart] = useState(null);
   const [dragEnd, setDragEnd] = useState(null);
   const [selectedSum, setSelectedSum] = useState(0);
+  const [maxSum, setMaxSum] = useState(10); // 최대 숫자 (기본값 10)
   const gridRef = useRef(null);
   const timerIntervalRef = useRef(null);
   const playerColorMap = useRef({});
@@ -80,6 +81,9 @@ function AppleBattle({ socket, room, onBackToLobby }) {
       setDragStart(null);
       setDragEnd(null);
       setSelectedSum(0);
+      const receivedMaxSum = gameState.maxSum || 10;
+      setMaxSum(receivedMaxSum);
+      console.log("사과배틀 게임 시작 - maxSum:", receivedMaxSum, "gameState:", gameState);
       
       // 기존 타이머가 있으면 정리
       if (timerIntervalRef.current) {
@@ -102,7 +106,11 @@ function AppleBattle({ socket, room, onBackToLobby }) {
     socket.on("gameStarted", handleGameStarted);
 
     // 사과배틀 업데이트 수신
-    socket.on("appleBattleUpdate", ({ scores: scoreUpdates, teamScores: teamScoresData, timeRemaining: remaining, grid: updatedGrid, teamActivePlayers: activePlayers }) => {
+    socket.on("appleBattleUpdate", ({ scores: scoreUpdates, teamScores: teamScoresData, timeRemaining: remaining, grid: updatedGrid, teamActivePlayers: activePlayers, maxSum: maxSumValue }) => {
+      if (maxSumValue !== undefined) {
+        console.log("사과배틀 업데이트 - maxSum:", maxSumValue);
+        setMaxSum(maxSumValue);
+      }
       if (scoreUpdates && Array.isArray(scoreUpdates)) {
         setScores(prev => {
           const newScores = {};
@@ -279,8 +287,10 @@ function AppleBattle({ socket, room, onBackToLobby }) {
     
     const sum = calculateSelectedSum(dragStart.row, dragStart.col, dragEnd.row, dragEnd.col);
     
-    // 합이 10이면 사과 제거 및 땅따먹기
-    if (sum === 10) {
+    // 합이 10이면 사과 제거 및 땅따먹기 (합은 항상 10으로 고정)
+    const targetSum = 10;
+    console.log("사과 선택 - 합:", sum, "목표 합:", targetSum, "일치:", sum === targetSum);
+    if (sum === targetSum) {
       socket.emit("appleBattleRemove", {
         roomId: room.id,
         startRow: dragStart.row,

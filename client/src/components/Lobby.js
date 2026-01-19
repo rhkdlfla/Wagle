@@ -162,6 +162,10 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [quizInfiniteRetry, setQuizInfiniteRetry] = useState(
     savedSettings?.quizInfiniteRetry || false
   );
+  // 사과배틀 최대 숫자 설정 (2~10)
+  const [appleBattleMaxSum, setAppleBattleMaxSum] = useState(
+    savedSettings?.appleBattleMaxSum || 10
+  );
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
@@ -185,9 +189,10 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         quizQuestionTimeLimit,
         quizTimeBasedScoring,
         quizInfiniteRetry,
+        appleBattleMaxSum,
       }, currentRoom.id);
     }
-  }, [selectedGame, drawGuessRounds, selectedQuizId, gameDurations, quizQuestionTimeLimit, quizTimeBasedScoring, quizInfiniteRetry, currentRoom?.id]);
+  }, [selectedGame, drawGuessRounds, selectedQuizId, gameDurations, quizQuestionTimeLimit, quizTimeBasedScoring, quizInfiniteRetry, appleBattleMaxSum, currentRoom?.id]);
 
   useEffect(() => {
     // 방 업데이트 수신
@@ -361,6 +366,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         quizQuestionTimeLimit,
         quizTimeBasedScoring,
         quizInfiniteRetry,
+        appleBattleMaxSum,
       }, currentRoom.id);
       
       const gameConfig = getGameConfig(selectedGame);
@@ -378,6 +384,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         questionTimeLimit: selectedGame === "quizBattle" ? (quizQuestionTimeLimit === null ? null : quizQuestionTimeLimit * 1000) : undefined,
         timeBasedScoring: selectedGame === "quizBattle" ? quizTimeBasedScoring : undefined,
         infiniteRetry: selectedGame === "quizBattle" ? quizInfiniteRetry : undefined,
+        maxSum: selectedGame === "appleBattle" ? appleBattleMaxSum : undefined,
       });
     }
   };
@@ -864,29 +871,33 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
           </div>
           
           {/* 퀴즈 배틀 퀴즈 선택 UI */}
-          {selectedGame === "quizBattle" && isHost && (
+          {selectedGame === "quizBattle" && (
             <div className="quiz-selection-section">
               <div className="quiz-selection-header">
                 <h3>🧩 퀴즈 선택</h3>
-                <button
-                  onClick={() => {
-                    if (!user || user.provider === "guest") {
-                      alert("퀴즈 생성을 위해서는 로그인이 필요합니다.");
-                      return;
-                    }
-                    navigate("/quiz/create");
-                  }}
-                  className="create-quiz-button"
-                >
-                  + 새 퀴즈 만들기
-                </button>
+                {isHost && (
+                  <button
+                    onClick={() => {
+                      if (!user || user.provider === "guest") {
+                        alert("퀴즈 생성을 위해서는 로그인이 필요합니다.");
+                        return;
+                      }
+                      navigate("/quiz/create");
+                    }}
+                    className="create-quiz-button"
+                  >
+                    + 새 퀴즈 만들기
+                  </button>
+                )}
               </div>
               {availableQuizzes.length === 0 ? (
                 <div className="quiz-loading">
                   <p>퀴즈 목록을 불러오는 중...</p>
-                  <button onClick={fetchAvailableQuizzes} className="refresh-quiz-button">
-                    새로고침
-                  </button>
+                  {isHost && (
+                    <button onClick={fetchAvailableQuizzes} className="refresh-quiz-button">
+                      새로고침
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="quiz-list">
@@ -897,11 +908,12 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                         key={quiz._id}
                         className={`quiz-item ${
                           selectedQuizId === quiz._id ? "selected" : ""
-                        } ${isMyOwnQuiz ? "my-quiz" : ""}`}
+                        } ${isMyOwnQuiz ? "my-quiz" : ""} ${!isHost ? "read-only" : ""}`}
                       >
                         <div 
                           className="quiz-item-content"
-                          onClick={() => setSelectedQuizId(quiz._id)}
+                          onClick={() => isHost && setSelectedQuizId(quiz._id)}
+                          style={{ cursor: isHost ? "pointer" : "default" }}
                         >
                           <div className="quiz-icon">🧩</div>
                           <div className="quiz-info">
@@ -943,7 +955,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
           )}
 
           {/* 그림 맞히기 라운드 설정 UI */}
-          {selectedGame === "drawGuess" && isHost && (
+          {selectedGame === "drawGuess" && (
             <div className="game-duration-section">
               <h3>🎨 라운드 설정</h3>
               <div className="duration-controls">
@@ -959,13 +971,14 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                   value={drawGuessRounds}
                   onChange={(e) => setDrawGuessRounds(parseInt(e.target.value))}
                   className="duration-slider"
+                  disabled={!isHost}
                 />
               </div>
             </div>
           )}
 
           {/* 퀴즈 배틀 문제당 시간 제한 설정 UI */}
-          {selectedGame === "quizBattle" && isHost && (
+          {selectedGame === "quizBattle" && (
             <div className="game-duration-section">
               <h3>⏱️ 문제당 시간 제한</h3>
               <div className="duration-controls">
@@ -981,6 +994,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                       }
                     }}
                     style={{ marginRight: "5px" }}
+                    disabled={!isHost}
                   />
                   <span>무제한 시간</span>
                 </label>
@@ -998,6 +1012,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                       value={quizQuestionTimeLimit}
                       onChange={(e) => setQuizQuestionTimeLimit(parseInt(e.target.value))}
                       className="duration-slider"
+                      disabled={!isHost}
                     />
                     <div className="duration-presets">
                       {[10, 15, 20, 30, 45, 60, 90, 120].map((preset) => (
@@ -1005,6 +1020,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                           key={preset}
                           onClick={() => setQuizQuestionTimeLimit(preset)}
                           className={quizQuestionTimeLimit === preset ? "active" : ""}
+                          disabled={!isHost}
                         >
                           {preset}초
                         </button>
@@ -1018,6 +1034,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                     checked={quizTimeBasedScoring}
                     onChange={(e) => setQuizTimeBasedScoring(e.target.checked)}
                     style={{ marginRight: "5px" }}
+                    disabled={!isHost}
                   />
                   <span>시간 비례 점수 (빠르게 답할수록 높은 점수)</span>
                 </label>
@@ -1027,9 +1044,48 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                     checked={quizInfiniteRetry}
                     onChange={(e) => setQuizInfiniteRetry(e.target.checked)}
                     style={{ marginRight: "5px" }}
+                    disabled={!isHost}
                   />
                   <span>무한 도전 모드 (틀려도 정답을 맞출 때까지 계속 시도 가능)</span>
                 </label>
+              </div>
+            </div>
+          )}
+
+          {/* 사과배틀 최대 숫자 설정 UI */}
+          {selectedGame === "appleBattle" && (
+            <div className="game-duration-section">
+              <h3>🍎 그리드 최대 숫자 설정</h3>
+              <div className="duration-controls">
+                <label htmlFor="max-sum-slider">
+                  그리드에 나오는 최대 숫자: <strong>{appleBattleMaxSum}</strong>
+                </label>
+                <input
+                  id="max-sum-slider"
+                  type="range"
+                  min="2"
+                  max="10"
+                  step="1"
+                  value={appleBattleMaxSum}
+                  onChange={(e) => setAppleBattleMaxSum(parseInt(e.target.value))}
+                  className="duration-slider"
+                  disabled={!isHost}
+                />
+                <div className="duration-presets">
+                  {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((preset) => (
+                    <button
+                      key={preset}
+                      onClick={() => setAppleBattleMaxSum(preset)}
+                      className={appleBattleMaxSum === preset ? "active" : ""}
+                      disabled={!isHost}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+                <p style={{ marginTop: "10px", fontSize: "0.9em", color: "#666" }}>
+                  합이 10이 되는 사과를 선택하세요
+                </p>
               </div>
             </div>
           )}
@@ -1038,7 +1094,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
           {(() => {
             const gameConfig = getGameConfig(selectedGame);
             // 퀴즈 배틀은 문제당 시간 제한만 사용하므로 전체 게임 시간 설정 제외
-            if (!gameConfig.supportsDuration || !isHost || selectedGame === "quizBattle") return null;
+            if (!gameConfig.supportsDuration || selectedGame === "quizBattle") return null;
             
             const currentDuration = gameDurations[selectedGame] || gameConfig.defaultDuration;
             const step = gameConfig.minDuration < 30 ? 5 : 10;
@@ -1064,6 +1120,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                       }))
                     }
                     className="duration-slider"
+                    disabled={!isHost}
                   />
                   <div className="duration-presets">
                     {gameConfig.durationPresets.map((preset) => (
@@ -1076,6 +1133,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
                           }))
                         }
                         className={currentDuration === preset ? "active" : ""}
+                        disabled={!isHost}
                       >
                         {formatDuration(preset)}
                       </button>

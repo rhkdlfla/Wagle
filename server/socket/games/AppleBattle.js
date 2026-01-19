@@ -7,13 +7,14 @@ class AppleBattle {
 
   // 게임 초기화
   initialize() {
-    // 17×10 그리드 생성 (1~9 숫자)
+    // 17×10 그리드 생성 (1~maxSum 숫자)
+    const maxNumber = this.gameState.maxSum || 10; // 그리드에 나오는 최대 숫자
     const grid = [];
     for (let row = 0; row < 10; row++) {
       grid[row] = [];
       for (let col = 0; col < 17; col++) {
         grid[row][col] = {
-          value: Math.floor(Math.random() * 9) + 1, // 1~9
+          value: Math.floor(Math.random() * maxNumber) + 1, // 1~maxSum
           owner: null, // 칸의 소유자 (플레이어 ID, 팀전 모드에서는 teamId 사용)
           teamId: null, // 칸의 소유 팀 (팀전 모드일 때)
         };
@@ -107,8 +108,11 @@ class AppleBattle {
       }
     }
     
-    // 합이 10이 아니면 무시
-    if (sum !== 10) {
+    // 합이 10이 아니면 무시 (합은 항상 10으로 고정)
+    const targetSum = 10;
+    console.log("서버 사과 제거 처리 - 합:", sum, "목표 합:", targetSum, "gameState.maxSum:", this.gameState.maxSum);
+    if (sum !== targetSum) {
+      console.log("합이 일치하지 않음 - 무시됨");
       return false;
     }
     
@@ -300,6 +304,7 @@ class AppleBattle {
       teamScores: this.room.teamMode ? (this.gameState.teamScores || {}) : null,
       timeRemaining: remaining,
       teamActivePlayers: this.gameState.relayMode ? (this.gameState.teamActivePlayers || {}) : null,
+      maxSum: this.gameState.maxSum || 10,
     };
   }
 
@@ -312,6 +317,7 @@ class AppleBattle {
       timeRemaining: gameStateData.timeRemaining || 0,
       grid: gameStateData.grid || [],
       teamActivePlayers: gameStateData.teamActivePlayers || null,
+      maxSum: this.gameState.maxSum || 10,
     };
   }
 
@@ -327,6 +333,7 @@ class AppleBattle {
       startTime: state.startTime,
       gameType: state.gameType,
       grid: state.grid,
+      maxSum: this.gameState.maxSum || 10,
     };
   }
 }
