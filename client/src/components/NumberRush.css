@@ -1,7 +1,7 @@
 .number-rush-container {
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  padding: 10px;
   color: white;
   display: flex;
   flex-direction: column;
@@ -29,8 +29,9 @@
 
 .number-rush-container .game-header-small {
   width: 100%;
-  max-width: 1400px;
-  margin-bottom: 15px;
+  max-width: 100%;
+  margin-bottom: 10px;
+  padding: 0 10px;
 }
 
 .number-rush-container .game-header-small-content {
@@ -103,11 +104,12 @@
 
 .number-rush-container .game-screen {
   width: 100%;
-  max-width: 1400px;
+  max-width: 100%;
   display: flex;
   flex-direction: row;
-  gap: 30px;
+  gap: 15px;
   align-items: flex-start;
+  padding: 0 10px;
 }
 
 .number-rush-container .game-main-area {
@@ -119,70 +121,23 @@
 }
 
 .number-rush-container .game-sidebar {
-  width: 320px;
+  width: 280px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 20px;
   position: sticky;
-  top: 20px;
-  max-height: calc(100vh - 100px);
+  top: 10px;
+  max-height: calc(100vh - 80px);
   overflow-y: auto;
 }
 
-/* 라운드 정보 */
-.round-info {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 15px;
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 15px;
-  backdrop-filter: blur(10px);
-}
-
-.round-badge {
-  font-size: 1.5rem;
-  font-weight: bold;
-  padding: 10px 30px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 25px;
-  border: 2px solid white;
-}
-
-.round-timer-circle {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: rgba(255, 152, 0, 0.3);
-  border: 3px solid #FF9800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 10px;
-  animation: timerPulse 1s infinite;
-}
-
-@keyframes timerPulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-}
-
-.round-timer-text {
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #FFD700;
-}
-
+/* 라운드 진행 표시 (game-hints 내부) */
 .round-progress {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .round-dot {
@@ -256,9 +211,10 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  max-width: 1200px;
-  margin-bottom: 20px;
-  gap: 20px;
+  max-width: 100%;
+  margin-bottom: 15px;
+  gap: 15px;
+  flex-wrap: wrap;
 }
 
 .round-time-hint {
@@ -284,6 +240,7 @@
   border: 2px solid white;
   flex-grow: 1;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .next-number-hint strong {
@@ -295,8 +252,9 @@
 .game-area {
   position: relative;
   width: 100%;
-  max-width: 1200px;
-  height: 600px;
+  max-width: 100%;
+  height: calc(100vh - 250px);
+  min-height: 700px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 15px;
   border: 3px solid white;
