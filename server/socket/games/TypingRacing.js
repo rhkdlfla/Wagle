@@ -8,17 +8,32 @@ class TypingRacing {
     this.room = room;
   }
 
-  // 텍스트 파일에서 문제 텍스트 로드
+  // 텍스트 파일에서 문제 텍스트 로드 (랜덤으로 10문장 선택)
   loadTypingText() {
     try {
       const filePath = path.join(__dirname, '../../data/typing-texts.txt');
       const fileContent = fs.readFileSync(filePath, 'utf-8');
-      // 모든 줄을 스페이스로 연결 (엔터를 스페이스로 변환)
-      const text = fileContent
+      // 모든 줄을 읽어서 빈 줄 제거
+      const allLines = fileContent
         .split('\n')
         .map(line => line.trim())
-        .filter(line => line.length > 0)
-        .join(' ');
+        .filter(line => line.length > 0);
+      
+      // 랜덤으로 10문장 선택 (10개 미만이면 모두 선택)
+      const selectedCount = Math.min(10, allLines.length);
+      const selectedLines = [];
+      const usedIndices = new Set();
+      
+      while (selectedLines.length < selectedCount) {
+        const randomIndex = Math.floor(Math.random() * allLines.length);
+        if (!usedIndices.has(randomIndex)) {
+          usedIndices.add(randomIndex);
+          selectedLines.push(allLines[randomIndex]);
+        }
+      }
+      
+      // 선택된 문장들을 스페이스로 연결
+      const text = selectedLines.join(' ');
       return text;
     } catch (error) {
       console.error('[TypingRacing] 텍스트 파일 로드 실패:', error);
