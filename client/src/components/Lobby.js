@@ -1645,7 +1645,6 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const gameSelectionSection = (
     <div className="game-selection-section">
       <h2>게임 선택</h2>
-      {gamesListSection}
       <div className="game-selection-scroll">
         {gamesListSection}
         <div className="game-selection-panels">
