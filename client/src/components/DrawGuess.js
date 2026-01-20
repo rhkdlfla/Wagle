@@ -10,6 +10,7 @@ const CANVAS_HEIGHT = 420;
 const DEFAULT_COLOR = "#222222";
 const DEFAULT_SIZE = 4;
 const COLOR_OPTIONS = ["#222222", "#e74c3c", "#3498db", "#2ecc71", "#f1c40f"];
+const POPUP_DURATION_MS = 2000;
 
 function DrawGuess({ socket, room, onBackToLobby }) {
   const navigate = useNavigate();
@@ -36,6 +37,12 @@ function DrawGuess({ socket, room, onBackToLobby }) {
   const userScrolledUpRef = useRef(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [unseenCount, setUnseenCount] = useState(0);
+  const [correctPopup, setCorrectPopup] = useState(null);
+  const popupTimerRef = useRef(null);
+  const popupHideAtRef = useRef(0);
+  const resultsTimerRef = useRef(null);
+  const latestAnswerRef = useRef(null);
+  const pendingCorrectRoundRef = useRef(null);
 
   const resizeCanvasToDisplaySize = () => {
     const canvas = canvasRef.current;
@@ -169,7 +176,12 @@ function DrawGuess({ socket, room, onBackToLobby }) {
       setWord(newWord || null);
     });
 
-    socket.on("drawGuessCorrect", ({ playerName, points, scores: nextScores }) => {
+    socket.on(
+      "drawGuessCorrect",
+      ({ playerName, points, scores: nextScores, word, round }) => {
+        if (typeof round === "number") {
+          pendingCorrectRoundRef.current = round;
+        }
       if (nextScores) {
         setScores(nextScores);
       }
@@ -183,13 +195,54 @@ function DrawGuess({ socket, room, onBackToLobby }) {
           timestamp: Date.now(),
         },
       ]);
-    });
+        if (word) {
+          latestAnswerRef.current = word;
+        }
+      const popupText = {
+        title: `${playerName}님 정답!`,
+        subtitle: `제시어: ${word || latestAnswerRef.current || "?"}`,
+      };
+      setCorrectPopup(popupText);
+      if (popupTimerRef.current) {
+        clearTimeout(popupTimerRef.current);
+      }
+      popupHideAtRef.current = Date.now() + POPUP_DURATION_MS;
+        popupTimerRef.current = setTimeout(() => {
+          setCorrectPopup(null);
+        }, POPUP_DURATION_MS);
+      }
+    );
 
-    socket.on("drawGuessRoundEnded", ({ word: answer }) => {
-      setRoundAnswer(answer || null);
+    socket.on("drawGuessRoundEnded", ({ word: answer, round }) => {
+      const resolvedAnswer = answer || null;
+      setRoundAnswer(resolvedAnswer);
+      if (resolvedAnswer) {
+        latestAnswerRef.current = resolvedAnswer;
+      }
+      if (resolvedAnswer && pendingCorrectRoundRef.current === round) {
+        setCorrectPopup((prev) =>
+          prev
+            ? {
+                ...prev,
+                subtitle: `제시어: ${resolvedAnswer}`,
+              }
+            : prev
+        );
+        pendingCorrectRoundRef.current = null;
+      }
     });
 
     socket.on("gameEnded", ({ results: gameResults }) => {
+      const delay = Math.max(0, popupHideAtRef.current - Date.now());
+      if (delay > 0) {
+        if (resultsTimerRef.current) {
+          clearTimeout(resultsTimerRef.current);
+        }
+        resultsTimerRef.current = setTimeout(() => {
+          setResults(gameResults || []);
+        }, delay);
+        return;
+      }
       setResults(gameResults || []);
     });
 
@@ -219,6 +272,17 @@ function DrawGuess({ socket, room, onBackToLobby }) {
       socket.off("messageError");
     };
   }, [socket, room.id]);
+
+  useEffect(() => {
+    return () => {
+      if (popupTimerRef.current) {
+        clearTimeout(popupTimerRef.current);
+      }
+      if (resultsTimerRef.current) {
+        clearTimeout(resultsTimerRef.current);
+      }
+    };
+  }, []);
 
   const isScrolledToBottom = (container) => {
     if (!container) return true;
@@ -345,6 +409,14 @@ function DrawGuess({ socket, room, onBackToLobby }) {
 
   return (
     <div className="draw-guess-container">
+      {correctPopup && (
+        <div className="draw-guess-popup-overlay" role="status" aria-live="polite">
+          <div className="draw-guess-popup">
+            <div className="draw-guess-popup-title">{correctPopup.title}</div>
+            <div className="draw-guess-popup-subtitle">{correctPopup.subtitle}</div>
+          </div>
+        </div>
+      )}
       <div className="draw-guess-header">
         <div className="header-left">
           <h1>🎨 그림 맞히기</h1>

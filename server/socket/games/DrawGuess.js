@@ -188,9 +188,11 @@ class DrawGuess {
     this.io.to(this.room.id).emit("drawGuessCorrect", {
       playerId: socketId,
       playerName: player?.name || "플레이어",
+      round: this.gameState.round,
       points: guessPoints,
       drawerPoints,
       scores: this.gameState.scores,
+      word: this.gameState.word,
     });
 
     // 가장 빠른 정답 1명 기준으로 즉시 다음 라운드로 진행

@@ -15,6 +15,35 @@
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);
 }
 
+.draw-guess-popup-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.draw-guess-popup {
+  text-align: center;
+  padding: 16px 28px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.draw-guess-popup-title {
+  font-weight: 700;
+  font-size: 20px;
+}
+
+.draw-guess-popup-subtitle {
+  margin-top: 4px;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .header-right {
   display: flex;
   flex-direction: column;
