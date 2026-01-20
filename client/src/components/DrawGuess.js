@@ -47,9 +47,6 @@ function DrawGuess({ socket, room, onBackToLobby }) {
   const [brushSize, setBrushSize] = useState(DEFAULT_SIZE);
   const [isEraser, setIsEraser] = useState(false);
   const chatMessagesRef = useRef(null);
-  const userScrolledUpRef = useRef(false);
-  const [showScrollButton, setShowScrollButton] = useState(false);
-  const [unseenCount, setUnseenCount] = useState(0);
   const [correctPopup, setCorrectPopup] = useState(null);
   const popupTimerRef = useRef(null);
   const popupHideAtRef = useRef(0);
@@ -326,44 +323,15 @@ function DrawGuess({ socket, room, onBackToLobby }) {
     };
   }, []);
 
-  const isScrolledToBottom = (container) => {
-    if (!container) return true;
-    const threshold = 24;
-    return container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
-  };
-
   const scrollToBottom = () => {
     const container = chatMessagesRef.current;
     if (!container) return;
     container.scrollTop = container.scrollHeight;
-    userScrolledUpRef.current = false;
   };
 
   useEffect(() => {
-    const container = chatMessagesRef.current;
-    if (!container) return;
-    if (!userScrolledUpRef.current) {
-      scrollToBottom();
-      setShowScrollButton(false);
-      setUnseenCount(0);
-    } else {
-      setShowScrollButton(true);
-      setUnseenCount((prev) => prev + 1);
-    }
+    scrollToBottom();
   }, [messages]);
-
-  const handleChatScroll = () => {
-    const container = chatMessagesRef.current;
-    if (!container) return;
-    const atBottom = isScrolledToBottom(container);
-    userScrolledUpRef.current = !atBottom;
-    if (atBottom) {
-      setShowScrollButton(false);
-      setUnseenCount(0);
-    } else {
-      setShowScrollButton(true);
-    }
-  };
 
   const handlePointerDown = (event) => {
     if (!isDrawer) return;
@@ -490,7 +458,7 @@ function DrawGuess({ socket, room, onBackToLobby }) {
           <div className="chat-header">
             <h3>채팅</h3>
           </div>
-          <div className="chat-messages" ref={chatMessagesRef} onScroll={handleChatScroll}>
+          <div className="chat-messages" ref={chatMessagesRef}>
             {messages.length === 0 ? (
               <div className="chat-empty">아직 메시지가 없습니다.</div>
             ) : (
@@ -509,15 +477,6 @@ function DrawGuess({ socket, room, onBackToLobby }) {
                   )}
                 </div>
               ))
-            )}
-            {showScrollButton && (
-              <button
-                type="button"
-                className="chat-scroll-button"
-                onClick={scrollToBottom}
-              >
-                아래로{unseenCount > 0 ? ` (${unseenCount})` : ""}
-              </button>
             )}
           </div>
           <div className="chat-input">
