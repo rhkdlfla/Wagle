@@ -1405,52 +1405,25 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
             <label style={{ display: "block", marginBottom: "10px", fontWeight: "bold" }}>
               모드 선택
             </label>
-            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <div className="memory-mode-presets">
               <button
                 onClick={() => setMemoryMode("number")}
-                className={memoryMode === "number" ? "active" : ""}
+                className={`memory-mode-button ${memoryMode === "number" ? "active" : ""}`}
                 disabled={!isHost}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "2px solid",
-                  borderColor: memoryMode === "number" ? "#667eea" : "#ddd",
-                  background: memoryMode === "number" ? "#667eea" : "white",
-                  color: memoryMode === "number" ? "white" : "#333",
-                  cursor: isHost ? "pointer" : "not-allowed",
-                }}
               >
                 🔢 숫자
               </button>
               <button
                 onClick={() => setMemoryMode("korean")}
-                className={memoryMode === "korean" ? "active" : ""}
+                className={`memory-mode-button ${memoryMode === "korean" ? "active" : ""}`}
                 disabled={!isHost}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "2px solid",
-                  borderColor: memoryMode === "korean" ? "#667eea" : "#ddd",
-                  background: memoryMode === "korean" ? "#667eea" : "white",
-                  color: memoryMode === "korean" ? "white" : "#333",
-                  cursor: isHost ? "pointer" : "not-allowed",
-                }}
               >
                 한글
               </button>
               <button
                 onClick={() => setMemoryMode("emoji")}
-                className={memoryMode === "emoji" ? "active" : ""}
+                className={`memory-mode-button ${memoryMode === "emoji" ? "active" : ""}`}
                 disabled={!isHost}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "2px solid",
-                  borderColor: memoryMode === "emoji" ? "#667eea" : "#ddd",
-                  background: memoryMode === "emoji" ? "#667eea" : "white",
-                  color: memoryMode === "emoji" ? "white" : "#333",
-                  cursor: isHost ? "pointer" : "not-allowed",
-                }}
               >
                 😀 이모지
               </button>

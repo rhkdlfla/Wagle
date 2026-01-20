@@ -12,6 +12,7 @@ const GAME_LABELS = {
   liarGame: "라이어 게임",
   ticTacToe: "틱택토",
   memoryGame: "기억력 게임",
+  typingRacing: "타이핑 레이싱",
 };
 
 function UserProfileModal({ isOpen, onClose, user, onUserUpdated }) {
