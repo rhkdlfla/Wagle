@@ -6,7 +6,6 @@ const NumberRush = require("../games/NumberRush");
 const LiarGame = require("../games/LiarGame");
 const TicTacToe = require("../games/TicTacToe");
 const MemoryGame = require("../games/MemoryGame");
-const TicTacToe = require("../games/TicTacToe");
 const User = require("../../models/User");
 
 // 게임 인스턴스 저장 (updateInterval 관리를 위해)
@@ -22,7 +21,6 @@ const GAME_CLASSES = {
   liarGame: LiarGame,
   ticTacToe: TicTacToe,
   memoryGame: MemoryGame,
-  ticTacToe: TicTacToe,
 };
 
 // 게임 설정 (각 게임의 기본 설정을 중앙에서 관리)
