@@ -75,6 +75,27 @@
   z-index: 1000;
 }
 
+.app-logo-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.app-logo {
+  height: 40px;
+  width: auto;
+  display: block;
+}
+
+.user-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .user-info-button {
   display: flex;
   align-items: center;
