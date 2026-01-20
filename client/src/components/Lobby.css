@@ -1129,6 +1129,7 @@
   padding: 25px 0 0 0;
   text-align: center;
   display: flex;
+  align-items: stretch;
   gap: 30px;
 }
 
@@ -1156,17 +1157,28 @@
   cursor: not-allowed;
 }
 
-.waiting-message {
-  padding: 20px;
-  margin-bottom: 15px;
+.lobby-actions .waiting-message {
+  padding: 20px !important;
+  flex: 2 1 0;
+  flex-shrink: 0;
+  margin-bottom: 0px;
   background: rgba(255, 152, 0, 0.2);
   border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: fit-content;
+  height: auto;
+  overflow: visible;
 }
 
 .waiting-message p {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.3rem;
+  font-weight: bold;
   color: #ff9800;
+  line-height: 1.2;
 }
 
 .leave-button {
