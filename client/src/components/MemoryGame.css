@@ -27,6 +27,25 @@
   text-align: center;
 }
 
+.memory-game-container .game-header-small {
+  width: 100%;
+  max-width: 1400px;
+  margin-bottom: 15px;
+}
+
+.memory-game-container .game-header-small-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+}
+
+.memory-game-container .game-header-small h2 {
+  font-size: 1.5rem;
+  margin: 0;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
 .memory-game-container .game-header-actions {
   display: flex;
   gap: 10px;
@@ -117,14 +136,16 @@
   min-height: 600px;
 }
 
-/* 오른쪽: 사이드바 (라운드 정보 및 스코어보드) */
+/* 오른쪽: 사이드바 (라운드 정보, 스코어보드 및 채팅) */
 .game-sidebar {
-  width: 300px;
+  width: 320px;
   display: flex;
   flex-direction: column;
   gap: 20px;
   position: sticky;
   top: 20px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
 }
 
 /* 라운드 정보 */

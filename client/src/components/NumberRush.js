@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import GameScoreboard from "./GameScoreboard";
 import GameResults from "./GameResults";
+import GameChat from "./GameChat";
 import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./NumberRush.css";
 
@@ -208,12 +209,9 @@ function NumberRush({ socket, room, onBackToLobby }) {
 
   return (
     <div className="number-rush-container">
-      <div className="game-header">
-        <div className="game-header-content">
-          <div>
-            <h1>🔢 넘버 러시!</h1>
-            <p>1부터 {roundMaxNumber}까지 순서대로 공을 클릭하세요!</p>
-          </div>
+      <div className="game-header-small">
+        <div className="game-header-small-content">
+          <h2>🔢 넘버 러시!</h2>
           <div className="game-header-actions">
             {isHost && isActive && (
               <button onClick={handleEndGame} className="end-game-button" title="게임 종료">
@@ -236,8 +234,9 @@ function NumberRush({ socket, room, onBackToLobby }) {
 
       {isActive && (
         <div className="game-screen">
-          {/* 라운드 정보 */}
-          <div className="round-info">
+          <div className="game-main-area">
+            {/* 라운드 정보 */}
+            <div className="round-info">
             <div className="round-badge">
               라운드 {currentRound} / {maxRounds}
             </div>
@@ -321,22 +320,31 @@ function NumberRush({ socket, room, onBackToLobby }) {
               })}
             </div>
           )}
+          </div>
 
-          <GameScoreboard
-            teams={room.teamMode ? room.teams : []}
-            teamScores={teamScores}
-            players={room.players}
-            scores={scores}
-            myPlayerId={socket.id}
-            teamMode={room.teamMode}
-            scoreUnit="점"
-            getPlayerScore={getPlayerScore}
-          />
+          <div className="game-sidebar">
+            <GameScoreboard
+              teams={room.teamMode ? room.teams : []}
+              teamScores={teamScores}
+              players={room.players}
+              scores={scores}
+              myPlayerId={socket.id}
+              teamMode={room.teamMode}
+              scoreUnit="점"
+              getPlayerScore={getPlayerScore}
+            />
+            <GameChat socket={socket} room={room} />
+          </div>
         </div>
       )}
 
       {results && (
         <div className="results-screen">
+          <div className="game-header-small">
+            <div className="game-header-small-content">
+              <h2>🔢 넘버 러시!</h2>
+            </div>
+          </div>
           <h2>게임 종료! 🎉</h2>
           <p className="final-round-info">총 {maxRounds}라운드 완료</p>
           

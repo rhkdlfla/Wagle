@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import GameScoreboard from "./GameScoreboard";
 import GameResults from "./GameResults";
+import GameChat from "./GameChat";
 import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./MemoryGame.css";
 
@@ -94,12 +95,9 @@ function MemoryGame({ socket, room, onBackToLobby }) {
   if (results) {
     return (
       <div className="memory-game-container">
-        <div className="game-header">
-          <div className="game-header-content">
-            <div>
-              <h1>🧠 기억력 게임</h1>
-              <p>게임 결과</p>
-            </div>
+        <div className="game-header-small">
+          <div className="game-header-small-content">
+            <h2>🧠 기억력 게임</h2>
             <div className="game-header-actions">
               <button onClick={onBackToLobby} className="leave-game-button">
                 🚪 로비로
@@ -152,12 +150,9 @@ function MemoryGame({ socket, room, onBackToLobby }) {
 
   return (
     <div className="memory-game-container">
-      <div className="game-header">
-        <div className="game-header-content">
-          <div>
-            <h1>🧠 기억력 게임</h1>
-            <p>패턴을 기억하고 순서대로 입력하세요!</p>
-          </div>
+      <div className="game-header-small">
+        <div className="game-header-small-content">
+          <h2>🧠 기억력 게임</h2>
           <div className="game-header-actions">
             {isHost && isActive && (
               <button onClick={handleEndGame} className="end-game-button" title="게임 종료">
@@ -266,7 +261,7 @@ function MemoryGame({ socket, room, onBackToLobby }) {
           )}
           </div>
 
-          {/* 오른쪽: 라운드 정보 및 스코어보드 */}
+          {/* 오른쪽: 라운드 정보, 스코어보드 및 채팅 */}
           <div className="game-sidebar">
             {/* 라운드 정보 */}
             <div className="round-info">
@@ -297,6 +292,8 @@ function MemoryGame({ socket, room, onBackToLobby }) {
               teams={room.teams}
               scoreUnit="라운드"
             />
+
+            <GameChat socket={socket} room={room} />
           </div>
         </div>
       )}

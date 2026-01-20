@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import GameScoreboard from "./GameScoreboard";
 import GameResults from "./GameResults";
+import GameChat from "./GameChat";
 import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./QuizBattle.css";
 
@@ -254,10 +255,12 @@ function QuizBattle({ socket, room, onBackToLobby }) {
   if (!isActive && !results) {
     return (
       <div className="quiz-battle-container">
-        <div className="game-header">
-          <h1>🧩 퀴즈 배틀</h1>
-          <p>게임 시작을 기다리는 중...</p>
+        <div className="game-header-small">
+          <div className="game-header-small-content">
+            <h2>🧩 퀴즈 배틀</h2>
+          </div>
         </div>
+        <p>게임 시작을 기다리는 중...</p>
       </div>
     );
   }
@@ -265,9 +268,10 @@ function QuizBattle({ socket, room, onBackToLobby }) {
   if (results) {
     return (
       <div className="quiz-battle-container">
-        <div className="game-header">
-          <h1>🧩 퀴즈 배틀</h1>
-          <p>게임 종료!</p>
+        <div className="game-header-small">
+          <div className="game-header-small-content">
+            <h2>🧩 퀴즈 배틀</h2>
+          </div>
         </div>
         <GameResults
           teams={room.teamMode ? room.teams : []}
@@ -288,30 +292,27 @@ function QuizBattle({ socket, room, onBackToLobby }) {
 
   return (
     <div className="quiz-battle-container">
-      <div className="game-header">
-        <div className="game-header-content">
-          <h1>🧩 퀴즈 배틀</h1>
-          {quiz && <h2>{quiz.title}</h2>}
-          {timeRemaining !== null && (
-            <div className="timer">⏱️ {formatTime(timeRemaining)}</div>
-          )}
-        </div>
-        <div className="game-header-actions">
-          {isHost && isActive && (
-            <button onClick={handleEndGame} className="end-game-button">
-              게임 종료
-            </button>
-          )}
-          {isActive && (
-            <button onClick={handleLeaveGame} className="leave-game-button" title="게임 나가기">
-              🚪 나가기
-            </button>
-          )}
+      <div className="game-header-small">
+        <div className="game-header-small-content">
+          <h2>🧩 퀴즈 배틀</h2>
+          <div className="game-header-actions">
+            {isHost && isActive && (
+              <button onClick={handleEndGame} className="end-game-button">
+                게임 종료
+              </button>
+            )}
+            {isActive && (
+              <button onClick={handleLeaveGame} className="leave-game-button" title="게임 나가기">
+                🚪 나가기
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {isActive && (
-        <div className="quiz-game-screen">
+        <div className="game-screen">
+          <div className="game-main-area">
           {questionResult ? (
             // 결과 표시 중
             <div className="question-result">
@@ -500,17 +501,21 @@ function QuizBattle({ socket, room, onBackToLobby }) {
               <p>문제를 기다리는 중...</p>
             </div>
           )}
+          </div>
 
-          <GameScoreboard
-            teams={room.teamMode ? room.teams : []}
-            teamScores={teamScores}
-            players={room.players}
-            scores={scores}
-            myPlayerId={socket.id}
-            teamMode={room.teamMode}
-            scoreUnit="점"
-            getPlayerScore={getPlayerScore}
-          />
+          <div className="game-sidebar">
+            <GameScoreboard
+              teams={room.teamMode ? room.teams : []}
+              teamScores={teamScores}
+              players={room.players}
+              scores={scores}
+              myPlayerId={socket.id}
+              teamMode={room.teamMode}
+              scoreUnit="점"
+              getPlayerScore={getPlayerScore}
+            />
+            <GameChat socket={socket} room={room} />
+          </div>
         </div>
       )}
     </div>

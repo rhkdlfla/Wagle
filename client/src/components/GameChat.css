@@ -1,0 +1,201 @@
+.game-chat {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  height: 400px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.game-chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.game-chat-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #ffc107;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.chat-mode-toggle {
+  display: flex;
+  gap: 5px;
+}
+
+.chat-mode-button {
+  padding: 5px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.chat-mode-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.chat-mode-button.active {
+  background: rgba(255, 193, 7, 0.3);
+  border-color: #ffc107;
+}
+
+.game-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 15px;
+  padding-right: 5px;
+}
+
+.game-chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.game-chat-messages::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.game-chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.game-chat-messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.chat-empty {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 20px;
+  font-size: 0.9rem;
+}
+
+.chat-message {
+  margin-bottom: 12px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.chat-message.my-message {
+  background: rgba(33, 150, 243, 0.2);
+}
+
+.chat-message.team-message {
+  border-left: 3px solid rgba(255, 193, 7, 0.5);
+}
+
+.message-sender {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.message-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.message-avatar-placeholder {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.message-player-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.team-badge {
+  font-size: 0.75rem;
+  margin-left: 5px;
+}
+
+.message-content {
+  margin-left: 32px;
+}
+
+.message-content p {
+  margin: 0 0 5px 0;
+  font-size: 0.9rem;
+  color: white;
+  word-wrap: break-word;
+}
+
+.message-time {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.game-chat-input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.game-chat-input-group input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 0.9rem;
+}
+
+.game-chat-input-group input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.game-chat-input-group input:focus {
+  outline: none;
+  border-color: #ffc107;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.game-chat-input-group button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 193, 7, 0.8);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.game-chat-input-group button:hover:not(:disabled) {
+  background: rgba(255, 193, 7, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.4);
+}
+
+.game-chat-input-group button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

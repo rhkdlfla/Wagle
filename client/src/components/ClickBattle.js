@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import GameScoreboard from "./GameScoreboard";
 import GameResults from "./GameResults";
+import GameChat from "./GameChat";
 import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./ClickBattle.css";
 
@@ -187,12 +188,9 @@ function ClickBattle({ socket, room, onBackToLobby }) {
 
   return (
     <div className="click-battle-container">
-      <div className="game-header">
-        <div className="game-header-content">
-          <div>
-            <h1>🎯 클릭 대결!</h1>
-            <p>일정 시간 동안 최대한 많이 클릭하세요!</p>
-          </div>
+      <div className="game-header-small">
+        <div className="game-header-small-content">
+          <h2>🎯 클릭 대결!</h2>
           <div className="game-header-actions">
             {isHost && isActive && (
               <button onClick={handleEndGame} className="end-game-button" title="게임 종료">
@@ -215,51 +213,61 @@ function ClickBattle({ socket, room, onBackToLobby }) {
 
       {isActive && (
         <div className="game-screen">
-          <div className="timer">
-            <div className="timer-circle">
-              <span className="timer-text">{formatTime(timeRemaining)}</span>
-            </div>
-          </div>
-
-          <div 
-            className="click-area" 
-            onClick={handleClick}
-            onContextMenu={handleClick}
-          >
-            <div className={`click-button ${!canClick() ? "disabled" : ""}`}>
-              <span className="click-icon">👆</span>
-              <span className="click-text">
-                {relayMode && !canClick() ? "대기 중..." : "클릭!"}
-              </span>
-              <span className="click-count">{myClicks}</span>
-            </div>
-            {relayMode && room.teamMode && (
-              <div className="relay-mode-info">
-                <p className="active-player-text">
-                  현재 차례: <strong>{getActivePlayerName() || "대기 중"}</strong>
-                </p>
-                <p className="relay-instruction">
-                  💡 우클릭으로 다음 팀원에게 순서 넘기기
-                </p>
+          <div className="game-main-area">
+            <div className="timer">
+              <div className="timer-circle">
+                <span className="timer-text">{formatTime(timeRemaining)}</span>
               </div>
-            )}
+            </div>
+
+            <div 
+              className="click-area" 
+              onClick={handleClick}
+              onContextMenu={handleClick}
+            >
+              <div className={`click-button ${!canClick() ? "disabled" : ""}`}>
+                <span className="click-icon">👆</span>
+                <span className="click-text">
+                  {relayMode && !canClick() ? "대기 중..." : "클릭!"}
+                </span>
+                <span className="click-count">{myClicks}</span>
+              </div>
+              {relayMode && room.teamMode && (
+                <div className="relay-mode-info">
+                  <p className="active-player-text">
+                    현재 차례: <strong>{getActivePlayerName() || "대기 중"}</strong>
+                  </p>
+                  <p className="relay-instruction">
+                    💡 우클릭으로 다음 팀원에게 순서 넘기기
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
-          <GameScoreboard
-            teams={room.teamMode ? room.teams : []}
-            teamScores={teamScores}
-            players={room.players}
-            scores={clicks}
-            myPlayerId={socket.id}
-            teamMode={room.teamMode}
-            scoreUnit="회"
-            getPlayerScore={getPlayerClicks}
-          />
+          <div className="game-sidebar">
+            <GameScoreboard
+              teams={room.teamMode ? room.teams : []}
+              teamScores={teamScores}
+              players={room.players}
+              scores={clicks}
+              myPlayerId={socket.id}
+              teamMode={room.teamMode}
+              scoreUnit="회"
+              getPlayerScore={getPlayerClicks}
+            />
+            <GameChat socket={socket} room={room} />
+          </div>
         </div>
       )}
 
       {results && (
         <div className="results-screen">
+          <div className="game-header-small">
+            <div className="game-header-small-content">
+              <h2>🎯 클릭 대결!</h2>
+            </div>
+          </div>
           <h2>게임 종료! 🎉</h2>
           
           <GameResults
