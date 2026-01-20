@@ -9,7 +9,6 @@ import QuizBattle from "../components/QuizBattle";
 import LiarGame from "../components/LiarGame";
 import TicTacToe from "../components/TicTacToe";
 import MemoryGame from "../components/MemoryGame";
-import TicTacToe from "../components/TicTacToe";
 
 // 게임 컴포넌트 맵핑
 // gameType (서버에서 사용하는 ID) -> React 컴포넌트
@@ -22,7 +21,6 @@ export const GAME_COMPONENTS = {
   liarGame: LiarGame,
   ticTacToe: TicTacToe,
   memoryGame: MemoryGame,
-  ticTacToe: TicTacToe,
   // 새로운 게임을 추가할 때 여기에 추가:
   // newGame: NewGameComponent,
 };

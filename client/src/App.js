@@ -161,6 +161,9 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
 
     socket.on("roomUpdated", (updatedRoom) => {
       setRoom(updatedRoom);
+      if (updatedRoom?.status === "waiting") {
+        navigate(`/room/${roomId}`);
+      }
     });
 
     socket.on("gameStarted", ({ room: gameRoom }) => {
@@ -279,11 +282,15 @@ function RoomGame({ socket, user }) {
 
     socket.on("roomUpdated", (updatedRoom) => {
       setRoom(updatedRoom);
+      if (updatedRoom?.status === "waiting") {
+        navigate(`/room/${roomId}`);
+      }
     });
     
-    socket.on("gameEnded", () => {
-      // 게임 종료 시 roomUpdated가 먼저 오므로 여기서는 추가 처리 불필요
-      // 하지만 명시적으로 처리하기 위해 roomUpdated에서 처리
+    socket.on("gameEnded", ({ reason } = {}) => {
+      if (reason === "hostEnd") {
+        navigate(`/room/${roomId}`);
+      }
     });
 
     return () => {
@@ -291,7 +298,7 @@ function RoomGame({ socket, user }) {
       socket.off("roomUpdated");
       socket.off("gameEnded");
     };
-  }, [socket, roomId]);
+  }, [socket, roomId, navigate]);
 
   if (isLoading || !room) {
     return (

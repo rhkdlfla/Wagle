@@ -1,6 +1,8 @@
 .liar-game-container {
-  height: 100vh;
-  padding: 12px;
+  height: calc(100vh - 72px);
+  height: calc(100dvh - 72px);
+  padding: 84px 12px 12px;
+  box-sizing: border-box;
   color: #ffffff;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
