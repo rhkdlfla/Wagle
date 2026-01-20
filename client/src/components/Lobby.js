@@ -193,13 +193,29 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
   const [chatMode, setChatMode] = useState("room"); // "room" or "team"
-  const messagesEndRef = useRef(null);
+  const chatMessagesRef = useRef(null);
+  const didAutoScrollRef = useRef(false);
   const location = useLocation();
   const navigate = useNavigate();
   const isHost = currentRoom?.players[0]?.id === socket.id;
   
   // 현재 플레이어의 팀 ID 가져오기
   const myTeamId = currentRoom?.players?.find((p) => p.id === socket.id)?.teamId || null;
+
+  // 로비에서는 페이지(바깥) 스크롤을 막고, 진입 시 항상 맨 위로 고정
+  useEffect(() => {
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+
+    window.scrollTo(0, 0);
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+    };
+  }, []);
 
   // 게임 설정 변경 시 자동 저장
   useEffect(() => {
@@ -276,9 +292,16 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     };
   }, [socket, onLeaveRoom, onStartGame, selectedGame]);
 
-  // 메시지 목록이 업데이트될 때마다 스크롤을 맨 아래로
+  // 메시지 목록이 업데이트될 때마다 "채팅 박스 내부"만 맨 아래로
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = chatMessagesRef.current;
+    if (!el) return;
+
+    const behavior = didAutoScrollRef.current ? "smooth" : "auto";
+    requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior });
+      didAutoScrollRef.current = true;
+    });
   }, [messages]);
 
 
@@ -654,7 +677,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         )}
       </div>
 
-      <div className="chat-messages">
+      <div className="chat-messages" ref={chatMessagesRef}>
         {displayedMessages.length === 0 ? (
           <div className="chat-empty">아직 메시지가 없습니다.</div>
         ) : (
@@ -699,7 +722,6 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
             );
           })
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       <div className="chat-input-group">
@@ -1308,9 +1330,6 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
               </button>
             ))}
           </div>
-          <p style={{ marginTop: "10px", fontSize: "0.9em", color: "#666" }}>
-            합이 10이 되는 사과를 선택하세요
-          </p>
         </div>
       </div>
     ) : null;
@@ -1433,15 +1452,17 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const gameSelectionSection = (
     <div className="game-selection-section">
       <h2>게임 선택</h2>
-      {gamesListSection}
-      <div className="game-selection-panels">
-        {quizBattleQuizSelectionPanel}
-        {liarSettingsPanel}
-        {drawGuessRoundsPanel}
-        {quizBattleSettingsPanel}
-        {appleBattleSettingsPanel}
-        {genericDurationPanel}
-        {relayModePanel}
+      <div className="game-selection-scroll">
+        {gamesListSection}
+        <div className="game-selection-panels">
+          {quizBattleQuizSelectionPanel}
+          {liarSettingsPanel}
+          {drawGuessRoundsPanel}
+          {quizBattleSettingsPanel}
+          {appleBattleSettingsPanel}
+          {genericDurationPanel}
+          {relayModePanel}
+        </div>
       </div>
       {actionsSection}
     </div>

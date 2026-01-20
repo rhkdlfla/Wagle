@@ -1,5 +1,8 @@
 .App {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  box-sizing: border-box; /* padding-top이 height 안에 포함되게 */
+  overflow: hidden;       /* 페이지(바깥) 스크롤 방지 */
 }
 
 .connection-status {
