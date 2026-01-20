@@ -641,6 +641,24 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     }
   });
 
+  socket.on("drawGuessUndo", ({ roomId }) => {
+    const gameState = gameStates.get(roomId);
+    const room = rooms.get(roomId);
+
+    if (!gameState || !room || gameState.gameType !== "drawGuess") {
+      return;
+    }
+
+    if (!gameState.isActive) {
+      return;
+    }
+
+    const instance = gameInstances.get(roomId);
+    if (instance && instance.game instanceof DrawGuess) {
+      instance.game.handleUndo(socket.id);
+    }
+  });
+
   socket.on("drawGuessGuess", ({ roomId, guess }) => {
     const gameState = gameStates.get(roomId);
     const room = rooms.get(roomId);

@@ -2,17 +2,54 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
   padding: 20px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  overflow-x: hidden;
 }
 
-.draw-guess-header {
+.draw-guess-container .game-header {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+}
+
+.draw-guess-container .game-header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.25);
+  gap: 16px;
+}
+
+.draw-guess-container .game-header-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.draw-guess-container .game-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.draw-guess-container .game-header-round {
+  opacity: 0.9;
+}
+
+.draw-guess-container .game-header-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
+}
+
+.draw-guess-container .timer {
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .results-screen {
@@ -64,17 +101,19 @@
   color: rgba(255, 255, 255, 0.85);
 }
 
-.header-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-}
 
 .draw-guess-body {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 16px;
+  width: 100%;
+}
+
+.canvas-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
 }
 
 .canvas-panel {
@@ -84,14 +123,27 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  width: fit-content;
+  max-width: 100%;
 }
 
 .word-panel {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   font-weight: 600;
+}
+
+.word-panel-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.word-timer {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .word-reveal {
@@ -120,14 +172,15 @@
   background: #ffffff;
 }
 
-.canvas-actions {
-  margin-top: 8px;
+.canvas-tools {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  min-height: 32px;
   gap: 12px;
   flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .clear-button {
@@ -183,7 +236,8 @@
 .side-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
+  width: 300px;
 }
 
 .chat-section {
@@ -202,10 +256,14 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+.chat-header h3 {
+  margin: 0;
+}
+
 .chat-messages {
   flex: 1;
-  height: 320px;
-  max-height: 320px;
+  height: 220px;
+  max-height: 220px;
   overflow-y: auto;
   padding: 8px 12px;
   display: flex;

@@ -5,7 +5,7 @@ import GameResults from "./GameResults";
 import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./DrawGuess.css";
 
-const CANVAS_WIDTH = 640;
+const CANVAS_WIDTH = 880;
 const CANVAS_HEIGHT = 420;
 const DEFAULT_COLOR = "#222222";
 const DEFAULT_SIZE = 4;
@@ -18,6 +18,8 @@ function DrawGuess({ socket, room, onBackToLobby }) {
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef(null);
   const strokesRef = useRef([]);
+  const strokeIdRef = useRef(0);
+  const currentStrokeIdRef = useRef(null);
 
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [drawerId, setDrawerId] = useState(null);
@@ -172,6 +174,11 @@ function DrawGuess({ socket, room, onBackToLobby }) {
       clearCanvas();
     });
 
+    socket.on("drawGuessUndo", ({ strokes }) => {
+      strokesRef.current = strokes || [];
+      redrawAll(strokesRef.current);
+    });
+
     socket.on("drawGuessWord", ({ word: newWord }) => {
       setWord(newWord || null);
     });
@@ -264,6 +271,7 @@ function DrawGuess({ socket, room, onBackToLobby }) {
       socket.off("drawGuessState");
       socket.off("drawGuessStroke");
       socket.off("drawGuessClear");
+      socket.off("drawGuessUndo");
       socket.off("drawGuessWord");
       socket.off("drawGuessCorrect");
       socket.off("drawGuessRoundEnded");
@@ -272,6 +280,29 @@ function DrawGuess({ socket, room, onBackToLobby }) {
       socket.off("messageError");
     };
   }, [socket, room.id]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (!isDrawer) return;
+      if (!event.ctrlKey || event.key.toLowerCase() !== "z") return;
+      const target = event.target;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      socket.emit("drawGuessUndo", { roomId: room.id });
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [socket, room.id, isDrawer]);
 
   useEffect(() => {
     return () => {
@@ -329,6 +360,8 @@ function DrawGuess({ socket, room, onBackToLobby }) {
       event.target.setPointerCapture(event.pointerId);
     }
     isDrawingRef.current = true;
+    strokeIdRef.current += 1;
+    currentStrokeIdRef.current = strokeIdRef.current;
     lastPointRef.current = getCanvasPoint(event);
   };
 
@@ -345,6 +378,7 @@ function DrawGuess({ socket, room, onBackToLobby }) {
       color: strokeColor,
       size: strokeSize,
       senderId: socket.id,
+      strokeId: currentStrokeIdRef.current,
     };
 
     strokesRef.current.push(stroke);
@@ -357,6 +391,7 @@ function DrawGuess({ socket, room, onBackToLobby }) {
   const handlePointerUp = () => {
     isDrawingRef.current = false;
     lastPointRef.current = null;
+    currentStrokeIdRef.current = null;
   };
 
   const handleClear = () => {
@@ -417,16 +452,15 @@ function DrawGuess({ socket, room, onBackToLobby }) {
           </div>
         </div>
       )}
-      <div className="draw-guess-header">
-        <div className="header-left">
-          <h1>🎨 그림 맞히기</h1>
-          <p>
-            라운드 {round}/{totalRounds}
-          </p>
-        </div>
-        <div className="header-right">
-          <div className="timer">⏱️ {formatTime(timeRemaining)}</div>
-          <div className="header-actions">
+      <div className="game-header">
+        <div className="game-header-content">
+          <div className="game-header-title">
+            <h1>🎨 그림 맞히기</h1>
+            <span className="game-header-round">
+              라운드 {round}/{totalRounds}
+            </span>
+          </div>
+          <div className="game-header-actions">
             {room?.players?.[0]?.id === socket.id && (
               <button onClick={handleEndGame} className="end-game-button">
                 🛑 게임 종료
@@ -440,30 +474,36 @@ function DrawGuess({ socket, room, onBackToLobby }) {
       </div>
 
       <div className="draw-guess-body">
-        <div className="canvas-panel">
-          <div className="word-panel">
-            {isDrawer ? (
-              <span className="word-reveal">제시어: {word || "..."}</span>
-            ) : (
-              <span className="word-hidden">
-                제시어: {"•".repeat(wordLength || 0)}
-              </span>
-            )}
-            {roundAnswer && (
-              <span className="word-answer">정답: {roundAnswer}</span>
-            )}
+        <div className="canvas-column">
+          <div className="canvas-panel">
+            <div className="word-panel">
+              {isDrawer ? (
+                <span className="word-reveal">제시어: {word || "..."}</span>
+              ) : (
+                <span className="word-hidden">
+                  제시어: {"•".repeat(wordLength || 0)}
+                </span>
+              )}
+              <div className="word-panel-right">
+                {roundAnswer && (
+                  <span className="word-answer">정답: {roundAnswer}</span>
+                )}
+                <span className="word-timer">⏱️ {formatTime(timeRemaining)}</span>
+              </div>
+            </div>
+            <canvas
+              ref={canvasRef}
+              width={CANVAS_WIDTH}
+              height={CANVAS_HEIGHT}
+              style={{ width: `${CANVAS_WIDTH}px`, height: `${CANVAS_HEIGHT}px` }}
+              className={`draw-canvas ${!isDrawer ? "readonly" : ""}`}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
+            />
           </div>
-          <canvas
-            ref={canvasRef}
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
-            className={`draw-canvas ${!isDrawer ? "readonly" : ""}`}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerUp}
-          />
-          <div className="canvas-actions">
+          <div className="canvas-tools">
             {isDrawer ? (
               <>
                 <div className="tool-group">

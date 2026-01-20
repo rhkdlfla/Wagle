@@ -141,6 +141,30 @@ class DrawGuess {
     this.io.to(this.room.id).emit("drawGuessClear");
   }
 
+  handleUndo(socketId) {
+    if (socketId !== this.getDrawerId()) {
+      return;
+    }
+    if (!this.gameState.strokes || this.gameState.strokes.length === 0) {
+      return;
+    }
+    const lastStroke = this.gameState.strokes[this.gameState.strokes.length - 1];
+    const lastStrokeId = lastStroke?.strokeId ?? null;
+    if (!lastStrokeId) {
+      this.gameState.strokes.pop();
+    } else {
+      while (
+        this.gameState.strokes.length > 0 &&
+        this.gameState.strokes[this.gameState.strokes.length - 1]?.strokeId === lastStrokeId
+      ) {
+        this.gameState.strokes.pop();
+      }
+    }
+    this.io.to(this.room.id).emit("drawGuessUndo", {
+      strokes: this.gameState.strokes,
+    });
+  }
+
   handleGuess(socketId, guess) {
     if (!this.gameState.isActive || this.isEndingRound) {
       return false;
