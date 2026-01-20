@@ -4,6 +4,7 @@ const DrawGuess = require("../games/DrawGuess");
 const QuizBattle = require("../games/QuizBattle");
 const NumberRush = require("../games/NumberRush");
 const LiarGame = require("../games/LiarGame");
+const TicTacToe = require("../games/TicTacToe");
 const MemoryGame = require("../games/MemoryGame");
 const TypingRacing = require("../games/TypingRacing");
 const User = require("../../models/User");
@@ -19,6 +20,7 @@ const GAME_CLASSES = {
   quizBattle: QuizBattle,
   numberRush: NumberRush,
   liarGame: LiarGame,
+  ticTacToe: TicTacToe,
   memoryGame: MemoryGame,
   typingRacing: TypingRacing,
 };
@@ -65,6 +67,11 @@ const GAME_CONFIGS = {
     defaultDuration: 120000, // 2분
     minDuration: 30000,
     maxDuration: 300000,
+  },
+  ticTacToe: {
+    defaultDuration: 300000, // 5분 (전역 타이머 사용 안 함)
+    minDuration: 60000,
+    maxDuration: 900000,
     supportsRelayMode: false,
   },
 };
@@ -309,6 +316,11 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       return;
     }
 
+    if (gameType === "ticTacToe" && room.players.length !== 2) {
+      socket.emit("gameError", { message: "2인만 플레이할 수 있습니다." });
+      return;
+    }
+
     room.status = "playing";
     room.selectedGame = gameType;
 
@@ -429,6 +441,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       results: results,
       winners: winners,
       teamScores: teamScores, // 팀 점수 포함
+      reason: reason || null,
     });
 
     await recordGameResults({
@@ -443,6 +456,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     
     // 방 상태를 대기 중으로 변경
     room.status = "waiting";
+    io.to(roomId).emit("roomUpdated", room);
     io.emit("roomList", getRoomList(rooms));
     
     console.log(`게임 종료: ${roomId}, 승자: ${winners.join(", ")}`, reason ? `(reason=${reason})` : "");

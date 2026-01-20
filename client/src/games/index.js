@@ -7,6 +7,7 @@ import DrawGuess from "../components/DrawGuess";
 import NumberRush from "../components/NumberRush";
 import QuizBattle from "../components/QuizBattle";
 import LiarGame from "../components/LiarGame";
+import TicTacToe from "../components/TicTacToe";
 import MemoryGame from "../components/MemoryGame";
 import TypingRacing from "../components/TypingRacing";
 
@@ -19,6 +20,7 @@ export const GAME_COMPONENTS = {
   numberRush: NumberRush,
   quizBattle: QuizBattle,
   liarGame: LiarGame,
+  ticTacToe: TicTacToe,
   memoryGame: MemoryGame,
   typingRacing: TypingRacing,
   // 새로운 게임을 추가할 때 여기에 추가:
@@ -105,6 +107,17 @@ export const GAME_METADATA = [
     durationPresets: [300, 600, 900],
     supportsDuration: false,
     supportsRelayMode: false,
+  },
+  {
+    id: "ticTacToe",
+    name: "(2인용) 틱택토",
+    description: "3줄을 먼저 완성하면 승리!",
+    icon: "🎯",
+    minPlayers: 2,
+    defaultDuration: 300, // 초 단위
+    minDuration: 60,
+    maxDuration: 900,
+    durationPresets: [60, 120, 180, 300],
   },
   {
     id: "memoryGame",

@@ -1,6 +1,8 @@
 .liar-game-container {
-  height: 100vh;
-  padding: 12px;
+  height: calc(100vh - 72px);
+  height: calc(100dvh - 72px);
+  padding: 84px 12px 12px;
+  box-sizing: border-box;
   color: #ffffff;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
@@ -15,12 +17,12 @@
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.game-header {
+.liar-game-container .game-header {
   width: 100%;
   margin-bottom: 6px;
 }
 
-.game-header-content {
+.liar-game-container .game-header-content {
   display: grid;
   grid-template-columns: minmax(220px, 260px) 1fr auto;
   align-items: center;
@@ -45,7 +47,7 @@
   min-width: 220px;
 }
 
-.game-header-actions {
+.liar-game-container .game-header-actions {
   display: flex;
   gap: 10px;
   align-items: center;
