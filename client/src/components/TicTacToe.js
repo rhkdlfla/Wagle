@@ -146,33 +146,27 @@ function TicTacToe({ socket, room, onBackToLobby }) {
       </div>
 
       {!results && (
-        <div className="tic-tac-toe-status">
-          <div className="status-text">{getStatusText()}</div>
-          <div className="player-row">
-            {players.slice(0, 2).map((player) => (
+        <div className="tic-tac-toe-game-area">
+          {/* 왼쪽 플레이어 정보 */}
+          <div className="tic-tac-toe-player-side">
+            {players[0] && (
               <div
-                key={player.id}
-                className={`player-card ${player.id === currentTurn ? "active" : ""} ${
-                  player.id === myPlayerId ? "me" : ""
+                className={`player-card ${players[0].id === currentTurn ? "active" : ""} ${
+                  players[0].id === myPlayerId ? "me" : ""
                 }`}
               >
-                <div className="player-symbol">{player.symbol || "?"}</div>
-                <div className="player-name">{player.name}</div>
-                {player.id === myPlayerId && <span className="me-badge">나</span>}
+                <div className="player-symbol">{players[0].symbol || "?"}</div>
+                <div className="player-name">{players[0].name}</div>
+                {players[0].id === myPlayerId && <span className="me-badge">나</span>}
+                {players[0].id === currentTurn && (
+                  <div className="turn-indicator">현재 차례</div>
+                )}
               </div>
-            ))}
+            )}
           </div>
-          {mySymbol && (
-            <div className="my-symbol">내 기호: {mySymbol}</div>
-          )}
-          {!mySymbol && (
-            <div className="spectator-hint">관전 중입니다.</div>
-          )}
-        </div>
-      )}
 
-      {!results && (
-        <div className="tic-tac-toe-board">
+          {/* 게임판 */}
+          <div className="tic-tac-toe-board">
           {board.map((cell, index) => (
             <button
               key={`cell-${index}`}
@@ -196,6 +190,34 @@ function TicTacToe({ socket, room, onBackToLobby }) {
               )}
             </button>
           ))}
+          </div>
+
+          {/* 오른쪽 플레이어 정보 */}
+          <div className="tic-tac-toe-player-side">
+            {players[1] && (
+              <div
+                className={`player-card ${players[1].id === currentTurn ? "active" : ""} ${
+                  players[1].id === myPlayerId ? "me" : ""
+                }`}
+              >
+                <div className="player-symbol">{players[1].symbol || "?"}</div>
+                <div className="player-name">{players[1].name}</div>
+                {players[1].id === myPlayerId && <span className="me-badge">나</span>}
+                {players[1].id === currentTurn && (
+                  <div className="turn-indicator">현재 차례</div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!results && (
+        <div className="tic-tac-toe-status-footer">
+          <div className="status-text">{getStatusText()}</div>
+          {!mySymbol && (
+            <div className="spectator-hint">관전 중입니다.</div>
+          )}
         </div>
       )}
 

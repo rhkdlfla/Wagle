@@ -83,7 +83,8 @@ function Login({ onLoginSuccess }) {
         </div>
 
         <div className="login-buttons">
-          <button onClick={handleGoogleLogin} className="login-button google">
+          {/* 구글 로그인 버튼 - 일시적으로 숨김 (로직은 유지) */}
+          {/* <button onClick={handleGoogleLogin} className="login-button google">
             <svg
               width="20"
               height="20"
@@ -109,7 +110,7 @@ function Login({ onLoginSuccess }) {
               />
             </svg>
             구글로 로그인
-          </button>
+          </button> */}
 
           <button onClick={handleKakaoLogin} className="login-button kakao">
             <svg
