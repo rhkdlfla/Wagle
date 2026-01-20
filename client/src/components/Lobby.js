@@ -85,6 +85,19 @@ const GAMES = [
     supportsDuration: false,
     supportsRelayMode: false,
   },
+  {
+    id: "ticTacToe",
+    name: "(2인용) 틱택토",
+    description: "3줄을 먼저 완성하면 승리!",
+    icon: "🎯",
+    minPlayers: 2,
+    defaultDuration: 300,
+    minDuration: 60,
+    maxDuration: 900,
+    durationPresets: [60, 120, 180, 300],
+    supportsDuration: false,
+    supportsRelayMode: false,
+  },
 ];
 
 // 게임 설정 가져오기 함수

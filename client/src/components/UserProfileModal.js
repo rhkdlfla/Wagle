@@ -10,6 +10,7 @@ const GAME_LABELS = {
   quizBattle: "퀴즈 배틀",
   numberRush: "숫자 러시",
   liarGame: "라이어 게임",
+  ticTacToe: "틱택토",
 };
 
 function UserProfileModal({ isOpen, onClose, user, onUserUpdated }) {
