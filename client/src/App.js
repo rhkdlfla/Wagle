@@ -53,23 +53,42 @@ function GameApp({ socket, user, onLogout, onUserUpdated }) {
       <div className="user-header">
         <button
           type="button"
-          className="user-info-button"
-          onClick={() => setIsProfileOpen(true)}
+          className="app-logo-button"
+          onClick={() => navigate("/")}
+          aria-label="홈으로"
         >
-          {user.photo && (
-            <img src={user.photo} alt={displayName} className="user-avatar" />
-          )}
-          <span className="user-name">{displayName}</span>
-          <span className="user-provider">
-            {user.provider === "google" ? "🔵" : user.provider === "kakao" ? "🟡" : "👤"}
-          </span>
-          {user.provider === "guest" && (
-            <span className="guest-badge">게스트</span>
-          )}
+          <img
+            src={`${process.env.PUBLIC_URL}/logo.png`}
+            alt="Wagle 로고"
+            className="app-logo"
+          />
         </button>
-        <button onClick={onLogout} className="logout-button">
-          로그아웃
-        </button>
+
+        <div className="user-actions">
+          <button
+            type="button"
+            className="user-info-button"
+            onClick={() => setIsProfileOpen(true)}
+          >
+            {user.photo && (
+              <img src={user.photo} alt={displayName} className="user-avatar" />
+            )}
+            <span className="user-name">{displayName}</span>
+            <span className="user-provider">
+              {user.provider === "google"
+                ? "🔵"
+                : user.provider === "kakao"
+                ? "🟡"
+                : "👤"}
+            </span>
+            {user.provider === "guest" && (
+              <span className="guest-badge">게스트</span>
+            )}
+          </button>
+          <button onClick={onLogout} className="logout-button">
+            로그아웃
+          </button>
+        </div>
       </div>
 
       <UserProfileModal
@@ -265,6 +284,11 @@ function RoomGame({ socket, user }) {
   const navigate = useNavigate();
   const [room, setRoom] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const isLoadingRef = useRef(true);
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
 
   useEffect(() => {
     // 게임 상태 요청
@@ -279,8 +303,17 @@ function RoomGame({ socket, user }) {
 
     socket.on("roomUpdated", (updatedRoom) => {
       setRoom(updatedRoom);
+      // NOTE:
+      // 게임 종료 시 서버는 roomUpdated(status=waiting)도 보내는데,
+      // 여기서 즉시 로비로 이동해버리면 각 게임 컴포넌트의 결과 화면(GameResults)이
+      // 렌더링되기 전에 언마운트되어 "결과창이 안 뜨는" 문제가 발생할 수 있음.
+      //
+      // 따라서 "게임이 아직 시작되지 않아 로딩 중인 경우"에만 waiting이면 로비로 이동.
+      if (updatedRoom?.status === "waiting" && isLoadingRef.current) {
+        navigate(`/room/${roomId}`);
+      }
     });
-    
+
     return () => {
       socket.off("gameStarted");
       socket.off("roomUpdated");
