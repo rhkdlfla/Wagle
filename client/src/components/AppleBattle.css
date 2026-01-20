@@ -1,17 +1,19 @@
 .apple-battle-container {
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  padding: 36px 20px 16px;
   color: white;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-start;
 }
 
 .apple-battle-header {
   width: 100%;
   max-width: 1200px;
-  margin-bottom: 20px;
+  margin-bottom: -8px;
+  padding-bottom: 0;
 }
 
 .apple-battle-container .game-header-content {
@@ -19,7 +21,7 @@
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 8px;
 }
 
 .apple-battle-container .game-header-content > div:first-child {
@@ -35,17 +37,20 @@
 
 .apple-battle-header h1 {
   font-size: 2.5rem;
-  margin-bottom: 10px;
+  margin-bottom: 0;
+  line-height: 1.1;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .apple-battle-container .timer {
   font-size: 1.5rem;
   font-weight: bold;
-  background: rgba(255, 255, 255, 0.2);
-  padding: 10px 20px;
-  border-radius: 10px;
+  background: transparent;
+  padding: 2px 6px;
+  border-radius: 0;
   display: inline-block;
+  margin-top: 0;
+  line-height: 1.2;
 }
 
 .apple-battle-container .end-game-button,
@@ -88,6 +93,7 @@
   max-width: 1200px;
   width: 100%;
   align-items: flex-start;
+  margin-top: -14px;
 }
 
 .game-grid-container {

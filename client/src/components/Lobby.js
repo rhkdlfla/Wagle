@@ -234,7 +234,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   ); // null = 전체 문제
   // 사과배틀 최대 숫자 설정 (2~9)
   const [appleBattleMaxSum, setAppleBattleMaxSum] = useState(
-    savedSettings?.appleBattleMaxSum || 10
+    savedSettings?.appleBattleMaxSum || 9
   );
   // 메모리 게임 모드 설정 ("number", "korean", "emoji")
   const [memoryMode, setMemoryMode] = useState(

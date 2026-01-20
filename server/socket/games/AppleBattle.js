@@ -8,7 +8,7 @@ class AppleBattle {
   // 게임 초기화
   initialize() {
     // 17×10 그리드 생성 (1~maxSum 숫자)
-    const maxNumber = this.gameState.maxSum || 10; // 그리드에 나오는 최대 숫자
+    const maxNumber = this.gameState.maxSum || 9; // 그리드에 나오는 최대 숫자
     const grid = [];
     for (let row = 0; row < 10; row++) {
       grid[row] = [];
@@ -304,7 +304,7 @@ class AppleBattle {
       teamScores: this.room.teamMode ? (this.gameState.teamScores || {}) : null,
       timeRemaining: remaining,
       teamActivePlayers: this.gameState.relayMode ? (this.gameState.teamActivePlayers || {}) : null,
-      maxSum: this.gameState.maxSum || 10,
+      maxSum: this.gameState.maxSum || 9,
     };
   }
 
@@ -317,7 +317,7 @@ class AppleBattle {
       timeRemaining: gameStateData.timeRemaining || 0,
       grid: gameStateData.grid || [],
       teamActivePlayers: gameStateData.teamActivePlayers || null,
-      maxSum: this.gameState.maxSum || 10,
+      maxSum: this.gameState.maxSum || 9,
     };
   }
 
@@ -333,7 +333,7 @@ class AppleBattle {
       startTime: state.startTime,
       gameType: state.gameType,
       grid: state.grid,
-      maxSum: this.gameState.maxSum || 10,
+      maxSum: this.gameState.maxSum || 9,
     };
   }
 }

@@ -32,7 +32,7 @@ function AppleBattle({ socket, room, onBackToLobby }) {
   const [dragStart, setDragStart] = useState(null);
   const [dragEnd, setDragEnd] = useState(null);
   const [selectedSum, setSelectedSum] = useState(0);
-  const [maxSum, setMaxSum] = useState(10); // 최대 숫자 (기본값 10)
+  const [maxSum, setMaxSum] = useState(9); // 최대 숫자 (기본값 9)
   const gridRef = useRef(null);
   const timerIntervalRef = useRef(null);
   const playerColorMap = useRef({});
@@ -84,7 +84,7 @@ function AppleBattle({ socket, room, onBackToLobby }) {
       setDragStart(null);
       setDragEnd(null);
       setSelectedSum(0);
-      const receivedMaxSum = gameState.maxSum || 10;
+      const receivedMaxSum = gameState.maxSum || 9;
       setMaxSum(receivedMaxSum);
       console.log("사과배틀 게임 시작 - maxSum:", receivedMaxSum, "gameState:", gameState);
       

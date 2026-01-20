@@ -346,7 +346,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       timeBasedScoring: timeBasedScoring === true, // 퀴즈 배틀 시간 비례 점수 모드
       infiniteRetry: infiniteRetry === true, // 퀴즈 배틀 무한 도전 모드
       questionCount: questionCount !== undefined ? (questionCount === null ? null : Math.max(1, parseInt(questionCount))) : null, // 퀴즈 배틀 풀 문제 수 (null이면 전체 문제)
-      maxSum: maxSum !== undefined ? Math.max(2, Math.min(10, parseInt(maxSum))) : 10, // 사과배틀 최대 숫자 (2~10, 기본값 10)
+      maxSum: maxSum !== undefined ? Math.max(2, Math.min(9, parseInt(maxSum))) : 9, // 사과배틀 최대 숫자 (2~9, 기본값 9)
       memoryMode: memoryMode || "number", // 메모리 게임 모드 ("number", "korean", "emoji")
       memoryOptionCount: memoryOptionCount !== undefined ? Math.max(4, Math.min(9, parseInt(memoryOptionCount))) : 4, // 메모리 게임 옵션 개수 (4, 6, 9)
     };
