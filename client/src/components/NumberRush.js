@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import GameScoreboard from "./GameScoreboard";
 import GameResults from "./GameResults";
-import GameChat from "./GameChat";
 import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./NumberRush.css";
 
@@ -235,35 +234,6 @@ function NumberRush({ socket, room, onBackToLobby }) {
       {isActive && (
         <div className="game-screen">
           <div className="game-main-area">
-            {/* 라운드 정보 */}
-            <div className="round-info">
-            <div className="round-badge">
-              라운드 {currentRound} / {maxRounds}
-            </div>
-            {!roundComplete && roundTimeRemaining > 0 && (
-              <div className="round-timer-circle">
-                <span className="round-timer-text">{(roundTimeRemaining / 1000).toFixed(1)}초</span>
-              </div>
-            )}
-            <div className="round-progress">
-              {Array.from({ length: maxRounds }).map((_, index) => (
-                <div
-                  key={index}
-                  className={`round-dot ${index < currentRound - 1 ? "completed" : ""} ${
-                    index === currentRound - 1 ? "current" : ""
-                  }`}
-                  title={
-                    index < roundWinners.length
-                      ? `라운드 ${index + 1}: ${getRoundWinnerName(index) || "미완료"}`
-                      : `라운드 ${index + 1}`
-                  }
-                >
-                  {index < roundWinners.length && "✓"}
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* 라운드 완료 메시지 */}
           {roundComplete && (
             <div className="round-complete-message">
@@ -287,6 +257,23 @@ function NumberRush({ socket, room, onBackToLobby }) {
               </div>
               <div className="next-number-hint">
                 다음 숫자: <strong>{nextNumber}</strong> / {roundMaxNumber}
+              </div>
+              <div className="round-progress">
+                {Array.from({ length: maxRounds }).map((_, index) => (
+                  <div
+                    key={index}
+                    className={`round-dot ${index < currentRound - 1 ? "completed" : ""} ${
+                      index === currentRound - 1 ? "current" : ""
+                    }`}
+                    title={
+                      index < roundWinners.length
+                        ? `라운드 ${index + 1}: ${getRoundWinnerName(index) || "미완료"}`
+                        : `라운드 ${index + 1}`
+                    }
+                  >
+                    {index < roundWinners.length && "✓"}
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -333,7 +320,6 @@ function NumberRush({ socket, room, onBackToLobby }) {
               scoreUnit="점"
               getPlayerScore={getPlayerScore}
             />
-            <GameChat socket={socket} room={room} />
           </div>
         </div>
       )}

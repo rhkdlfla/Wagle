@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import GameScoreboard from "./GameScoreboard";
 import GameResults from "./GameResults";
-import GameChat from "./GameChat";
 import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./ClickBattle.css";
 
@@ -256,7 +255,6 @@ function ClickBattle({ socket, room, onBackToLobby }) {
               scoreUnit="회"
               getPlayerScore={getPlayerClicks}
             />
-            <GameChat socket={socket} room={room} />
           </div>
         </div>
       )}
