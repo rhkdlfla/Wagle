@@ -1,13 +1,18 @@
 .lobby-container {
-  min-height: 100vh;
+  /* App(.App)의 padding-top(70px) 아래 영역을 정확히 채움 */
+  height: 100%;
+  overflow: hidden;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
   color: white;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 20px;
 }
 
 .lobby-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 0;
 }
 
 .lobby-header h1 {
@@ -71,6 +76,8 @@
   display: grid;
   grid-template-columns: 1fr 2fr 1fr;
   gap: 20px;
+  min-height: 0;
+  height: calc(100vh - 240px);
 }
 
 @media (max-width: 768px) {
@@ -84,11 +91,13 @@
   backdrop-filter: blur(10px);
   border-radius: 15px;
   padding: 30px;
-  margin-bottom: 20px;
+  margin-bottom: 0;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  height: 600px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden; /* 메시지 영역만 스크롤 */
 }
 
 .chat-header {
@@ -324,8 +333,13 @@
   backdrop-filter: blur(10px);
   border-radius: 15px;
   padding: 30px;
-  margin-bottom: 20px;
+  margin-bottom: 0;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .players-section h2 {
@@ -339,6 +353,9 @@
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 15px;
   margin-bottom: 30px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 .player-item {
@@ -427,6 +444,7 @@
 .name-input-section {
   margin-top: 30px;
   padding-top: 30px;
+  margin-bottom: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -480,8 +498,38 @@
   backdrop-filter: blur(10px);
   border-radius: 15px;
   padding: 30px;
-  margin-bottom: 20px;
+  margin-bottom: 0px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 게임 선택: 내용만 스크롤, 하단 actionsSection은 고정 */
+.game-selection-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden; /* hover 효과로 좌우 스크롤 생기는 것 방지 */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 스크롤은 되되 스크롤바는 숨김 */
+.game-selection-scroll::-webkit-scrollbar,
+.chat-messages::-webkit-scrollbar,
+.players-list::-webkit-scrollbar,
+.teams-list::-webkit-scrollbar {
+  display: none;
+}
+
+.game-selection-scroll,
+.chat-messages,
+.players-list,
+.teams-list {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge legacy */
 }
 
 .game-selection-section h2 {
@@ -545,7 +593,8 @@
 
 .game-item:hover:not(.disabled) {
   background: rgba(255, 255, 255, 0.2);
-  transform: translateX(5px);
+  /* 가로로 밀리면 overflow-x 스크롤이 생길 수 있어서 세로만 살짝 띄움 */
+  transform: translateY(-2px);
 }
 
 .game-item.selected {
@@ -885,13 +934,9 @@
   background: rgba(33, 150, 243, 0.8);
   border-color: #2196f3;
   box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.3);
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
   font-weight: bold;
 }
 
