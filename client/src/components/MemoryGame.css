@@ -154,56 +154,14 @@
   overflow-y: auto;
 }
 
-/* 라운드 정보 */
-.round-info {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 15px;
-  padding: 20px;
+.round-text {
+  text-align: center;
+  padding: 12px 20px;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 15px;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: 600;
   backdrop-filter: blur(10px);
-}
-
-.round-badge {
-  background: rgba(255, 255, 255, 0.2);
-  padding: 10px 20px;
-  border-radius: 20px;
-  font-size: 1.2rem;
-  font-weight: bold;
-  backdrop-filter: blur(10px);
-}
-
-.round-progress {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.round-dot {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.9rem;
-  transition: all 0.3s;
-}
-
-.round-dot.completed {
-  background: rgba(76, 175, 80, 0.8);
-  color: white;
-}
-
-.round-dot.current {
-  background: rgba(255, 193, 7, 0.9);
-  color: white;
-  transform: scale(1.2);
-  box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
 }
 
 .round-complete-message {

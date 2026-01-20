@@ -263,27 +263,11 @@ function MemoryGame({ socket, room, onBackToLobby }) {
           )}
           </div>
 
-          {/* 오른쪽: 라운드 정보, 스코어보드 및 채팅 */}
+          {/* 오른쪽: 스코어보드 및 채팅 */}
           <div className="game-sidebar">
-            {/* 라운드 정보 */}
-            <div className="round-info">
-              <div className="round-badge">
-                라운드 {gameState.currentRound} / {gameState.maxRounds}
-              </div>
-              <div className="round-progress">
-                {Array.from({ length: gameState.maxRounds }).map((_, index) => (
-                  <div
-                    key={index}
-                    className={`round-dot ${
-                      index < gameState.currentRound - 1 ? "completed" : ""
-                    } ${
-                      index === gameState.currentRound - 1 ? "current" : ""
-                    }`}
-                  >
-                    {index < gameState.currentRound - 1 && "✓"}
-                  </div>
-                ))}
-              </div>
+            {/* 라운드 텍스트 표시 */}
+            <div className="round-text">
+              라운드 {gameState.currentRound} / {gameState.maxRounds}
             </div>
 
             <GameScoreboard 
