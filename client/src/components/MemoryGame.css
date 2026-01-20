@@ -112,6 +112,12 @@
   padding: 100px 20px;
 }
 
+.memory-results {
+  width: 100%;
+  max-width: 720px;
+  margin: 120px auto 0;
+}
+
 .memory-game-container .waiting-screen h2 {
   font-size: 2.5rem;
   margin-bottom: 20px;

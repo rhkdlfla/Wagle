@@ -105,13 +105,15 @@ function MemoryGame({ socket, room, onBackToLobby }) {
             </div>
           </div>
         </div>
-        <GameResults 
-          results={results} 
-          teams={room.teams}
-          myPlayerId={socket.id}
-          teamMode={room.teamMode}
-          scoreUnit="라운드"
-        />
+        <div className="memory-results">
+          <GameResults 
+            results={results} 
+            teams={room.teams}
+            myPlayerId={socket.id}
+            teamMode={room.teamMode}
+            scoreUnit="라운드"
+          />
+        </div>
       </div>
     );
   }
