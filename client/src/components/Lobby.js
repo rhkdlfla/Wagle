@@ -1533,6 +1533,53 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
     </div>
   ) : null;
 
+  // 타이핑 레이싱 아이템 효과 설명 패널
+  const typingRacingItemInfoPanel = selectedGame === "typingRacing" ? (
+    <div className="game-setting-info">
+      <h3>🎁 아이템 효과</h3>
+      <div className="items-info-grid">
+        <div className="item-info-card">
+          <div className="item-icon">✨</div>
+          <div className="item-name">쉬운 타이핑</div>
+          <div className="item-description">10초간 모든 글자를 가나다라마바사아자차카타파하로 변경</div>
+        </div>
+        <div className="item-info-card">
+          <div className="item-icon">🤖</div>
+          <div className="item-name">자동 타이핑</div>
+          <div className="item-description">5초간 자동으로 타이핑</div>
+        </div>
+        <div className="item-info-card">
+          <div className="item-icon">🌀</div>
+          <div className="item-name">텍스트 혼란</div>
+          <div className="item-description">앞선 플레이어들의 글자를 어려운 단어로 변경 (3초 후 발동)</div>
+        </div>
+        <div className="item-info-card">
+          <div className="item-icon">❄️</div>
+          <div className="item-name">짝수칸 정지</div>
+          <div className="item-description">앞선 플레이어 중 짝수칸에 있으면 3초간 멈춤 (3초 후 발동)</div>
+        </div>
+        <div className="item-info-card">
+          <div className="item-icon">🔒</div>
+          <div className="item-name">1등 봉쇄</div>
+          <div className="item-description">1등을 3초간 타이핑 못하게 막기</div>
+        </div>
+        <div className="item-info-card">
+          <div className="item-icon">🛡️</div>
+          <div className="item-name">방패</div>
+          <div className="item-description">10초간 공격에 면역</div>
+        </div>
+        <div className="item-info-card">
+          <div className="item-icon">🪞</div>
+          <div className="item-name">반사</div>
+          <div className="item-description">1초간 공격을 상대에게 반사</div>
+        </div>
+      </div>
+      <div className="items-tip">
+        💡 <strong>팁:</strong> 후발 주자는 타이핑 도움 아이템을, 선두 주자는 방어 아이템을 더 자주 획득합니다!
+      </div>
+    </div>
+  ) : null;
+
   const actionsSection = (
     <div className="lobby-actions">
       {isHost && (
@@ -1566,6 +1613,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         {quizBattleSettingsPanel}
         {appleBattleSettingsPanel}
         {memoryGameSettingsPanel}
+        {typingRacingItemInfoPanel}
         {genericDurationPanel}
         {relayModePanel}
       </div>
