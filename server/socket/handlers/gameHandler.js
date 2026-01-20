@@ -4,6 +4,7 @@ const DrawGuess = require("../games/DrawGuess");
 const QuizBattle = require("../games/QuizBattle");
 const NumberRush = require("../games/NumberRush");
 const LiarGame = require("../games/LiarGame");
+const TicTacToe = require("../games/TicTacToe");
 const MemoryGame = require("../games/MemoryGame");
 const TicTacToe = require("../games/TicTacToe");
 const User = require("../../models/User");
@@ -19,6 +20,7 @@ const GAME_CLASSES = {
   quizBattle: QuizBattle,
   numberRush: NumberRush,
   liarGame: LiarGame,
+  ticTacToe: TicTacToe,
   memoryGame: MemoryGame,
   ticTacToe: TicTacToe,
 };
