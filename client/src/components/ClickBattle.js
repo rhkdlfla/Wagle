@@ -16,6 +16,7 @@ function ClickBattle({ socket, room, onBackToLobby }) {
   const [teamActivePlayers, setTeamActivePlayers] = useState(null); // 이어달리기 모드: 각 팀의 현재 활성 플레이어
   const [relayMode, setRelayMode] = useState(false); // 이어달리기 모드 여부
   const timerIntervalRef = useRef(null);
+  const serverTimeRef = useRef(null); // 서버에서 받은 최신 시간 저장
 
   useEffect(() => {
     // 게임 시작 수신
@@ -28,6 +29,7 @@ function ClickBattle({ socket, room, onBackToLobby }) {
       
       setIsActive(true);
       setTimeRemaining(gameState.duration);
+      serverTimeRef.current = gameState.duration; // 서버 시간 저장
       setClicks({});
       setResults(null);
       setMyClicks(0);
@@ -37,15 +39,18 @@ function ClickBattle({ socket, room, onBackToLobby }) {
         clearInterval(timerIntervalRef.current);
       }
       
-      // 타이머 시작 (setInterval 사용)
+      // 타이머 시작 (서버 시간을 기준으로 감소)
       timerIntervalRef.current = setInterval(() => {
-        const elapsed = Date.now() - gameState.startTime;
-        const remaining = Math.max(0, gameState.duration - elapsed);
-        setTimeRemaining(remaining);
-        
-        if (remaining <= 0) {
-          clearInterval(timerIntervalRef.current);
-          timerIntervalRef.current = null;
+        if (serverTimeRef.current !== null) {
+          const remaining = Math.max(0, serverTimeRef.current - 100);
+          serverTimeRef.current = remaining;
+          setTimeRemaining(remaining);
+          
+          if (remaining <= 0) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+            serverTimeRef.current = null;
+          }
         }
       }, 100); // 100ms마다 업데이트
     };
@@ -69,7 +74,9 @@ function ClickBattle({ socket, room, onBackToLobby }) {
       }
       
       setTeamScores(scores || null);
-      if (remaining !== undefined) {
+      // 서버에서 받은 시간으로 동기화 (서버가 권위 있는 소스)
+      if (remaining !== undefined && remaining !== null) {
+        serverTimeRef.current = remaining;
         setTimeRemaining(remaining);
       }
       setTeamActivePlayers(activePlayers || null);
@@ -85,6 +92,7 @@ function ClickBattle({ socket, room, onBackToLobby }) {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
+      serverTimeRef.current = null;
     });
 
     return () => {
