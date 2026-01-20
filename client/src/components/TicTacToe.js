@@ -1,0 +1,225 @@
+import React, { useEffect, useState } from "react";
+import GameResults from "./GameResults";
+import "./TicTacToe.css";
+
+const EMPTY_BOARD = Array(9).fill(null);
+
+function TicTacToe({ socket, room, onBackToLobby }) {
+  const [board, setBoard] = useState(EMPTY_BOARD);
+  const [players, setPlayers] = useState([]);
+  const [currentTurn, setCurrentTurn] = useState(null);
+  const [winner, setWinner] = useState(null);
+  const [isDraw, setIsDraw] = useState(false);
+  const [isActive, setIsActive] = useState(false);
+  const [results, setResults] = useState(null);
+
+  const applyGameState = (state) => {
+    if (!state) return;
+    if (Array.isArray(state.board)) {
+      setBoard(state.board);
+    }
+    if (Array.isArray(state.players)) {
+      setPlayers(state.players);
+    }
+    if (state.currentTurn !== undefined) {
+      setCurrentTurn(state.currentTurn);
+    }
+    if (state.winner !== undefined) {
+      setWinner(state.winner);
+    }
+    if (state.isDraw !== undefined) {
+      setIsDraw(state.isDraw);
+    }
+  };
+
+  useEffect(() => {
+    const handleGameStarted = ({ gameState }) => {
+      if (!gameState || gameState.gameType !== "ticTacToe") return;
+      setIsActive(true);
+      setResults(null);
+      setWinner(null);
+      setIsDraw(false);
+      applyGameState(gameState);
+    };
+
+    const handleUpdate = (state) => {
+      if (!state || state.gameType !== "ticTacToe") return;
+      applyGameState(state);
+    };
+
+    const handleGameEnded = ({ results: gameResults }) => {
+      setIsActive(false);
+      setResults(gameResults || []);
+    };
+
+    socket.on("gameStarted", handleGameStarted);
+    socket.on("ticTacToeUpdate", handleUpdate);
+    socket.on("gameEnded", handleGameEnded);
+
+    return () => {
+      socket.off("gameStarted", handleGameStarted);
+      socket.off("ticTacToeUpdate", handleUpdate);
+      socket.off("gameEnded", handleGameEnded);
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    if (room?.id) {
+      socket.emit("getGameState", { roomId: room.id });
+    }
+  }, [room, socket]);
+
+  const myPlayerId = socket.id;
+  const myPlayer = players.find((player) => player.id === myPlayerId) || null;
+  const mySymbol = myPlayer?.symbol || null;
+  const currentPlayer = players.find((player) => player.id === currentTurn) || null;
+  const isMyTurn = isActive && !winner && !isDraw && currentTurn === myPlayerId;
+
+  const handleCellClick = (index) => {
+    if (!room?.id) return;
+    if (!isMyTurn) return;
+    if (board[index]) return;
+    socket.emit("gameAction", {
+      roomId: room.id,
+      action: "placeMark",
+      data: { index },
+    });
+  };
+
+  const getStatusText = () => {
+    if (!isActive && !results) {
+      return "게임 준비 중...";
+    }
+    if (winner) {
+      const winnerPlayer = players.find((player) => player.id === winner);
+      return `승리: ${winnerPlayer?.name || "알 수 없음"} (${winnerPlayer?.symbol || "?"})`;
+    }
+    if (isDraw) {
+      return "무승부!";
+    }
+    if (!currentPlayer) {
+      return "플레이어 대기 중...";
+    }
+    return `현재 차례: ${currentPlayer.name} (${currentPlayer.symbol})`;
+  };
+
+  const isHost = room?.players?.[0]?.id === socket.id;
+
+  const handleLeaveGame = () => {
+    if (window.confirm("게임을 나가시겠습니까?")) {
+      onBackToLobby();
+    }
+  };
+
+  const handleEndGame = () => {
+    if (window.confirm("게임을 종료하시겠습니까? 모든 플레이어가 로비로 돌아갑니다.")) {
+      socket.emit("endGame", { roomId: room.id });
+    }
+  };
+
+  const handleReplayGame = () => {
+    if (!room?.id) return;
+    if (!isHost) {
+      alert("방장만 다시 시작할 수 있습니다.");
+      return;
+    }
+    socket.emit("startGame", {
+      roomId: room.id,
+      gameType: "ticTacToe",
+    });
+  };
+
+  return (
+    <div className="tic-tac-toe-container">
+      <div className="game-header">
+        <div className="game-header-content">
+          <div>
+            <h1>❌⭕ 틱택토</h1>
+            <p>3줄을 먼저 완성하면 승리!</p>
+          </div>
+          <div className="game-header-actions">
+            {isHost && isActive && (
+              <button onClick={handleEndGame} className="end-game-button" title="게임 종료">
+                🛑 게임 종료
+              </button>
+            )}
+            <button onClick={handleLeaveGame} className="leave-game-button" title="게임 나가기">
+              🚪 나가기
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {!results && (
+        <div className="tic-tac-toe-status">
+          <div className="status-text">{getStatusText()}</div>
+          <div className="player-row">
+            {players.slice(0, 2).map((player) => (
+              <div
+                key={player.id}
+                className={`player-card ${player.id === currentTurn ? "active" : ""} ${
+                  player.id === myPlayerId ? "me" : ""
+                }`}
+              >
+                <div className="player-symbol">{player.symbol || "?"}</div>
+                <div className="player-name">{player.name}</div>
+                {player.id === myPlayerId && <span className="me-badge">나</span>}
+              </div>
+            ))}
+          </div>
+          {mySymbol && (
+            <div className="my-symbol">내 기호: {mySymbol}</div>
+          )}
+          {!mySymbol && (
+            <div className="spectator-hint">관전 중입니다.</div>
+          )}
+        </div>
+      )}
+
+      {!results && (
+        <div className="tic-tac-toe-board">
+          {board.map((cell, index) => (
+            <button
+              key={`cell-${index}`}
+              className={`tic-tac-toe-cell ${
+                cell ? "filled" : isMyTurn ? "clickable" : ""
+              } ${cell === "X" ? "mark-x" : cell === "O" ? "mark-o" : ""}`}
+              onClick={() => handleCellClick(index)}
+              disabled={!isMyTurn || Boolean(cell)}
+              type="button"
+            >
+              {cell ? (
+                <span
+                  className={`tic-tac-toe-mark ${
+                    cell === "X" ? "mark-x" : cell === "O" ? "mark-o" : ""
+                  }`}
+                >
+                  {cell}
+                </span>
+              ) : (
+                ""
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {results && (
+        <div className="results-screen">
+          <h2>게임 종료! 🎉</h2>
+          <GameResults results={results} myPlayerId={socket.id} scoreUnit="승" />
+          <div className="result-actions">
+            <button onClick={handleReplayGame} className="replay-button">
+              바로 재시작(방장만)
+            </button>
+            <button onClick={onBackToLobby} className="back-button">
+              로비로 돌아가기
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default TicTacToe;
