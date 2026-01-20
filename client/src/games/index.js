@@ -7,6 +7,7 @@ import DrawGuess from "../components/DrawGuess";
 import NumberRush from "../components/NumberRush";
 import QuizBattle from "../components/QuizBattle";
 import LiarGame from "../components/LiarGame";
+import MemoryGame from "../components/MemoryGame";
 
 // 게임 컴포넌트 맵핑
 // gameType (서버에서 사용하는 ID) -> React 컴포넌트
@@ -17,6 +18,7 @@ export const GAME_COMPONENTS = {
   numberRush: NumberRush,
   quizBattle: QuizBattle,
   liarGame: LiarGame,
+  memoryGame: MemoryGame,
   // 새로운 게임을 추가할 때 여기에 추가:
   // newGame: NewGameComponent,
 };
@@ -99,6 +101,19 @@ export const GAME_METADATA = [
     minDuration: 60,
     maxDuration: 1800,
     durationPresets: [300, 600, 900],
+    supportsDuration: false,
+    supportsRelayMode: false,
+  },
+  {
+    id: "memoryGame",
+    name: "기억력 게임",
+    description: "패턴을 기억하고 순서대로 입력하세요!",
+    icon: "🧠",
+    minPlayers: 1,
+    defaultDuration: 300, // 초 단위 (라운드 기반이므로 사용 안 함)
+    minDuration: 60,
+    maxDuration: 600,
+    durationPresets: [180, 300, 450, 600],
     supportsDuration: false,
     supportsRelayMode: false,
   },
