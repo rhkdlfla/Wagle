@@ -161,9 +161,6 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
 
     socket.on("roomUpdated", (updatedRoom) => {
       setRoom(updatedRoom);
-      if (updatedRoom?.status === "waiting") {
-        navigate(`/room/${roomId}`);
-      }
     });
 
     socket.on("gameStarted", ({ room: gameRoom }) => {
@@ -282,21 +279,11 @@ function RoomGame({ socket, user }) {
 
     socket.on("roomUpdated", (updatedRoom) => {
       setRoom(updatedRoom);
-      if (updatedRoom?.status === "waiting") {
-        navigate(`/room/${roomId}`);
-      }
     });
     
-    socket.on("gameEnded", ({ reason } = {}) => {
-      if (reason === "hostEnd") {
-        navigate(`/room/${roomId}`);
-      }
-    });
-
     return () => {
       socket.off("gameStarted");
       socket.off("roomUpdated");
-      socket.off("gameEnded");
     };
   }, [socket, roomId, navigate]);
 
