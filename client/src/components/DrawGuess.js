@@ -5,11 +5,22 @@ import GameResults from "./GameResults";
 import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./DrawGuess.css";
 
-const CANVAS_WIDTH = 880;
-const CANVAS_HEIGHT = 420;
+const CANVAS_WIDTH = 1000;
+const CANVAS_HEIGHT = 662;
 const DEFAULT_COLOR = "#222222";
 const DEFAULT_SIZE = 4;
-const COLOR_OPTIONS = ["#222222", "#e74c3c", "#3498db", "#2ecc71", "#f1c40f"];
+const COLOR_OPTIONS = [
+  "#000000", // 검정
+  "#FF0000", // 빨강
+  "#FF8C00", // 주황
+  "#FFD700", // 노랑
+  "#00FF00", // 초록
+  "#0000FF", // 파랑
+  "#000080", // 남색
+  "#800080", // 보라
+  "#FF69B4", // 분홍
+  "#8B4513", // 갈색
+];
 const POPUP_DURATION_MS = 2000;
 
 function DrawGuess({ socket, room, onBackToLobby }) {
@@ -474,35 +485,90 @@ function DrawGuess({ socket, room, onBackToLobby }) {
       </div>
 
       <div className="draw-guess-body">
-        <div className="canvas-column">
-          <div className="canvas-panel">
-            <div className="word-panel">
-              {isDrawer ? (
-                <span className="word-reveal">제시어: {word || "..."}</span>
-              ) : (
-                <span className="word-hidden">
-                  제시어: {"•".repeat(wordLength || 0)}
-                </span>
-              )}
-              <div className="word-panel-right">
-                {roundAnswer && (
-                  <span className="word-answer">정답: {roundAnswer}</span>
-                )}
-                <span className="word-timer">⏱️ {formatTime(timeRemaining)}</span>
-              </div>
-            </div>
-            <canvas
-              ref={canvasRef}
-              width={CANVAS_WIDTH}
-              height={CANVAS_HEIGHT}
-              style={{ width: `${CANVAS_WIDTH}px`, height: `${CANVAS_HEIGHT}px` }}
-              className={`draw-canvas ${!isDrawer ? "readonly" : ""}`}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerLeave={handlePointerUp}
-            />
+        {/* 채팅 섹션 (왼쪽) */}
+        <div className="draw-guess-chat-section">
+          <div className="chat-header">
+            <h3>채팅</h3>
           </div>
+          <div className="chat-messages" ref={chatMessagesRef} onScroll={handleChatScroll}>
+            {messages.length === 0 ? (
+              <div className="chat-empty">아직 메시지가 없습니다.</div>
+            ) : (
+              messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`chat-message ${msg.type === "system" ? "system" : ""}`}
+                >
+                  {msg.type === "system" ? (
+                    <span className="system-message">{msg.message}</span>
+                  ) : (
+                    <>
+                      <span className="chat-name">{msg.playerName}</span>
+                      <span className="chat-text">{msg.message}</span>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
+            {showScrollButton && (
+              <button
+                type="button"
+                className="chat-scroll-button"
+                onClick={scrollToBottom}
+              >
+                아래로{unseenCount > 0 ? ` (${unseenCount})` : ""}
+              </button>
+            )}
+          </div>
+          <div className="chat-input">
+            <input
+              type="text"
+              placeholder="정답을 입력하세요..."
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === "Enter") {
+                  handleSendMessage();
+                }
+              }}
+            />
+            <button onClick={handleSendMessage} disabled={!messageInput.trim()}>
+              전송
+            </button>
+          </div>
+        </div>
+
+        {/* 그리는 곳 (가운데) */}
+        <div className="canvas-column">
+          <div className="word-panel">
+            {isDrawer ? (
+              <span className="word-reveal">제시어: {word || "..."}</span>
+            ) : (
+              <span className="word-hidden">
+                제시어: {"•".repeat(wordLength || 0)}
+              </span>
+            )}
+            <div className="word-panel-right">
+              {roundAnswer && (
+                <span className="word-answer">정답: {roundAnswer}</span>
+              )}
+              <span className="word-timer">⏱️ {formatTime(timeRemaining)}</span>
+            </div>
+          </div>
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_WIDTH}
+            height={CANVAS_HEIGHT}
+            className={`draw-canvas ${!isDrawer ? "readonly" : ""}`}
+            style={{
+              maxWidth: `${CANVAS_WIDTH}px`,
+              aspectRatio: `${CANVAS_WIDTH} / ${CANVAS_HEIGHT}`,
+            }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
+          />
           <div className="canvas-tools">
             {isDrawer ? (
               <>
@@ -551,7 +617,8 @@ function DrawGuess({ socket, room, onBackToLobby }) {
           </div>
         </div>
 
-        <div className="side-panel">
+        {/* 랭킹 섹션 (오른쪽) */}
+        <div className="draw-guess-ranking-section">
           <GameScoreboard
             players={room.players}
             scores={scores}
@@ -559,58 +626,6 @@ function DrawGuess({ socket, room, onBackToLobby }) {
             teamMode={false}
             scoreUnit="점"
           />
-
-          <div className="chat-section">
-            <div className="chat-header">
-              <h3>채팅</h3>
-            </div>
-            <div className="chat-messages" ref={chatMessagesRef} onScroll={handleChatScroll}>
-              {messages.length === 0 ? (
-                <div className="chat-empty">아직 메시지가 없습니다.</div>
-              ) : (
-                messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`chat-message ${msg.type === "system" ? "system" : ""}`}
-                  >
-                    {msg.type === "system" ? (
-                      <span className="system-message">{msg.message}</span>
-                    ) : (
-                      <>
-                        <span className="chat-name">{msg.playerName}</span>
-                        <span className="chat-text">{msg.message}</span>
-                      </>
-                    )}
-                  </div>
-                ))
-              )}
-              {showScrollButton && (
-                <button
-                  type="button"
-                  className="chat-scroll-button"
-                  onClick={scrollToBottom}
-                >
-                  아래로{unseenCount > 0 ? ` (${unseenCount})` : ""}
-                </button>
-              )}
-            </div>
-            <div className="chat-input">
-              <input
-                type="text"
-                placeholder="정답을 입력하세요..."
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    handleSendMessage();
-                  }
-                }}
-              />
-              <button onClick={handleSendMessage} disabled={!messageInput.trim()}>
-                전송
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
