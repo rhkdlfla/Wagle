@@ -180,9 +180,6 @@ function RoomLobby({ socket, onLeaveRoom, onStartGame, user }) {
 
     socket.on("roomUpdated", (updatedRoom) => {
       setRoom(updatedRoom);
-      if (updatedRoom?.status === "waiting") {
-        navigate(`/room/${roomId}`);
-      }
     });
 
     socket.on("gameStarted", ({ room: gameRoom }) => {

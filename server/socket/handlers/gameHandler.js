@@ -327,7 +327,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     const config = getGameConfig(gameType);
     // 퀴즈 배틀은 문제를 다 풀면 끝나므로 duration 설정 불필요
     // 전역 타이머를 사용하지 않으므로 duration은 임의의 값으로 설정 (실제로 사용되지 않음)
-    const gameDuration = gameType === "quizBattle" 
+    const gameDuration = gameType === "quizBattle"
       ? 3600000 // 1시간 (임의의 값, 실제로 사용되지 않음)
       : calculateGameDuration(gameType, duration);
 

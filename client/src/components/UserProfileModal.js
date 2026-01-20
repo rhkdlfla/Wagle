@@ -11,6 +11,7 @@ const GAME_LABELS = {
   numberRush: "숫자 러시",
   liarGame: "라이어 게임",
   ticTacToe: "틱택토",
+  memoryGame: "기억력 게임",
 };
 
 function UserProfileModal({ isOpen, onClose, user, onUserUpdated }) {
@@ -56,7 +57,9 @@ function UserProfileModal({ isOpen, onClose, user, onUserUpdated }) {
   const providerLabel =
     user?.provider === "google" ? "Google" : user?.provider === "kakao" ? "Kakao" : "Guest";
 
-  const recentGames = profile?.recentGames || [];
+  const recentGames = (profile?.recentGames || []).filter(
+    (entry) => entry.gameType !== "stopwatchGame"
+  );
   const gameStats = profile?.gameStats || {};
 
   const handleSaveNickname = async () => {
@@ -161,9 +164,11 @@ function UserProfileModal({ isOpen, onClose, user, onUserUpdated }) {
           {Object.keys(gameStats).length === 0 && (
             <div className="profile-note">기록이 없습니다.</div>
           )}
-          {Object.keys(gameStats).length > 0 && (
+          {Object.keys(gameStats).filter((gameType) => gameType !== "stopwatchGame").length > 0 && (
             <div className="profile-list profile-stats-grid">
-              {Object.entries(gameStats).map(([gameType, stats]) => {
+              {Object.entries(gameStats)
+                .filter(([gameType]) => gameType !== "stopwatchGame")
+                .map(([gameType, stats]) => {
                 const plays = stats?.plays || 0;
                 const wins = stats?.wins || 0;
                 const rate = plays ? Math.round((wins / plays) * 100) : 0;
