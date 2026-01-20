@@ -434,6 +434,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       results: results,
       winners: winners,
       teamScores: teamScores, // 팀 점수 포함
+      reason: reason || null,
     });
 
     await recordGameResults({
@@ -448,6 +449,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     
     // 방 상태를 대기 중으로 변경
     room.status = "waiting";
+    io.to(roomId).emit("roomUpdated", room);
     io.emit("roomList", getRoomList(rooms));
     
     console.log(`게임 종료: ${roomId}, 승자: ${winners.join(", ")}`, reason ? `(reason=${reason})` : "");
