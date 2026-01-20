@@ -98,6 +98,19 @@ const GAMES = [
     supportsDuration: false,
     supportsRelayMode: false,
   },
+  {
+    id: "typingRacing",
+    name: "타이핑 레이싱",
+    description: "빠르고 정확하게 타이핑해서 1등에 도달하세요!",
+    icon: "⌨️",
+    minPlayers: 2,
+    defaultDuration: 120,
+    minDuration: 30,
+    maxDuration: 300,
+    durationPresets: [60, 120, 180, 300],
+    supportsDuration: true,
+    supportsRelayMode: false,
+  },
 ];
 
 // 게임 설정 가져오기 함수

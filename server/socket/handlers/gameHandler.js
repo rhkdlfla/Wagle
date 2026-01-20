@@ -5,6 +5,7 @@ const QuizBattle = require("../games/QuizBattle");
 const NumberRush = require("../games/NumberRush");
 const LiarGame = require("../games/LiarGame");
 const MemoryGame = require("../games/MemoryGame");
+const TypingRacing = require("../games/TypingRacing");
 const User = require("../../models/User");
 
 // 게임 인스턴스 저장 (updateInterval 관리를 위해)
@@ -19,6 +20,7 @@ const GAME_CLASSES = {
   numberRush: NumberRush,
   liarGame: LiarGame,
   memoryGame: MemoryGame,
+  typingRacing: TypingRacing,
 };
 
 // 게임 설정 (각 게임의 기본 설정을 중앙에서 관리)
@@ -57,6 +59,12 @@ const GAME_CONFIGS = {
     defaultDuration: 600000, // 10분 (전역 타이머 사용 안 함)
     minDuration: 60000,
     maxDuration: 1800000,
+    supportsRelayMode: false,
+  },
+  typingRacing: {
+    defaultDuration: 120000, // 2분
+    minDuration: 30000,
+    maxDuration: 300000,
     supportsRelayMode: false,
   },
 };

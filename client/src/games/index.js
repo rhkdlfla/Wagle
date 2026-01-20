@@ -8,6 +8,7 @@ import NumberRush from "../components/NumberRush";
 import QuizBattle from "../components/QuizBattle";
 import LiarGame from "../components/LiarGame";
 import MemoryGame from "../components/MemoryGame";
+import TypingRacing from "../components/TypingRacing";
 
 // 게임 컴포넌트 맵핑
 // gameType (서버에서 사용하는 ID) -> React 컴포넌트
@@ -19,6 +20,7 @@ export const GAME_COMPONENTS = {
   quizBattle: QuizBattle,
   liarGame: LiarGame,
   memoryGame: MemoryGame,
+  typingRacing: TypingRacing,
   // 새로운 게임을 추가할 때 여기에 추가:
   // newGame: NewGameComponent,
 };
@@ -115,6 +117,19 @@ export const GAME_METADATA = [
     maxDuration: 600,
     durationPresets: [180, 300, 450, 600],
     supportsDuration: false,
+    supportsRelayMode: false,
+  },
+  {
+    id: "typingRacing",
+    name: "타이핑 레이싱",
+    description: "빠르고 정확하게 타이핑해서 1등에 도달하세요!",
+    icon: "⌨️",
+    minPlayers: 2,
+    defaultDuration: 120, // 초 단위
+    minDuration: 30,
+    maxDuration: 300,
+    durationPresets: [60, 120, 180, 300],
+    supportsDuration: true,
     supportsRelayMode: false,
   },
   // 새로운 게임을 추가할 때 여기에 추가:
