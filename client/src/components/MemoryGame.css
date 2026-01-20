@@ -1,0 +1,479 @@
+.memory-game-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.game-header {
+  width: 100%;
+  max-width: 1200px;
+  margin-bottom: 30px;
+}
+
+.game-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.game-header-content > div:first-child {
+  flex: 1;
+  text-align: center;
+}
+
+.game-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.game-header h1 {
+  font-size: 3rem;
+  margin-bottom: 10px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.game-header p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
+.end-game-button,
+.leave-game-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.end-game-button {
+  background: rgba(244, 67, 54, 0.9);
+  color: white;
+}
+
+.end-game-button:hover {
+  background: rgba(244, 67, 54, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
+}
+
+.leave-game-button {
+  background: rgba(158, 158, 158, 0.8);
+  color: white;
+}
+
+.leave-game-button:hover {
+  background: rgba(158, 158, 158, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(158, 158, 158, 0.4);
+}
+
+.waiting-screen {
+  text-align: center;
+  padding: 100px 20px;
+}
+
+.waiting-screen h2 {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+}
+
+.game-screen {
+  width: 100%;
+  max-width: 1400px;
+  display: flex;
+  flex-direction: row;
+  gap: 30px;
+  align-items: flex-start;
+}
+
+/* 왼쪽: 게임 메인 영역 */
+.game-main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 600px;
+}
+
+/* 오른쪽: 사이드바 (라운드 정보 및 스코어보드) */
+.game-sidebar {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: sticky;
+  top: 20px;
+}
+
+/* 라운드 정보 */
+.round-info {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  backdrop-filter: blur(10px);
+}
+
+.round-badge {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  backdrop-filter: blur(10px);
+}
+
+.round-progress {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.round-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  transition: all 0.3s;
+}
+
+.round-dot.completed {
+  background: rgba(76, 175, 80, 0.8);
+  color: white;
+}
+
+.round-dot.current {
+  background: rgba(255, 193, 7, 0.9);
+  color: white;
+  transform: scale(1.2);
+  box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+}
+
+.round-complete-message {
+  text-align: center;
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  backdrop-filter: blur(10px);
+  animation: fadeIn 0.5s;
+}
+
+.round-complete-message h2 {
+  font-size: 2rem;
+  margin-bottom: 15px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.round-complete-message p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
+/* 패턴 표시 영역 */
+.sequence-display {
+  text-align: center;
+  animation: fadeIn 0.5s;
+  width: 100%;
+  max-width: 800px;
+  padding: 60px 40px;
+}
+
+.sequence-label {
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin-bottom: 40px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.sequence-single-item {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 250px;
+  margin-bottom: 30px;
+}
+
+.sequence-item {
+  width: 250px;
+  height: 250px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #667eea;
+  border-radius: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 120px;
+  font-weight: bold;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.sequence-item.korean {
+  font-size: 100px;
+  font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+}
+
+.sequence-item.emoji {
+  font-size: 140px;
+}
+
+.sequence-item.active {
+  animation: popIn 0.3s ease-out;
+  transform: scale(1);
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.sequence-item.empty {
+  opacity: 0.3;
+  transform: scale(0.8);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.sequence-progress {
+  margin-top: 20px;
+}
+
+.progress-text {
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: bold;
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0) rotate(180deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+/* 입력 영역 */
+.input-area {
+  text-align: center;
+  animation: fadeIn 0.5s;
+  width: 100%;
+  max-width: 800px;
+  padding: 40px;
+}
+
+.input-label {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.input-time {
+  font-size: 1.5rem;
+  margin-bottom: 25px;
+  color: #ffd700;
+  font-weight: bold;
+}
+
+.input-time strong {
+  font-size: 1.8rem;
+}
+
+.current-input {
+  font-size: 1.3rem;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+}
+
+.number-buttons {
+  display: grid;
+  gap: 30px;
+  max-width: 600px;
+  margin: 0 auto 20px;
+}
+
+/* 옵션 개수에 따른 그리드 레이아웃 */
+.number-buttons.option-4 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.number-buttons.option-6 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.number-buttons.option-9 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.number-button {
+  width: 180px;
+  height: 180px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #667eea;
+  border: none;
+  border-radius: 20px;
+  font-size: 72px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.number-button.korean {
+  font-size: 60px;
+  font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+}
+
+.number-button.emoji {
+  font-size: 80px;
+}
+
+.number-button:hover:not(:disabled) {
+  transform: scale(1.1);
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.number-button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.number-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input-complete {
+  margin-top: 20px;
+  font-size: 1.3rem;
+  color: #4ade80;
+  font-weight: bold;
+  animation: pulse 1s infinite;
+}
+
+.failed-message {
+  font-size: 1.5rem;
+  color: #ef4444;
+  font-weight: bold;
+  padding: 30px;
+  background: rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  border: 2px solid rgba(239, 68, 68, 0.5);
+}
+
+/* 대기 영역 */
+.waiting-area {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.waiting-message {
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.8);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 반응형 디자인 */
+@media (max-width: 1024px) {
+  .game-screen {
+    flex-direction: column;
+  }
+
+  .game-sidebar {
+    width: 100%;
+    position: static;
+    flex-direction: row;
+    justify-content: space-around;
+  }
+
+  .round-info {
+    flex: 1;
+    max-width: 300px;
+  }
+}
+
+@media (max-width: 768px) {
+  .game-header h1 {
+    font-size: 2rem;
+  }
+
+  .game-header-content {
+    flex-direction: column;
+  }
+
+  .game-screen {
+    flex-direction: column;
+  }
+
+  .game-sidebar {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .sequence-item {
+    width: 180px;
+    height: 180px;
+    font-size: 96px;
+  }
+
+  .number-button {
+    width: 140px;
+    height: 140px;
+    font-size: 56px;
+  }
+
+  .input-label {
+    font-size: 1.5rem;
+  }
+
+  .sequence-label {
+    font-size: 2rem;
+  }
+}
