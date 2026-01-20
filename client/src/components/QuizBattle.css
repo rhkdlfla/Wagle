@@ -9,7 +9,7 @@
   color: white;
 }
 
-.game-header {
+.quiz-battle-container .game-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -18,29 +18,29 @@
   margin-bottom: 30px;
 }
 
-.game-header-content {
+.quiz-battle-container .game-header-content {
   text-align: center;
   flex-grow: 1;
 }
 
-.game-header-content h1 {
+.quiz-battle-container .game-header-content h1 {
   font-size: 2.5rem;
   margin-bottom: 10px;
 }
 
-.game-header-content h2 {
+.quiz-battle-container .game-header-content h2 {
   font-size: 1.5rem;
   margin-bottom: 10px;
   opacity: 0.9;
 }
 
-.game-header-actions {
+.quiz-battle-container .game-header-actions {
   display: flex;
   gap: 10px;
   align-items: center;
 }
 
-.end-game-button {
+.quiz-battle-container .end-game-button {
   padding: 8px 15px;
   background: #f44336;
   color: white;
@@ -52,13 +52,13 @@
   transition: all 0.3s;
 }
 
-.end-game-button:hover {
+.quiz-battle-container .end-game-button:hover {
   background: #d32f2f;
   transform: translateY(-2px);
   box-shadow: 0 4px 10px rgba(244, 67, 54, 0.4);
 }
 
-.leave-game-button {
+.quiz-battle-container .leave-game-button {
   padding: 8px 15px;
   background: rgba(255, 255, 255, 0.2);
   color: white;
@@ -70,13 +70,13 @@
   transition: all 0.3s;
 }
 
-.leave-game-button:hover {
+.quiz-battle-container .leave-game-button:hover {
   background: rgba(255, 255, 255, 0.3);
   transform: translateY(-2px);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
-.timer {
+.quiz-battle-container .timer {
   font-size: 1.5rem;
   font-weight: bold;
   margin-top: 10px;

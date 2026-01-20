@@ -14,7 +14,7 @@
   margin-bottom: 20px;
 }
 
-.game-header-content {
+.apple-battle-container .game-header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -22,12 +22,12 @@
   gap: 20px;
 }
 
-.game-header-content > div:first-child {
+.apple-battle-container .game-header-content > div:first-child {
   flex: 1;
   text-align: center;
 }
 
-.game-header-actions {
+.apple-battle-container .game-header-actions {
   display: flex;
   gap: 10px;
   align-items: center;
@@ -39,7 +39,7 @@
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.timer {
+.apple-battle-container .timer {
   font-size: 1.5rem;
   font-weight: bold;
   background: rgba(255, 255, 255, 0.2);
@@ -48,8 +48,8 @@
   display: inline-block;
 }
 
-.end-game-button,
-.leave-game-button {
+.apple-battle-container .end-game-button,
+.apple-battle-container .leave-game-button {
   padding: 10px 20px;
   border: none;
   border-radius: 8px;
@@ -60,23 +60,23 @@
   white-space: nowrap;
 }
 
-.end-game-button {
+.apple-battle-container .end-game-button {
   background: rgba(244, 67, 54, 0.9);
   color: white;
 }
 
-.end-game-button:hover {
+.apple-battle-container .end-game-button:hover {
   background: rgba(244, 67, 54, 1);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(244, 67, 54, 0.4);
 }
 
-.leave-game-button {
+.apple-battle-container .leave-game-button {
   background: rgba(158, 158, 158, 0.8);
   color: white;
 }
 
-.leave-game-button:hover {
+.apple-battle-container .leave-game-button:hover {
   background: rgba(158, 158, 158, 1);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(158, 158, 158, 0.4);

@@ -17,12 +17,12 @@
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.game-header {
+.liar-game-container .game-header {
   width: 100%;
   margin-bottom: 6px;
 }
 
-.game-header-content {
+.liar-game-container .game-header-content {
   display: grid;
   grid-template-columns: minmax(220px, 260px) 1fr auto;
   align-items: center;
@@ -47,7 +47,7 @@
   min-width: 220px;
 }
 
-.game-header-actions {
+.liar-game-container .game-header-actions {
   display: flex;
   gap: 10px;
   align-items: center;

@@ -1,0 +1,696 @@
+.typing-racing-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+  color: #fff;
+}
+
+.game-header {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.game-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.game-header h1 {
+  margin: 0;
+  font-size: 2rem;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.game-header p {
+  margin: 5px 0 0 0;
+  opacity: 0.9;
+}
+
+.game-header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.end-game-button,
+.leave-game-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.3s;
+}
+
+.end-game-button:hover,
+.leave-game-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.typing-racing-main {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* 타이핑 영역 */
+.typing-area {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.text-display-container {
+  width: 100%;
+  max-width: 800px;
+  height: 120px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  position: relative;
+  padding: 20px;
+}
+
+.text-display {
+  font-size: 2rem;
+  line-height: 1.5;
+  white-space: nowrap;
+  display: inline-block;
+  font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+  text-align: center;
+  width: 100%;
+}
+
+.text-prefix,
+.text-suffix {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 2rem;
+  margin: 0 10px;
+}
+
+.char-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.text-display .char {
+  display: inline-block;
+  transition: all 0.2s;
+  min-width: 0.5em;
+  position: relative;
+}
+
+.text-display .char.space {
+  background: rgba(255, 255, 255, 0.03);
+  min-width: 0.8em;
+  position: relative;
+}
+
+.text-display .char.space::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.text-display .char.completed {
+  color: #10b981;
+  font-weight: bold;
+}
+
+.text-display .char.completed.space {
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.text-display .char.completed.space::after {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.text-display .char.current {
+  background: #fbbf24;
+  color: #000;
+  padding: 2px 4px;
+  border-radius: 3px;
+  animation: blink 1s infinite;
+  font-weight: bold;
+}
+
+.text-display .char.current.space {
+  background: #fbbf24;
+  border-bottom-color: #000;
+}
+
+.text-display .char.composing {
+  background: #fbbf24;
+  color: #000;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-weight: bold;
+  animation: composing-pulse 0.5s infinite;
+}
+
+@keyframes composing-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* 다른 플레이어 커서 */
+.other-player-cursor-wrapper {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.char-wrapper.my-position .other-player-cursor-wrapper {
+  top: -25px;
+}
+
+.other-player-cursor {
+  color: var(--player-color);
+  font-weight: bold;
+  font-size: 1.5rem;
+  animation: cursor-blink 1s infinite;
+}
+
+.other-player-name {
+  color: var(--player-color);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--player-color);
+  white-space: nowrap;
+}
+
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.3; }
+}
+
+/* 아이템 박스 마커 */
+.item-box-marker {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.5rem;
+  animation: item-box-pulse 1.5s infinite;
+  z-index: 15;
+  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.8));
+}
+
+.char-wrapper.item-box-position {
+  position: relative;
+}
+
+.char-wrapper.item-box-position::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(255, 140, 0, 0.3));
+  border-radius: 4px;
+  z-index: -1;
+  animation: item-box-glow 2s infinite;
+}
+
+@keyframes item-box-pulse {
+  0%, 100% { 
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+  50% { 
+    transform: translateX(-50%) scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+@keyframes item-box-glow {
+  0%, 100% { 
+    opacity: 0.3;
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+  }
+  50% { 
+    opacity: 0.6;
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.8);
+  }
+}
+
+/* 카운트다운 표시 */
+.countdown-display {
+  background: rgba(76, 175, 80, 0.2);
+  border: 2px solid rgba(76, 175, 80, 0.5);
+  border-radius: 10px;
+  padding: 15px 20px;
+  margin-top: 15px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.countdown-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #4caf50;
+}
+
+.countdown-number {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #fbbf24;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.8);
+  animation: countdown-pulse 1s infinite;
+  min-width: 60px;
+}
+
+@keyframes countdown-pulse {
+  0%, 100% { 
+    transform: scale(1);
+  }
+  50% { 
+    transform: scale(1.1);
+  }
+}
+
+/* 공격 경고 */
+.attack-warning {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 999;
+  animation: attack-warning-slide 0.3s ease-out;
+}
+
+.attack-warning-content {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #fff;
+  padding: 15px 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  min-width: 250px;
+}
+
+.attack-warning-icon {
+  font-size: 2rem;
+  animation: attack-warning-blink 1s infinite;
+}
+
+.attack-warning-text {
+  flex: 1;
+}
+
+.attack-warning-source {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.attack-warning-effect {
+  font-size: 0.9rem;
+  opacity: 0.95;
+}
+
+.attack-warning-timer {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.attack-warning-active {
+  color: #fbbf24;
+  font-weight: 600;
+  animation: attack-warning-blink 0.5s infinite;
+}
+
+@keyframes attack-warning-slide {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes attack-warning-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.5; }
+}
+
+/* 아이템 타이핑 모드 */
+.item-typing-mode {
+  background: rgba(251, 191, 36, 0.2);
+  border: 2px solid #fbbf24;
+  border-radius: 10px;
+  padding: 15px;
+}
+
+.item-typing-label {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #fbbf24;
+}
+
+.item-word-display {
+  font-size: 1.5rem;
+  font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+}
+
+.item-word-display .char {
+  display: inline-block;
+  transition: all 0.2s;
+}
+
+.item-word-display .char.completed {
+  color: #10b981;
+  font-weight: bold;
+}
+
+.item-word-display .char.current {
+  background: #fbbf24;
+  color: #000;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.typing-hint {
+  padding: 15px;
+  font-size: 1.2rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+}
+
+.hidden-input {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  border: none;
+  outline: none;
+}
+
+/* 진행도 */
+.progress-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 30px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 15px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  transition: width 0.3s;
+  border-radius: 15px;
+}
+
+.progress-text {
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+/* 현재 적용 중인 효과 */
+.active-effects {
+  background: rgba(76, 175, 80, 0.15);
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 20px;
+  border: 2px solid rgba(76, 175, 80, 0.3);
+}
+
+.effects-label {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #4caf50;
+}
+
+.effects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.effect-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  border-left: 3px solid #4caf50;
+}
+
+.effect-icon {
+  font-size: 1.2rem;
+}
+
+.effect-name {
+  flex: 1;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.effect-timer {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.2);
+  padding: 2px 8px;
+  border-radius: 12px;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* 아이템 인벤토리 */
+.items-inventory {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 15px;
+}
+
+.items-label {
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.items-list {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.item-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  min-width: 80px;
+}
+
+.item-word {
+  font-size: 1rem;
+  font-weight: bold;
+  color: #fbbf24;
+}
+
+.item-display.typing {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.2);
+}
+
+.item-icon {
+  font-size: 2rem;
+}
+
+.item-progress {
+  font-size: 0.8rem;
+  color: #fbbf24;
+  font-weight: bold;
+}
+
+.items-hint {
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+}
+
+.items-hint small {
+  display: block;
+  margin-top: 5px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+}
+
+.no-items {
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+/* 사이드바 */
+.racing-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 미니맵 */
+.minimap-container {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 20px;
+}
+
+.minimap-container h3 {
+  margin: 0 0 15px 0;
+  font-size: 1.3rem;
+}
+
+.minimap-canvas {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* 순위표 */
+.rankings-container {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 20px;
+}
+
+.rankings-container h3 {
+  margin: 0 0 15px 0;
+  font-size: 1.3rem;
+}
+
+.rankings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.ranking-item.me {
+  background: rgba(251, 191, 36, 0.3);
+  border: 2px solid #fbbf24;
+}
+
+.ranking-item.finished {
+  background: rgba(16, 185, 129, 0.3);
+}
+
+.rank-number {
+  font-weight: bold;
+  font-size: 1.2rem;
+  min-width: 30px;
+}
+
+.rank-name {
+  flex: 1;
+  font-size: 1rem;
+}
+
+.rank-progress {
+  font-weight: bold;
+  color: #10b981;
+}
+
+.waiting-message {
+  text-align: center;
+  font-size: 1.5rem;
+  padding: 50px;
+}
+
+/* 반응형 */
+@media (max-width: 1200px) {
+  .typing-racing-main {
+    grid-template-columns: 1fr;
+  }
+
+  .racing-sidebar {
+    order: -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .text-display {
+    font-size: 1.5rem;
+  }
+
+  .typing-input {
+    font-size: 1.2rem;
+  }
+}

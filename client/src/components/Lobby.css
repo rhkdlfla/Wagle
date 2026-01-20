@@ -1,6 +1,7 @@
 .lobby-container {
-  /* App(.App)의 padding-top(70px) 아래 영역을 정확히 채움 */
-  height: 100%;
+  /* 상단 고정 헤더(70px) 제외한 화면 높이를 정확히 채움 */
+  height: calc(100vh - var(--app-header-height, 70px));
+  height: calc(100dvh - var(--app-header-height, 70px));
   overflow: hidden;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
@@ -511,20 +512,44 @@
 .game-selection-scroll {
   flex: 1 1 auto;
   min-height: 0;
+  max-height: calc(100vh - 200px); /* 화면 높이에 맞춰 최대 높이 제한 */
   overflow-y: auto;
   overflow-x: hidden; /* hover 효과로 좌우 스크롤 생기는 것 방지 */
   -webkit-overflow-scrolling: touch;
+  padding-right: 10px; /* 스크롤바 공간 확보 */
 }
 
-/* 스크롤은 되되 스크롤바는 숨김 */
-.game-selection-scroll::-webkit-scrollbar,
+/* 게임 선택 스크롤바 스타일 */
+.game-selection-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.game-selection-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.game-selection-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.game-selection-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.game-selection-scroll {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1); /* Firefox */
+}
+
+/* 다른 스크롤 영역은 스크롤바 숨김 유지 */
 .chat-messages::-webkit-scrollbar,
 .players-list::-webkit-scrollbar,
 .teams-list::-webkit-scrollbar {
   display: none;
 }
 
-.game-selection-scroll,
 .chat-messages,
 .players-list,
 .teams-list {
@@ -1034,6 +1059,70 @@
   background: rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   border-left: 3px solid #4caf50;
+}
+
+/* 타이핑 레이싱 아이템 정보 */
+.items-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.item-info-card {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s;
+}
+
+.item-info-card:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.item-icon {
+  font-size: 2rem;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.item-name {
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.item-description {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  text-align: center;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.items-tip {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(76, 175, 80, 0.2);
+  border-radius: 8px;
+  border-left: 4px solid #4caf50;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.items-tip strong {
+  color: #4caf50;
+}
+
+@media (max-width: 768px) {
+  .items-info-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .lobby-actions {
