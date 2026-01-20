@@ -137,8 +137,18 @@ function LiarGame({ socket, room, onBackToLobby }) {
       setActiveCategory((prev) => data?.category || prev);
       setShowRevealModal(true);
     });
-    socket.on("gameEnded", ({ results: gameResults }) => {
+    socket.on("gameEnded", ({ results: gameResults, reason }) => {
       setResults(gameResults || []);
+      // gameEnded를 받았을 때 reveal이 없으면 기본 reveal 객체 생성
+      if (!reveal) {
+        setReveal({
+          winnerTeam: "villagers", // 기본값 (실제로는 서버에서 받아야 함)
+          reason: reason || "gameEnded",
+          word: activeCategory || "알 수 없음",
+          category: activeCategory || null,
+          liarIds: [],
+        });
+      }
       setShowRevealModal(true);
     });
 
@@ -270,6 +280,15 @@ function LiarGame({ socket, room, onBackToLobby }) {
           <div className="liar-time-text">
             남은 시간: {phase === "discussion" ? formatTime(timeRemaining) : "제한 없음"}
           </div>
+          {phase === "discussion" && currentPlayerId && (
+            <div className="liar-current-turn">
+              <span className="turn-label">현재 차례:</span>
+              <span className={`turn-player ${isMyTurn ? "my-turn" : ""}`}>
+                {getPlayerName(currentPlayerId)}
+                {isMyTurn && " (나)"}
+              </span>
+            </div>
+          )}
           <div className="liar-chat-header">
             <h2>🗨️ 발언 기록</h2>
             <span>{messages.length}개</span>
@@ -388,23 +407,34 @@ function LiarGame({ socket, room, onBackToLobby }) {
         </div>
       </div>
 
-      {reveal && showRevealModal && (
+      {(reveal || results) && showRevealModal && (
         <div className="liar-modal-backdrop">
           <div className="liar-modal">
-            <h2>{reveal.winnerTeam === "villagers" ? "시민 승리!" : "라이어 승리!"}</h2>
-            {getRevealReason(reveal.reason) && (
-              <p>{getRevealReason(reveal.reason)}</p>
+            {reveal ? (
+              <>
+                <h2>{reveal.winnerTeam === "villagers" ? "시민 승리!" : "라이어 승리!"}</h2>
+                {getRevealReason(reveal.reason) && (
+                  <p>{getRevealReason(reveal.reason)}</p>
+                )}
+                <p>제시어: {reveal.word}</p>
+                <p>카테고리: {reveal.category || "알 수 없음"}</p>
+                <p>라이어: {reveal.liarIds.map(getPlayerName).join(", ") || "없음"}</p>
+              </>
+            ) : (
+              <>
+                <h2>게임 종료</h2>
+                <p>게임이 종료되었습니다.</p>
+              </>
             )}
-            <p>제시어: {reveal.word}</p>
-            <p>카테고리: {reveal.category || "알 수 없음"}</p>
-            <p>라이어: {reveal.liarIds.map(getPlayerName).join(", ") || "없음"}</p>
             <div className="liar-modal-actions">
               <button onClick={onBackToLobby}>로비로 나가기</button>
-              <button onClick={handleReplay} disabled={!isHost}>
-                다시 플레이
-              </button>
+              {reveal && (
+                <button onClick={handleReplay} disabled={!isHost}>
+                  다시 플레이
+                </button>
+              )}
             </div>
-            {!isHost && <p className="liar-modal-note">방장만 다시 플레이할 수 있어요.</p>}
+            {reveal && !isHost && <p className="liar-modal-note">방장만 다시 플레이할 수 있어요.</p>}
           </div>
         </div>
       )}
