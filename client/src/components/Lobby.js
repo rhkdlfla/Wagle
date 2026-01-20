@@ -85,6 +85,19 @@ const GAMES = [
     supportsDuration: false,
     supportsRelayMode: false,
   },
+  {
+    id: "memoryGame",
+    name: "기억력 게임",
+    description: "패턴을 기억하고 순서대로 입력하세요!",
+    icon: "🧠",
+    minPlayers: 1,
+    defaultDuration: 300,
+    minDuration: 60,
+    maxDuration: 600,
+    durationPresets: [180, 300, 450, 600],
+    supportsDuration: false,
+    supportsRelayMode: false,
+  },
 ];
 
 // 게임 설정 가져오기 함수
@@ -189,6 +202,14 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
   const [appleBattleMaxSum, setAppleBattleMaxSum] = useState(
     savedSettings?.appleBattleMaxSum || 10
   );
+  // 메모리 게임 모드 설정 ("number", "korean", "emoji")
+  const [memoryMode, setMemoryMode] = useState(
+    savedSettings?.memoryMode || "number"
+  );
+  // 메모리 게임 옵션 개수 설정 (4, 6, 9)
+  const [memoryOptionCount, setMemoryOptionCount] = useState(
+    savedSettings?.memoryOptionCount || 4
+  );
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState("");
@@ -230,9 +251,11 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         quizInfiniteRetry,
         quizQuestionCount,
         appleBattleMaxSum,
+        memoryMode,
+        memoryOptionCount,
       }, currentRoom.id);
     }
-  }, [selectedGame, drawGuessRounds, selectedQuizId, gameDurations, quizQuestionTimeLimit, quizTimeBasedScoring, quizInfiniteRetry, quizQuestionCount, appleBattleMaxSum, currentRoom?.id]);
+  }, [selectedGame, drawGuessRounds, selectedQuizId, gameDurations, quizQuestionTimeLimit, quizTimeBasedScoring, quizInfiniteRetry, quizQuestionCount, appleBattleMaxSum, memoryMode, memoryOptionCount, currentRoom?.id]);
 
   useEffect(() => {
     // 방 업데이트 수신
@@ -438,7 +461,10 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         quizQuestionTimeLimit,
         quizTimeBasedScoring,
         quizInfiniteRetry,
+        quizQuestionCount,
         appleBattleMaxSum,
+        memoryMode,
+        memoryOptionCount,
       }, currentRoom.id);
       
       const gameConfig = getGameConfig(selectedGame);
@@ -465,6 +491,8 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
         infiniteRetry: selectedGame === "quizBattle" ? quizInfiniteRetry : undefined,
         questionCount: selectedGame === "quizBattle" ? quizQuestionCount : undefined,
         maxSum: selectedGame === "appleBattle" ? appleBattleMaxSum : undefined,
+        memoryMode: selectedGame === "memoryGame" ? memoryMode : undefined,
+        memoryOptionCount: selectedGame === "memoryGame" ? memoryOptionCount : undefined,
       });
     }
   };
@@ -1334,6 +1362,90 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       </div>
     ) : null;
 
+  const memoryGameSettingsPanel =
+    selectedGame === "memoryGame" ? (
+      <div className="game-duration-section">
+        <h3>🧠 기억력 게임 설정</h3>
+        <div className="duration-controls">
+          <div style={{ marginBottom: "20px" }}>
+            <label style={{ display: "block", marginBottom: "10px", fontWeight: "bold" }}>
+              모드 선택
+            </label>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <button
+                onClick={() => setMemoryMode("number")}
+                className={memoryMode === "number" ? "active" : ""}
+                disabled={!isHost}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  border: "2px solid",
+                  borderColor: memoryMode === "number" ? "#667eea" : "#ddd",
+                  background: memoryMode === "number" ? "#667eea" : "white",
+                  color: memoryMode === "number" ? "white" : "#333",
+                  cursor: isHost ? "pointer" : "not-allowed",
+                }}
+              >
+                🔢 숫자
+              </button>
+              <button
+                onClick={() => setMemoryMode("korean")}
+                className={memoryMode === "korean" ? "active" : ""}
+                disabled={!isHost}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  border: "2px solid",
+                  borderColor: memoryMode === "korean" ? "#667eea" : "#ddd",
+                  background: memoryMode === "korean" ? "#667eea" : "white",
+                  color: memoryMode === "korean" ? "white" : "#333",
+                  cursor: isHost ? "pointer" : "not-allowed",
+                }}
+              >
+                한글
+              </button>
+              <button
+                onClick={() => setMemoryMode("emoji")}
+                className={memoryMode === "emoji" ? "active" : ""}
+                disabled={!isHost}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  border: "2px solid",
+                  borderColor: memoryMode === "emoji" ? "#667eea" : "#ddd",
+                  background: memoryMode === "emoji" ? "#667eea" : "white",
+                  color: memoryMode === "emoji" ? "white" : "#333",
+                  cursor: isHost ? "pointer" : "not-allowed",
+                }}
+              >
+                😀 이모지
+              </button>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="memory-option-count" style={{ display: "block", marginBottom: "10px", fontWeight: "bold" }}>
+              옵션 개수: <strong>{memoryOptionCount}개</strong>
+            </label>
+            <div className="duration-presets">
+              {[4, 6, 9].map((count) => (
+                <button
+                  key={count}
+                  onClick={() => setMemoryOptionCount(count)}
+                  className={memoryOptionCount === count ? "active" : ""}
+                  disabled={!isHost}
+                >
+                  {count}개
+                </button>
+              ))}
+            </div>
+            <p style={{ marginTop: "10px", fontSize: "0.9em", color: "#666" }}>
+              선택할 수 있는 옵션의 개수입니다
+            </p>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
   const genericDurationPanel = showGenericDuration
     ? (() => {
         const currentDuration =
@@ -1460,6 +1572,7 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
           {drawGuessRoundsPanel}
           {quizBattleSettingsPanel}
           {appleBattleSettingsPanel}
+          {memoryGameSettingsPanel}
           {genericDurationPanel}
           {relayModePanel}
         </div>

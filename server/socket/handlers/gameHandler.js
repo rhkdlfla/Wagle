@@ -4,6 +4,7 @@ const DrawGuess = require("../games/DrawGuess");
 const QuizBattle = require("../games/QuizBattle");
 const NumberRush = require("../games/NumberRush");
 const LiarGame = require("../games/LiarGame");
+const MemoryGame = require("../games/MemoryGame");
 const User = require("../../models/User");
 
 // 게임 인스턴스 저장 (updateInterval 관리를 위해)
@@ -17,6 +18,7 @@ const GAME_CLASSES = {
   quizBattle: QuizBattle,
   numberRush: NumberRush,
   liarGame: LiarGame,
+  memoryGame: MemoryGame,
 };
 
 // 게임 설정 (각 게임의 기본 설정을 중앙에서 관리)
@@ -280,7 +282,9 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     timeBasedScoring, 
     infiniteRetry, 
     questionCount, 
-    maxSum 
+    maxSum,
+    memoryMode,
+    memoryOptionCount
   }) => {
     const room = rooms.get(roomId);
     if (!room || room.players.length === 0) return;
@@ -323,6 +327,8 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       infiniteRetry: infiniteRetry === true, // 퀴즈 배틀 무한 도전 모드
       questionCount: questionCount !== undefined ? (questionCount === null ? null : Math.max(1, parseInt(questionCount))) : null, // 퀴즈 배틀 풀 문제 수 (null이면 전체 문제)
       maxSum: maxSum !== undefined ? Math.max(2, Math.min(10, parseInt(maxSum))) : 10, // 사과배틀 최대 숫자 (2~10, 기본값 10)
+      memoryMode: memoryMode || "number", // 메모리 게임 모드 ("number", "korean", "emoji")
+      memoryOptionCount: memoryOptionCount !== undefined ? Math.max(4, Math.min(9, parseInt(memoryOptionCount))) : 4, // 메모리 게임 옵션 개수 (4, 6, 9)
     };
     
     console.log("게임 시작 - maxSum 설정:", gameState.maxSum, "받은 값:", maxSum, "게임 타입:", gameType);
@@ -382,6 +388,16 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     if (!gameState || !room) return;
     // idempotent 보장: 여러 경로에서 endGame이 호출돼도 한 번만 처리
     if (!gameState.isActive) return;
+    
+    // 플레이어가 없는 방이면 즉시 방 삭제
+    if (!room.players || room.players.length === 0) {
+      console.log(`게임 종료: ${roomId} - 플레이어가 없어 방 삭제`);
+      gameStates.delete(roomId);
+      cleanupInstance(roomId);
+      rooms.delete(roomId);
+      io.emit("roomList", getRoomList(rooms));
+      return;
+    }
     
     gameState.isActive = false;
     
