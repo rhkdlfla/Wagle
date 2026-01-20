@@ -931,10 +931,11 @@
 }
 
 .duration-presets {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
+  max-width: 400px;
+  margin: 0 auto;
 }
 
 .duration-presets button {

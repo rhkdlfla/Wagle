@@ -78,37 +78,48 @@
   box-shadow: 0 4px 12px rgba(158, 158, 158, 0.4);
 }
 
-.tic-tac-toe-status {
-  margin: 10px 0 20px;
+.tic-tac-toe-game-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 100px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+  max-width: 1400px;
+  width: 100%;
+}
+
+.tic-tac-toe-player-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 200px;
+}
+
+.tic-tac-toe-status-footer {
+  margin: 20px 0;
   text-align: center;
   background: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(10px);
   border-radius: 15px;
-  padding: 20px 30px;
+  padding: 15px 30px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   max-width: 900px;
   width: 100%;
 }
 
-.tic-tac-toe-status .status-text {
+.tic-tac-toe-status-footer .status-text {
   font-size: 1.4rem;
   font-weight: 700;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   color: #ffc107;
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-.player-row {
-  display: flex;
-  justify-content: center;
-  gap: 14px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
 .player-card {
   min-width: 180px;
-  padding: 14px 18px;
+  width: 100%;
+  padding: 20px 24px;
   border-radius: 12px;
   border: 2px solid rgba(255, 255, 255, 0.25);
   background: rgba(255, 255, 255, 0.18);
@@ -117,6 +128,7 @@
   align-items: center;
   position: relative;
   transition: all 0.3s;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .player-card.active {
@@ -130,17 +142,53 @@
 }
 
 .player-symbol {
-  font-size: 28px;
+  font-size: 48px;
   font-weight: 700;
-  margin-bottom: 6px;
+  margin-bottom: 12px;
+  font-family: "Fredoka", "Arial Rounded MT Bold", "Segoe UI", sans-serif;
 }
 
 .player-name {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
+  margin-bottom: 8px;
 }
 
-.my-symbol,
+.turn-indicator {
+  margin-top: 12px;
+  padding: 6px 16px;
+  background: rgba(76, 175, 80, 0.3);
+  border: 2px solid #4caf50;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #4caf50;
+  animation: pulse-turn 2s infinite;
+}
+
+@keyframes pulse-turn {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 4px rgba(76, 175, 80, 0);
+  }
+}
+
+.me-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #ffc107;
+  color: #000;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .spectator-hint {
   font-size: 0.95rem;
   opacity: 0.85;
@@ -148,25 +196,25 @@
 
 .tic-tac-toe-board {
   display: grid;
-  grid-template-columns: repeat(3, 110px);
-  gap: 12px;
+  grid-template-columns: repeat(3, 140px);
+  gap: 20px;
   justify-content: center;
-  margin: 10px auto 30px;
-  padding: 20px;
+  padding: 30px;
   background: rgba(255, 255, 255, 0.12);
   border-radius: 20px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
 }
 
 @import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700;800&display=swap");
 
 .tic-tac-toe-cell {
-  width: 110px;
-  height: 110px;
+  width: 140px;
+  height: 140px;
   border-radius: 14px;
   border: 2px solid rgba(255, 255, 255, 0.35);
   background: rgba(255, 255, 255, 0.9);
-  font-size: 42px;
+  font-size: 52px;
   font-weight: 800;
   font-family: "Fredoka", "Arial Rounded MT Bold", "Segoe UI", sans-serif;
   cursor: pointer;
@@ -189,7 +237,7 @@
   display: inline-block;
   font-family: "Fredoka", "Arial Rounded MT Bold", "Segoe UI", sans-serif;
   font-weight: 800;
-  font-size: 64px;
+  font-size: 80px;
   line-height: 1;
 }
 
@@ -257,23 +305,49 @@
   box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
 }
 
+@media (max-width: 900px) {
+  .tic-tac-toe-game-area {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .tic-tac-toe-player-side {
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .player-card {
+    width: 100%;
+  }
+}
+
 @media (max-width: 600px) {
   .game-header h1 {
     font-size: 2rem;
   }
 
   .tic-tac-toe-board {
-    grid-template-columns: repeat(3, 90px);
-    padding: 15px;
+    grid-template-columns: repeat(3, 100px);
+    gap: 15px;
+    padding: 20px;
   }
 
   .tic-tac-toe-cell {
-    width: 90px;
-    height: 90px;
-    font-size: 36px;
+    width: 100px;
+    height: 100px;
+    font-size: 40px;
+  }
+
+  .tic-tac-toe-mark {
+    font-size: 60px;
   }
 
   .player-card {
     min-width: 140px;
+    padding: 16px 20px;
+  }
+
+  .player-symbol {
+    font-size: 36px;
   }
 }
