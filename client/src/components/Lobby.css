@@ -1,6 +1,7 @@
 .lobby-container {
-  /* App(.App)의 padding-top(70px) 아래 영역을 정확히 채움 */
-  height: 100%;
+  /* 상단 고정 헤더(70px) 제외한 화면 높이를 정확히 채움 */
+  height: calc(100vh - var(--app-header-height, 70px));
+  height: calc(100dvh - var(--app-header-height, 70px));
   overflow: hidden;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;

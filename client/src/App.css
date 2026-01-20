@@ -1,8 +1,11 @@
+:root {
+  --app-header-height: 70px;
+}
+
 .App {
-  height: 100vh;
-  height: 100dvh;
-  box-sizing: border-box; /* padding-top이 height 안에 포함되게 */
-  overflow: hidden;       /* 페이지(바깥) 스크롤 방지 */
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding-top: var(--app-header-height);
 }
 
 .connection-status {
@@ -60,9 +63,11 @@
   top: 0;
   left: 0;
   right: 0;
+  height: var(--app-header-height);
+  box-sizing: border-box;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  padding: 15px 30px;
+  padding: 0 30px; /* 높이 고정과 충돌 방지 */
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -129,6 +134,3 @@
   box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
 }
 
-.App {
-  padding-top: 70px;
-}

@@ -8,13 +8,13 @@
   align-items: center;
 }
 
-.game-header {
+.number-rush-container .game-header {
   width: 100%;
   max-width: 1200px;
   margin-bottom: 30px;
 }
 
-.game-header-content {
+.number-rush-container .game-header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -22,25 +22,25 @@
   gap: 20px;
 }
 
-.game-header-content > div:first-child {
+.number-rush-container .game-header-content > div:first-child {
   flex: 1;
   text-align: center;
 }
 
-.game-header-actions {
+.number-rush-container .game-header-actions {
   display: flex;
   gap: 10px;
   align-items: center;
 }
 
-.game-header h1 {
+.number-rush-container .game-header h1 {
   font-size: 3rem;
   margin-bottom: 10px;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-  animation: pulse 2s infinite;
+  animation: numberRushPulse 2s infinite;
 }
 
-@keyframes pulse {
+@keyframes numberRushPulse {
   0%, 100% {
     transform: scale(1);
   }
@@ -49,13 +49,13 @@
   }
 }
 
-.game-header p {
+.number-rush-container .game-header p {
   font-size: 1.2rem;
   opacity: 0.9;
 }
 
-.end-game-button,
-.leave-game-button {
+.number-rush-container .end-game-button,
+.number-rush-container .leave-game-button {
   padding: 10px 20px;
   background: rgba(255, 255, 255, 0.2);
   border: 2px solid white;
@@ -66,23 +66,23 @@
   transition: all 0.3s;
 }
 
-.end-game-button:hover,
-.leave-game-button:hover {
+.number-rush-container .end-game-button:hover,
+.number-rush-container .leave-game-button:hover {
   background: rgba(255, 255, 255, 0.3);
   transform: translateY(-2px);
 }
 
-.waiting-screen {
+.number-rush-container .waiting-screen {
   text-align: center;
   padding: 100px 20px;
 }
 
-.waiting-screen h2 {
+.number-rush-container .waiting-screen h2 {
   font-size: 2.5rem;
   margin-bottom: 20px;
 }
 
-.game-screen {
+.number-rush-container .game-screen {
   width: 100%;
   max-width: 1200px;
   display: flex;
