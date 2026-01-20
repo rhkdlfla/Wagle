@@ -1,9 +1,12 @@
 import React, { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import GameScoreboard from "./GameScoreboard";
 import GameResults from "./GameResults";
+import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./QuizBattle.css";
 
 function QuizBattle({ socket, room, onBackToLobby }) {
+  const navigate = useNavigate();
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [essayAnswer, setEssayAnswer] = useState(""); // 주관식 답변
@@ -237,17 +240,12 @@ function QuizBattle({ socket, room, onBackToLobby }) {
     return remainingSeconds > 0 ? `${minutes}분 ${remainingSeconds}초` : `${minutes}분`;
   };
 
-  const handleLeaveGame = () => {
-    if (window.confirm("정말로 게임을 나가시겠습니까? 게임은 계속 진행됩니다.")) {
-      onBackToLobby();
-    }
-  };
+  const handleLeaveGame = () => leaveGame(socket, room, navigate);
 
-  const handleEndGame = () => {
-    if (window.confirm("정말로 게임을 종료하시겠습니까? 모든 플레이어의 게임이 종료됩니다.")) {
-      socket.emit("endGame", { roomId: room.id });
-    }
-  };
+  const handleEndGame = () => endGame(socket, room, { 
+    isHost, 
+    message: "정말로 게임을 종료하시겠습니까? 모든 플레이어의 게임이 종료됩니다." 
+  });
 
   const getPlayerScore = (playerId) => {
     return scores[playerId] || 0;
@@ -305,8 +303,8 @@ function QuizBattle({ socket, room, onBackToLobby }) {
             </button>
           )}
           {isActive && (
-            <button onClick={handleLeaveGame} className="leave-game-button">
-              나가기
+            <button onClick={handleLeaveGame} className="leave-game-button" title="게임 나가기">
+              🚪 나가기
             </button>
           )}
         </div>

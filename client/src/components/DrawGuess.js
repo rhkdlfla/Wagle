@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import GameScoreboard from "./GameScoreboard";
 import GameResults from "./GameResults";
+import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./DrawGuess.css";
 
 const CANVAS_WIDTH = 640;
@@ -10,6 +12,7 @@ const DEFAULT_SIZE = 4;
 const COLOR_OPTIONS = ["#222222", "#e74c3c", "#3498db", "#2ecc71", "#f1c40f"];
 
 function DrawGuess({ socket, room, onBackToLobby }) {
+  const navigate = useNavigate();
   const canvasRef = useRef(null);
   const isDrawingRef = useRef(false);
   const lastPointRef = useRef(null);
@@ -313,17 +316,13 @@ function DrawGuess({ socket, room, onBackToLobby }) {
     return `${minutes}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleLeaveGame = () => {
-    if (window.confirm("게임을 나가시겠습니까?")) {
-      onBackToLobby();
-    }
-  };
+  const handleLeaveGame = () => leaveGame(socket, room, navigate);
 
-  const handleEndGame = () => {
-    if (window.confirm("게임을 종료하시겠습니까?")) {
-      socket.emit("endGame", { roomId: room.id });
-    }
-  };
+  const isHost = room?.players?.[0]?.id === socket.id;
+  const handleEndGame = () => endGame(socket, room, { 
+    isHost, 
+    message: "게임을 종료하시겠습니까?" 
+  });
 
   if (results) {
     return (

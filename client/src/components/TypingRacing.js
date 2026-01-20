@@ -1,9 +1,12 @@
 import React, { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import GameScoreboard from "./GameScoreboard";
 import GameResults from "./GameResults";
+import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./TypingRacing.css";
 
 function TypingRacing({ socket, room, onBackToLobby }) {
+  const navigate = useNavigate();
   const [gameState, setGameState] = useState(null);
   const [isActive, setIsActive] = useState(false);
   const [results, setResults] = useState(null);
@@ -356,16 +359,9 @@ function TypingRacing({ socket, room, onBackToLobby }) {
     });
   };
 
-  const handleEndGame = () => {
-    if (isHost) {
-      socket.emit("endGame", { roomId: room.id });
-    }
-  };
+  const handleEndGame = () => endGame(socket, room, { isHost, skipConfirm: true });
 
-  const handleLeaveGame = () => {
-    socket.emit("leaveRoom", { roomId: room.id });
-    onBackToLobby();
-  };
+  const handleLeaveGame = () => leaveGame(socket, room, navigate);
 
   if (results) {
     return (

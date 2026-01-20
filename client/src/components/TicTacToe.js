@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import GameResults from "./GameResults";
+import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./TicTacToe.css";
 
 const EMPTY_BOARD = Array(9).fill(null);
 
 function TicTacToe({ socket, room, onBackToLobby }) {
+  const navigate = useNavigate();
   const [board, setBoard] = useState(EMPTY_BOARD);
   const [players, setPlayers] = useState([]);
   const [currentTurn, setCurrentTurn] = useState(null);
@@ -105,17 +108,9 @@ function TicTacToe({ socket, room, onBackToLobby }) {
 
   const isHost = room?.players?.[0]?.id === socket.id;
 
-  const handleLeaveGame = () => {
-    if (window.confirm("게임을 나가시겠습니까?")) {
-      onBackToLobby();
-    }
-  };
+  const handleLeaveGame = () => leaveGame(socket, room, navigate);
 
-  const handleEndGame = () => {
-    if (window.confirm("게임을 종료하시겠습니까? 모든 플레이어가 로비로 돌아갑니다.")) {
-      socket.emit("endGame", { roomId: room.id });
-    }
-  };
+  const handleEndGame = () => endGame(socket, room, { isHost });
 
   const handleReplayGame = () => {
     if (!room?.id) return;

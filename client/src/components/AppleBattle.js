@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import GameScoreboard from "./GameScoreboard";
 import GameResults from "./GameResults";
+import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./AppleBattle.css";
 
 const GRID_ROWS = 10;
@@ -16,6 +18,7 @@ const PLAYER_COLORS = [
 ];
 
 function AppleBattle({ socket, room, onBackToLobby }) {
+  const navigate = useNavigate();
   const [grid, setGrid] = useState([]);
   const [scores, setScores] = useState({});
   const [teamScores, setTeamScores] = useState(null);
@@ -337,17 +340,9 @@ function AppleBattle({ socket, room, onBackToLobby }) {
   const selectedArea = getSelectedArea();
   const isHost = room?.players?.[0]?.id === socket.id;
 
-  const handleLeaveGame = () => {
-    if (window.confirm("게임을 나가시겠습니까?")) {
-      onBackToLobby();
-    }
-  };
+  const handleLeaveGame = () => leaveGame(socket, room, navigate);
 
-  const handleEndGame = () => {
-    if (window.confirm("게임을 종료하시겠습니까? 모든 플레이어가 로비로 돌아갑니다.")) {
-      socket.emit("endGame", { roomId: room.id });
-    }
-  };
+  const handleEndGame = () => endGame(socket, room, { isHost });
 
   if (results) {
     return (

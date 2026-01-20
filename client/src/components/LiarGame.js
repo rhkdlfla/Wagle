@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./LiarGame.css";
 
 function LiarGame({ socket, room, onBackToLobby }) {
+  const navigate = useNavigate();
   const [phase, setPhase] = useState("discussion");
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [turnIndex, setTurnIndex] = useState(0);
@@ -193,17 +196,9 @@ function LiarGame({ socket, room, onBackToLobby }) {
     setGuessSubmitted(true);
   };
 
-  const handleLeaveGame = () => {
-    if (window.confirm("게임을 나가시겠습니까?")) {
-      onBackToLobby();
-    }
-  };
+  const handleLeaveGame = () => leaveGame(socket, room, navigate);
 
-  const handleEndGame = () => {
-    if (window.confirm("게임을 종료하시겠습니까? 모든 플레이어가 로비로 돌아갑니다.")) {
-      socket.emit("endGame", { roomId: room.id });
-    }
-  };
+  const handleEndGame = () => endGame(socket, room, { isHost });
 
   const handleReplay = () => {
     if (!isHost) return;

@@ -1,15 +1,23 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import GameScoreboard from "./GameScoreboard";
 import GameResults from "./GameResults";
+import { handleLeaveGame as leaveGame, handleEndGame as endGame } from "../utils/gameUtils";
 import "./MemoryGame.css";
 
 function MemoryGame({ socket, room, onBackToLobby }) {
+  const navigate = useNavigate();
   const [gameState, setGameState] = useState(null);
   const [isActive, setIsActive] = useState(false);
   const [results, setResults] = useState(null);
   const [myInput, setMyInput] = useState([]);
 
   useEffect(() => {
+    // 게임 상태 요청 (이미 진행 중인 게임이 있을 수 있음)
+    if (room?.id) {
+      socket.emit("getGameState", { roomId: room.id });
+    }
+
     // 게임 시작 수신
     const handleGameStarted = ({ gameState: gs, room: gameRoom }) => {
       if (!gs || gs.gameType !== "memoryGame") return;
@@ -26,6 +34,10 @@ function MemoryGame({ socket, room, onBackToLobby }) {
     // 게임 업데이트 수신
     socket.on("memoryGameUpdate", (data) => {
       setGameState(data);
+      // 게임 상태가 있으면 게임이 활성화된 것으로 간주
+      if (data && (data.phase === 'showing' || data.phase === 'inputting' || data.phase === 'result' || data.phase === 'waiting')) {
+        setIsActive(true);
+      }
       if (data.playerInputs && data.playerInputs[socket.id]) {
         setMyInput(data.playerInputs[socket.id]);
       } else {
@@ -126,17 +138,9 @@ function MemoryGame({ socket, room, onBackToLobby }) {
   const myFailed = gameState.playerScores?.find(p => p.id === socket.id)?.failed || false;
   const isHost = room?.players?.[0]?.id === socket.id;
 
-  const handleLeaveGame = () => {
-    if (window.confirm("게임을 나가시겠습니까?")) {
-      onBackToLobby();
-    }
-  };
+  const handleLeaveGame = () => leaveGame(socket, room, navigate);
 
-  const handleEndGame = () => {
-    if (window.confirm("게임을 종료하시겠습니까? 모든 플레이어가 로비로 돌아갑니다.")) {
-      socket.emit("endGame", { roomId: room.id });
-    }
-  };
+  const handleEndGame = () => endGame(socket, room, { isHost });
 
   // 점수 데이터 변환 (GameScoreboard 형식에 맞춤)
   const scoreData = {};
