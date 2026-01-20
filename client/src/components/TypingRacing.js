@@ -159,57 +159,102 @@ function TypingRacing({ socket, room, onBackToLobby }) {
     };
   }, [socket]);
 
-  // 키보드 입력 직접 감지
+  // 한글 입력을 위한 숨겨진 input 필드
+  const hiddenInputRef = useRef(null);
+  const [isComposing, setIsComposing] = useState(false);
+
+  // 키보드 입력 처리 (한글 지원)
   useEffect(() => {
     if (!isActive || !gameState || results) return;
 
-    const handleKeyDown = (e) => {
-      // 입력 필드에 포커스가 있으면 무시 (다른 입력 방지)
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        return;
-      }
+    const hiddenInput = hiddenInputRef.current;
+    if (!hiddenInput) return;
 
-      const char = e.key;
-      
-      // 특수 키는 무시
-      if (char.length > 1 && char !== 'Backspace') {
-        return;
-      }
+    // 포커스 유지
+    hiddenInput.focus();
 
-      // 백스페이스는 무시 (타이핑 게임에서는 필요 없음)
-      if (char === 'Backspace') {
-        e.preventDefault();
-        return;
-      }
+    const handleCompositionStart = (e) => {
+      setIsComposing(true);
+    };
 
-      // 한 글자만 처리
-      if (char.length === 1) {
-        e.preventDefault();
-        
-        // 아이템 활성화 모드가 아닌 경우
-        if (!gameState.activeItems || !gameState.activeItems[socket.id]) {
-          socket.emit("gameAction", {
-            roomId: room.id,
-            action: "typing",
-            data: { char }
-          });
-        } else {
-          // 아이템 단어 타이핑 모드
-          socket.emit("gameAction", {
-            roomId: room.id,
-            action: "typing",
-            data: { char }
-          });
+    const handleCompositionEnd = (e) => {
+      setIsComposing(false);
+      const text = e.data || hiddenInput.value;
+      if (text && text.length > 0) {
+        // 마지막 글자만 사용
+        const char = text[text.length - 1];
+        handleTyping(char);
+        // 입력 초기화
+        hiddenInput.value = '';
+      }
+    };
+
+    const handleInput = (e) => {
+      // 조합 중이 아닐 때만 처리
+      if (!isComposing) {
+        const text = hiddenInput.value;
+        if (text && text.length > 0) {
+          // 마지막 글자만 사용
+          const char = text[text.length - 1];
+          handleTyping(char);
+          // 입력 초기화
+          hiddenInput.value = '';
         }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    const handleKeyDown = (e) => {
+      // 백스페이스는 무시
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        hiddenInput.value = '';
+        return;
+      }
+
+      // 특수 키는 무시
+      if (e.key.length > 1 && !['Enter', 'Space'].includes(e.key)) {
+        return;
+      }
+
+      // 영문/숫자/특수문자는 바로 처리
+      if (e.key.length === 1 && !isComposing) {
+        const char = e.key;
+        handleTyping(char);
+        hiddenInput.value = '';
+        e.preventDefault();
+      }
+    };
+
+    const handleTyping = (char) => {
+      // 아이템 활성화 모드가 아닌 경우
+      if (!gameState.activeItems || !gameState.activeItems[socket.id]) {
+        socket.emit("gameAction", {
+          roomId: room.id,
+          action: "typing",
+          data: { char }
+        });
+      } else {
+        // 아이템 단어 타이핑 모드
+        socket.emit("gameAction", {
+          roomId: room.id,
+          action: "typing",
+          data: { char }
+        });
+      }
+    };
+
+    hiddenInput.addEventListener('compositionstart', handleCompositionStart);
+    hiddenInput.addEventListener('compositionend', handleCompositionEnd);
+    hiddenInput.addEventListener('input', handleInput);
+    hiddenInput.addEventListener('keydown', handleKeyDown);
     
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      hiddenInput.removeEventListener('compositionstart', handleCompositionStart);
+      hiddenInput.removeEventListener('compositionend', handleCompositionEnd);
+      hiddenInput.removeEventListener('input', handleInput);
+      hiddenInput.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isActive, gameState, results, socket, room]);
+  }, [isActive, gameState, results, socket, room, isComposing]);
 
   // 아이템 활성화
   const activateItem = (itemType) => {
@@ -331,6 +376,16 @@ function TypingRacing({ socket, room, onBackToLobby }) {
           <div className="typing-hint">
             키보드를 눌러서 타이핑하세요
           </div>
+          
+          {/* 한글 입력을 위한 숨겨진 input */}
+          <input
+            ref={hiddenInputRef}
+            type="text"
+            className="hidden-input"
+            autoFocus
+            autoComplete="off"
+            spellCheck="false"
+          />
 
           {/* 진행도 표시 */}
           <div className="progress-info">

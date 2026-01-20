@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 class TypingRacing {
   constructor(io, gameState, room) {
     this.io = io;
@@ -5,20 +8,31 @@ class TypingRacing {
     this.room = room;
   }
 
+  // 텍스트 파일에서 문제 텍스트 로드
+  loadTypingTexts() {
+    try {
+      const filePath = path.join(__dirname, '../../data/typing-texts.txt');
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      // 빈 줄 제거하고 텍스트 배열로 변환
+      const texts = fileContent
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+      return texts;
+    } catch (error) {
+      console.error('[TypingRacing] 텍스트 파일 로드 실패:', error);
+      // 기본 텍스트 반환
+      return [
+        "인생은 속도가 아니라 방향이다",
+        "간절히 원하면 온 우주가 도와준다",
+        "끝날 때까지 끝난 게 아니다"
+      ];
+    }
+  }
+
   initialize() {
-    // 타자연습 텍스트 (한글)
-    const typingTexts = [
-      "인생은 속도가 아니라 방향이다",
-      "간절히 원하면 온 우주가 도와준다",
-      "끝날 때까지 끝난 게 아니다",
-      "꿈을 계속 간직하고 있으면 반드시 실현할 때가 온다",
-      "성공은 준비된 자에게 주어지는 기회다",
-      "오늘 할 수 있는 일을 내일로 미루지 마라",
-      "실패는 성공의 어머니다",
-      "노력은 배신하지 않는다",
-      "작은 기회로부터 종종 위대한 업적이 시작된다",
-      "자신감은 성공의 첫 번째 비밀이다"
-    ];
+    // 타자연습 텍스트 파일에서 로드
+    const typingTexts = this.loadTypingTexts();
 
     // 게임 상태 초기화
     this.gameState.text = typingTexts[Math.floor(Math.random() * typingTexts.length)];

@@ -154,6 +154,17 @@
   border: 2px dashed rgba(255, 255, 255, 0.3);
 }
 
+.hidden-input {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  border: none;
+  outline: none;
+}
+
 /* 진행도 */
 .progress-info {
   display: flex;
