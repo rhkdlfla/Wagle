@@ -1037,6 +1037,70 @@
   border-left: 3px solid #4caf50;
 }
 
+/* 타이핑 레이싱 아이템 정보 */
+.items-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.item-info-card {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s;
+}
+
+.item-info-card:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.item-icon {
+  font-size: 2rem;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.item-name {
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.item-description {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  text-align: center;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.items-tip {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(76, 175, 80, 0.2);
+  border-radius: 8px;
+  border-left: 4px solid #4caf50;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.items-tip strong {
+  color: #4caf50;
+}
+
+@media (max-width: 768px) {
+  .items-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .lobby-actions {
   padding: 25px 0 0 0;
   text-align: center;

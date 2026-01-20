@@ -6,6 +6,7 @@ const NumberRush = require("../games/NumberRush");
 const LiarGame = require("../games/LiarGame");
 const TicTacToe = require("../games/TicTacToe");
 const MemoryGame = require("../games/MemoryGame");
+const TypingRacing = require("../games/TypingRacing");
 const User = require("../../models/User");
 
 // 게임 인스턴스 저장 (updateInterval 관리를 위해)
@@ -21,6 +22,7 @@ const GAME_CLASSES = {
   liarGame: LiarGame,
   ticTacToe: TicTacToe,
   memoryGame: MemoryGame,
+  typingRacing: TypingRacing,
 };
 
 // 게임 설정 (각 게임의 기본 설정을 중앙에서 관리)
@@ -60,6 +62,11 @@ const GAME_CONFIGS = {
     minDuration: 60000,
     maxDuration: 1800000,
     supportsRelayMode: false,
+  },
+  typingRacing: {
+    defaultDuration: 120000, // 2분
+    minDuration: 30000,
+    maxDuration: 300000,
   },
   ticTacToe: {
     defaultDuration: 300000, // 5분 (전역 타이머 사용 안 함)
