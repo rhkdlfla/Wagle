@@ -449,6 +449,10 @@ class LiarGame {
     return this.getGameStateData(socketId);
   }
 
+  getRevealData() {
+    return this.gameState.reveal || null;
+  }
+
   emitPrivateState(socket) {
     const isLiar = this.gameState.liarIds?.includes(socket.id);
     socket.emit("liarGameRole", {

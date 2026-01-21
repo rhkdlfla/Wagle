@@ -137,12 +137,13 @@ function LiarGame({ socket, room, onBackToLobby }) {
       setActiveCategory((prev) => data?.category || prev);
       setShowRevealModal(true);
     });
-    socket.on("gameEnded", ({ results: gameResults, reason }) => {
+    socket.on("gameEnded", ({ results: gameResults, reason, reveal: revealData }) => {
       setResults(gameResults || []);
-      // gameEnded를 받았을 때 reveal이 없으면 기본 reveal 객체 생성
-      if (!reveal) {
+      if (revealData) {
+        setReveal(revealData);
+      } else if (!reveal) {
         setReveal({
-          winnerTeam: "villagers", // 기본값 (실제로는 서버에서 받아야 함)
+          winnerTeam: "villagers",
           reason: reason || "gameEnded",
           word: activeCategory || "알 수 없음",
           category: activeCategory || null,

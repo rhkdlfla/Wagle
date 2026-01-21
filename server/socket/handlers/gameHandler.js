@@ -422,18 +422,22 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
     gameState.isActive = false;
     
     const instance = gameInstances.get(roomId);
-    let results, winners, teamScores;
+    let results, winners, teamScores, reveal;
     
     if (instance && instance.game) {
       const gameResult = instance.game.calculateResults();
       results = gameResult.results;
       winners = gameResult.winners;
       teamScores = gameResult.teamScores || null; // 퀴즈 배틀 등에서 teamScores 포함
+      if (typeof instance.game.getRevealData === "function") {
+        reveal = instance.game.getRevealData();
+      }
     } else {
       // 폴백 (게임 인스턴스가 없는 경우)
       results = [];
       winners = [];
       teamScores = null;
+      reveal = null;
     }
     
     // 게임 종료 이벤트 전송
@@ -441,6 +445,7 @@ function setupGameHandlers(socket, io, rooms, gameStates, getRoomList) {
       results: results,
       winners: winners,
       teamScores: teamScores, // 팀 점수 포함
+      reveal: reveal || null,
       reason: reason || null,
     });
 
