@@ -400,8 +400,12 @@ function Lobby({ socket, room, onLeaveRoom, onStartGame, user }) {
       const data = await response.json();
       if (data.quizzes) {
         setAvailableQuizzes(data.quizzes);
-        if (data.quizzes.length > 0 && !selectedQuizId) {
-          setSelectedQuizId(data.quizzes[0]._id);
+        if (data.quizzes.length > 0) {
+          if (!selectedQuizId || !data.quizzes.some((quiz) => quiz._id === selectedQuizId)) {
+            setSelectedQuizId(data.quizzes[0]._id);
+          }
+        } else {
+          setSelectedQuizId(null);
         }
       }
     } catch (error) {
