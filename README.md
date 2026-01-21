@@ -102,21 +102,21 @@
 
 ## 🧠 시스템 구조 개요
 
-Client (React)
-├─ UI 렌더링
-├─ 게임 입력 처리
-└─ Socket.IO 이벤트 송신
-↓
-Server (Node.js)
-├─ 게임 상태 관리
-├─ 룸 / 유저 / 팀 로직
-├─ 점수 계산
-└─ Socket.IO 브로드캐스트
-↓
-Database (MongoDB)
-├─ 사용자 정보
-├─ 게임 기록
-└─ 통계 데이터
+- Client (React)
+- ├─ UI 렌더링
+- ├─ 게임 입력 처리
+- └─ Socket.IO 이벤트 송신
+- ↓
+- Server (Node.js)
+- ├─ 게임 상태 관리
+- ├─ 룸 / 유저 / 팀 로직
+- ├─ 점수 계산
+- └─ Socket.IO 브로드캐스트
+- ↓
+- Database (MongoDB)
+- ├─ 사용자 정보
+- ├─ 게임 기록
+- └─ 통계 데이터
 
 > 서버는 **Single Source of Truth**로 동작하며  
 > 모든 게임 상태를 일관되게 관리합니다.
