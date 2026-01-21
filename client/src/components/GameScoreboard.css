@@ -12,6 +12,7 @@
   box-sizing: border-box;
   overflow: hidden;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  position: relative;
 }
 
 .game-scoreboard h3 {
@@ -85,6 +86,8 @@
   transition: all 0.3s;
   border-left: 4px solid transparent;
   min-width: 0;
+  position: relative;
+  overflow: visible;
 }
 
 .scoreboard-player-item:hover {
@@ -132,9 +135,17 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  overflow: hidden;
 }
 
-.scoreboard-player-name,
+.scoreboard-player-name-inner {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
 .scoreboard-team-name {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -191,6 +202,7 @@
   padding: 25px;
   margin-bottom: 30px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  position: relative;
 }
 
 .results-container h3 {
@@ -292,6 +304,8 @@
   border-radius: 12px;
   transition: all 0.3s;
   border-left: 4px solid transparent;
+  position: relative;
+  overflow: visible;
 }
 
 .results-player-item.winner {
@@ -329,6 +343,7 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  align-items: flex-start;
 }
 
 .results-player-name {
@@ -337,6 +352,17 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+  justify-content: flex-start;
+}
+
+.results-player-name-inner {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .results-player-score {
@@ -390,6 +416,8 @@
   font-size: 0.8rem;
   color: #2196f3;
   font-weight: bold;
+  flex-shrink: 0;
+  position: static;
 }
 
 /* 반응형 디자인 */

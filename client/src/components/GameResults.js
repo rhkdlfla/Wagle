@@ -98,7 +98,7 @@ function GameResults({
                       )}
                       <div className="results-player-info">
                         <div className="results-player-name">
-                          {player.name}
+                          <span className="results-player-name-inner">{player.name}</span>
                           {player.isWinner && (
                             <span className="winner-badge">승자!</span>
                           )}
@@ -160,7 +160,7 @@ function GameResults({
               )}
               <div className="results-player-info">
                 <div className="results-player-name">
-                  {result.name}
+                  <span className="results-player-name-inner">{result.name}</span>
                   {result.isWinner && <span className="winner-badge">승자!</span>}
                   {result.id === myPlayerId && <span className="me-badge">나</span>}
                 </div>

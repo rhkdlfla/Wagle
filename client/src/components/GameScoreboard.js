@@ -105,7 +105,7 @@ function GameScoreboard({
               )}
               <div className="scoreboard-player-info">
                 <div className="scoreboard-player-name">
-                  {player.name}
+                  <span className="scoreboard-player-name-inner">{player.name}</span>
                   {player.id === myPlayerId && <span className="me-badge">나</span>}
                 </div>
                 <div className="scoreboard-player-score-bar-container">

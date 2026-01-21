@@ -341,6 +341,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .players-section h2 {
@@ -364,6 +365,8 @@
   padding: 15px;
   border-radius: 10px;
   transition: all 0.3s;
+  position: relative;
+  overflow: visible;
 }
 
 .player-item.me {
@@ -440,6 +443,7 @@
   border-radius: 10px;
   font-size: 0.75rem;
   color: #4caf50;
+  position: static;
 }
 
 .name-input-section {
